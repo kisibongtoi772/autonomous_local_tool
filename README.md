@@ -32,31 +32,34 @@ desktop-automator
 # or use the shorthand: dauto
 ```
 
-The GUI allows you to click buttons to Record, Stop, and Playback on the **Dashboard** tab. It features a **Live Log Console** that displays exactly what the automation is doing (e.g., clicking coordinates, finding templates) in real-time. 
+The GUI provides a complete control center for your automation tasks:
+- **Dashboard Tab**: Allows you to Record, Stop, and Playback workflows. It features a Live Log Console that displays the execution details (e.g., clicking coordinates, finding templates) in real-time. You can also manage multiple workflows using the dropdown menu and the "New" button.
+- **Workflow Editor Tab**: A visual editor to view and modify all recorded steps without editing raw JSON files. Available operations include:
+  - **Reorder**: Move actions up or down.
+  - **Edit**: Modify action properties (e.g., coordinates, durations, command strings).
+  - **Duplicate**: Clone an existing action.
+  - **Test**: Perform a partial playback of a single action.
+  - **Delete / Clear**: Remove specific actions or clear the entire workflow.
+  - **Manual Insertion**: Add complex actions (like sleep delays or terminal commands) directly from the GUI.
 
-You can **manage multiple workflows** using the dropdown menu and the **New** button in the Dashboard.
-
-You can also switch to the **Workflow** tab to view a visual summary of all recorded steps without needing to open the raw JSON file. You can **delete individual steps** by clicking the "❌" button next to them, **edit action properties** using the "✏️" button, **duplicate an action** using the "📑" button, **test a single action** using the "▶️" button, **reorder actions** using the "⬆️" and "⬇️" arrows, or **clear the entire workflow** using the "🗑️ Clear All" button. You can also manually inject complex actions (like sleep delays or terminal commands) by clicking the **"➕ Add Action"** button.
-
-Alternatively, you can use the physical hotkeys:
-
-### Hotkeys:
-- **`F9` (Record)**: Start recording actions (clicks and keystrokes).
-- **`F10` (Stop)**: Stop recording. This will generate a `workflow.json` file and a `templates/` directory containing image snippets of your clicks inside the `workspace/` folder.
-- **`F11` (Playback)**: Playback the last recorded workflow.
+### Hotkeys
+Alternatively, you can control the core functions using physical hotkeys:
+- **`F9` (Record)**: Start capturing global mouse clicks and keystrokes.
+- **`F10` (Stop)**: Stop recording. The workflow is automatically saved to your `workspace/` directory along with any generated image templates.
+- **`F11` (Playback)**: Playback the currently selected workflow.
 
 > **Note for macOS Users:**
 > You must grant **Accessibility** and **Screen Recording** permissions to your Terminal application (e.g., iTerm2 or Terminal) in `System Settings > Privacy & Security` for the automation tool to intercept global inputs and capture screen templates.
 
 ## Advanced Features
-- **Hierarchical Looping:** You can manually edit `workspace/workflow.json` to repeat blocks of actions. Use `{"type": "loop", "count": 5, "actions": [...]}` to repeat specific sequences.
-- **Run Subprocesses/Apps:** You can start applications or run shell scripts before executing clicks using `{"type": "run_command", "command": "open -a Calculator", "wait": false}`.
-- **Global Hotkeys:** Trigger multi-key shortcuts seamlessly (e.g. `{"type": "hotkey", "keys": ["cmd", "space"]}`).
-- **Explicit Sleep:** Insert hardcoded delays directly into your workflow (e.g. `{"type": "sleep", "duration": 3.5}`).
-- **Scroll Simulation:** Simulate mouse scroll wheels (e.g. `{"type": "scroll", "amount": -10}`).
-- **Take Screenshots:** Capture screen states at any point in your workflow (e.g. `{"type": "screenshot", "filename": "state_1.png"}`).
-- **Robust Verification (Assert):** Fail the workflow if an expected image template does not appear on screen (e.g. `{"type": "assert_template", "template": "success_btn.png"}`).
-- **Advanced Clicks:** Support for right-click and double-click natively (e.g. `{"type": "click", "x": 100, "y": 200, "button": "right", "clicks": 2}`).
+- **Hierarchical Looping:** Repeat specific blocks of actions by editing the workflow to use the `LoopAction` structure (`{"type": "loop", "count": 5, "actions": [...]}`).
+- **Subprocess Execution:** Launch applications or shell scripts as part of your workflow via the `run_command` action type.
+- **Global Hotkeys:** Trigger multi-key shortcuts seamlessly (e.g., `{"type": "hotkey", "keys": ["cmd", "space"]}`).
+- **Explicit Delays:** Insert precise sleep intervals (e.g., `{"type": "sleep", "duration": 3.5}`).
+- **Scroll Simulation:** Control the mouse scroll wheel (e.g., `{"type": "scroll", "amount": -10}`).
+- **State Capture:** Take screenshots during workflow execution (e.g., `{"type": "screenshot", "filename": "state.png"}`).
+- **Robust Verification:** Assert the presence of UI elements. If the specified template is not found, the workflow safely halts (e.g., `{"type": "assert_template", "template": "btn.png"}`).
+- **Advanced Clicks:** Full support for custom click behaviors including right-clicks and double-clicks.
 
 ## Architecture
 - `src/automator/cli`: CLI interface and hotkeys.
