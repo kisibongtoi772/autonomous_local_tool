@@ -36,9 +36,20 @@ class Player:
             logger.error(f"Error reading workflow: {e}")
             return
             
-        logger.info(f"Starting playback of {len(workflow.actions)} actions...")
-        self._play_actions(workflow.actions)
+        logger.info(f"Starting playback of {len(self.workflow.actions)} actions...")
+        self._play_actions(self.workflow.actions)
         logger.info("Playback finished.")
+        
+    def play_single_action(self, action_dict: dict):
+        """Helper to test a single action dictionary without loading a file."""
+        try:
+            workflow = Workflow.model_validate({"workflow_name": "temp", "actions": [action_dict]})
+            logger.info("Testing single action playback...")
+            self._play_actions(workflow.actions)
+        except ValidationError as e:
+            logger.error(f"Invalid action format: {e}")
+        except Exception as e:
+            logger.error(f"Error playing single action: {e}")
         
     def _play_actions(self, actions: list['ActionType']):
         for action in actions:

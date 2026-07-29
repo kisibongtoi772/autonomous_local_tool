@@ -214,6 +214,10 @@ class AutomatorGUI(ctk.CTk):
                 ctrl_frame = ctk.CTkFrame(row_frame, fg_color="transparent")
                 ctrl_frame.pack(side="right")
 
+                # Test button
+                test_btn = ctk.CTkButton(ctrl_frame, text="▶️", width=30, fg_color="transparent", hover_color="#333333", command=lambda idx=i: self.test_action(idx))
+                test_btn.pack(side="left", padx=2)
+
                 if i > 0:
                     up_btn = ctk.CTkButton(ctrl_frame, text="⬆️", width=30, fg_color="transparent", hover_color="#333333", command=lambda idx=i: self.move_action_up(idx))
                     up_btn.pack(side="left", padx=2)
@@ -250,6 +254,28 @@ class AutomatorGUI(ctk.CTk):
                 self.load_workflow()
         except Exception as e:
             logger.error(f"Failed to delete action: {e}")
+
+    def test_action(self, index):
+        workflow_path = self.current_workflow_path
+        try:
+            with open(workflow_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            if "actions" in data and 0 <= index < len(data["actions"]):
+                action_dict = data["actions"][index]
+                logger.info(f"GUI: Testing action {index+1}...")
+                
+                def run_test():
+                    try:
+                        player = Player()
+                        player.play_single_action(action_dict)
+                    except Exception as e:
+                        logger.error(f"Test action error: {e}")
+                
+                # Run in background to avoid freezing GUI
+                threading.Thread(target=run_test, daemon=True).start()
+        except Exception as e:
+            logger.error(f"Failed to load action for test: {e}")
 
     def move_action_up(self, index):
         if index <= 0: return
