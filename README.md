@@ -35,6 +35,7 @@ desktop-automator
 The GUI provides a complete control center for your automation tasks:
 - **Dashboard Tab**: Allows you to Record, Stop, and Playback workflows. It features a Live Log Console that displays the execution details (e.g., clicking coordinates, finding templates) in real-time. You can also manage multiple workflows using the dropdown menu and the "New" button.
 - **Workflow Editor Tab**: A visual editor to view and modify all recorded steps without editing raw JSON files. Available operations include:
+  - **Thumbnail Previews**: Visually inspect the exact image template captured for click actions right inside the editor row.
   - **Reorder**: Move actions up or down.
   - **Edit**: Modify action properties (e.g., coordinates, durations, command strings).
   - **Duplicate**: Clone an existing action.

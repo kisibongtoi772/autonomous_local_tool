@@ -5,6 +5,7 @@ import json
 import os
 import glob
 from pynput import keyboard
+from PIL import Image
 from ..core.recorder import Recorder
 from ..core.player import Player
 from ..utils.logger import get_logger
@@ -206,6 +207,19 @@ class AutomatorGUI(ctk.CTk):
                 # Create a frame for each row to hold label and buttons
                 row_frame = ctk.CTkFrame(self.workflow_frame, fg_color="transparent")
                 row_frame.pack(fill="x", padx=5, pady=2)
+                
+                # Check for template image
+                template_name = action.get("template_image")
+                if action_type == "click" and template_name:
+                    img_path = os.path.join("workspace", "templates", template_name)
+                    if os.path.exists(img_path):
+                        try:
+                            pil_img = Image.open(img_path)
+                            ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(40, 40))
+                            img_lbl = ctk.CTkLabel(row_frame, image=ctk_img, text="")
+                            img_lbl.pack(side="left", padx=(0, 10))
+                        except Exception as e:
+                            logger.error(f"Failed to load thumbnail: {e}")
                 
                 lbl = ctk.CTkLabel(row_frame, text=details, anchor="w", justify="left")
                 lbl.pack(side="left", fill="x", expand=True)
