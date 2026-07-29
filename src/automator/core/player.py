@@ -15,21 +15,23 @@ logger = get_logger(__name__)
 pyautogui.FAILSAFE = True
 
 class Player:
-    def __init__(self):
-        self.workflow_file = WORKFLOW_FILE
+    def __init__(self, workflow_path=None):
+        self.workflow_path = workflow_path or WORKFLOW_FILE
+        self.workflow: Optional[Workflow] = None
         
-    def play(self):
-        if not os.path.exists(self.workflow_file):
-            logger.error(f"Workflow file {self.workflow_file} not found.")
-            return
+    def load_workflow(self) -> bool:
+        if not os.path.exists(self.workflow_path):
+            logger.error(f"Workflow file not found: {self.workflow_path}")
+            return False
             
         try:
-            with open(self.workflow_file, 'r', encoding='utf-8') as f:
+            with open(self.workflow_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
-            workflow = Workflow.model_validate(data)
+            self.workflow = Workflow.model_validate(data)
+            return True
         except ValidationError as e:
             logger.error(f"Invalid workflow format: {e}")
-            return
+            return False
         except Exception as e:
             logger.error(f"Error reading workflow: {e}")
             return

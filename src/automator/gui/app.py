@@ -3,6 +3,7 @@ import customtkinter as ctk
 import threading
 import json
 import os
+import glob
 from pynput import keyboard
 from ..core.recorder import Recorder
 from ..core.player import Player
@@ -47,6 +48,10 @@ class AutomatorGUI(ctk.CTk):
 
         self.recording = False
         self.recorder = None
+        self.current_workflow_path = os.path.join("workspace", "workflow.json")
+
+        # Ensure workspace exists
+        os.makedirs("workspace", exist_ok=True)
 
         self.setup_ui()
         self.start_hotkey_listener()
@@ -73,9 +78,20 @@ class AutomatorGUI(ctk.CTk):
         self.status_label = ctk.CTkLabel(dashboard, text="Status: Ready", font=ctk.CTkFont(size=14))
         self.status_label.pack(pady=5)
 
+        # File selection frame
+        self.file_frame = ctk.CTkFrame(dashboard, fg_color="transparent")
+        self.file_frame.pack(pady=5)
+
+        self.file_var = ctk.StringVar(value="workflow.json")
+        self.file_dropdown = ctk.CTkOptionMenu(self.file_frame, variable=self.file_var, values=self.get_workflow_files(), command=self.on_file_select)
+        self.file_dropdown.grid(row=0, column=0, padx=5)
+
+        self.new_file_btn = ctk.CTkButton(self.file_frame, text="New", width=50, command=self.create_new_workflow)
+        self.new_file_btn.grid(row=0, column=1, padx=5)
+
         # Buttons Frame
         self.btn_frame = ctk.CTkFrame(dashboard, fg_color="transparent")
-        self.btn_frame.pack(pady=10)
+        self.btn_frame.pack(pady=5)
 
         # Record Button
         self.record_btn = ctk.CTkButton(self.btn_frame, text="🔴 Record (F9)", command=self.start_recording, fg_color="#c0392b", hover_color="#e74c3c")
@@ -99,6 +115,32 @@ class AutomatorGUI(ctk.CTk):
         logger.addHandler(gui_handler)
         
         logger.info("GUI started successfully.")
+
+    def get_workflow_files(self):
+        files = glob.glob("workspace/*.json")
+        if not files:
+            return ["workflow.json"]
+        return [os.path.basename(f) for f in files]
+
+    def on_file_select(self, choice):
+        self.current_workflow_path = os.path.join("workspace", choice)
+        logger.info(f"Selected workflow: {choice}")
+        self.load_workflow()
+
+    def create_new_workflow(self):
+        dialog = ctk.CTkInputDialog(text="Enter new workflow name (without .json):", title="New Workflow")
+        name = dialog.get_input()
+        if name:
+            filename = f"{name}.json"
+            self.current_workflow_path = os.path.join("workspace", filename)
+            # Create empty workflow
+            with open(self.current_workflow_path, "w", encoding="utf-8") as f:
+                json.dump({"workflow_name": name, "created_at": "", "actions": []}, f)
+            # Update dropdown
+            self.file_dropdown.configure(values=self.get_workflow_files())
+            self.file_var.set(filename)
+            logger.info(f"Created and selected new workflow: {filename}")
+            self.load_workflow()
 
     def setup_workflow_tab(self):
         workflow_tab = self.tabview.tab("Workflow")
@@ -126,7 +168,7 @@ class AutomatorGUI(ctk.CTk):
         for widget in self.workflow_frame.winfo_children():
             widget.destroy()
             
-        workflow_path = "workspace/workflow.json"
+        workflow_path = self.current_workflow_path
         if not os.path.exists(workflow_path):
             lbl = ctk.CTkLabel(self.workflow_frame, text="No workflow found. Record one first!")
             lbl.pack(pady=20)
@@ -173,7 +215,7 @@ class AutomatorGUI(ctk.CTk):
             lbl.pack(pady=20)
 
     def delete_action(self, index):
-        workflow_path = "workspace/workflow.json"
+        workflow_path = self.current_workflow_path
         try:
             with open(workflow_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
@@ -190,7 +232,7 @@ class AutomatorGUI(ctk.CTk):
             logger.error(f"Failed to delete action: {e}")
 
     def clear_workflow(self):
-        workflow_path = "workspace/workflow.json"
+        workflow_path = self.current_workflow_path
         try:
             if os.path.exists(workflow_path):
                 with open(workflow_path, "r", encoding="utf-8") as f:
@@ -208,9 +250,9 @@ class AutomatorGUI(ctk.CTk):
 
     def start_recording(self):
         if not self.recording:
-            logger.info("GUI: Starting recording...")
+            logger.info(f"GUI: Starting recording to {self.file_var.get()}...")
             self.recording = True
-            self.recorder = Recorder()
+            self.recorder = Recorder(workflow_path=self.current_workflow_path)
             self.recorder.start()
             
             # Update UI
@@ -226,7 +268,7 @@ class AutomatorGUI(ctk.CTk):
             self.recording = False
             
             # Update UI
-            self.status_label.configure(text="Status: ⏹ Saved to workspace/workflow.json", text_color="white")
+            self.status_label.configure(text=f"Status: ⏹ Saved to {self.file_var.get()}", text_color="white")
             self.record_btn.configure(state="normal")
             self.stop_btn.configure(state="disabled")
             self.play_btn.configure(state="normal")
@@ -238,7 +280,7 @@ class AutomatorGUI(ctk.CTk):
             
             def run_playback():
                 try:
-                    player = Player()
+                    player = Player(workflow_path=self.current_workflow_path)
                     player.play()
                 except Exception as e:
                     logger.error(f"Playback error: {e}")

@@ -12,7 +12,8 @@ from ..utils.config import TEMPLATES_DIR, TEMPLATE_SIZE, WORKFLOW_FILE
 logger = get_logger(__name__)
 
 class Recorder:
-    def __init__(self):
+    def __init__(self, workflow_path=None):
+        self.workflow_path = workflow_path or WORKFLOW_FILE
         self.actions: List[ActionType] = []
         self.start_time = None
         self.last_action_time = None
@@ -116,10 +117,10 @@ class Recorder:
 
     def save(self):
         workflow = Workflow(
-            workflow_name="recorded_workflow",
+            workflow_name=os.path.basename(self.workflow_path).replace(".json", ""),
             created_at=time.strftime("%Y-%m-%dT%H:%M:%S"),
             actions=self.actions
         )
-        with open(WORKFLOW_FILE, 'w', encoding='utf-8') as f:
+        with open(self.workflow_path, 'w', encoding='utf-8') as f:
             f.write(workflow.model_dump_json(indent=2))
-        logger.info(f"Workflow saved to {WORKFLOW_FILE}")
+        logger.info(f"Workflow saved to {self.workflow_path}")
