@@ -36,7 +36,7 @@ The GUI allows you to click buttons to Record, Stop, and Playback on the **Dashb
 
 You can **manage multiple workflows** using the dropdown menu and the **New** button in the Dashboard.
 
-You can also switch to the **Workflow** tab to view a visual summary of all recorded steps without needing to open the raw JSON file. You can **delete individual steps** by clicking the "❌" button next to them, **edit action properties** using the "✏️" button, **test a single action** using the "▶️" button, **reorder actions** using the "⬆️" and "⬇️" arrows, or **clear the entire workflow** using the "🗑️ Clear All" button. You can also manually inject complex actions (like sleep delays or terminal commands) by clicking the **"➕ Add Action"** button.
+You can also switch to the **Workflow** tab to view a visual summary of all recorded steps without needing to open the raw JSON file. You can **delete individual steps** by clicking the "❌" button next to them, **edit action properties** using the "✏️" button, **duplicate an action** using the "📑" button, **test a single action** using the "▶️" button, **reorder actions** using the "⬆️" and "⬇️" arrows, or **clear the entire workflow** using the "🗑️ Clear All" button. You can also manually inject complex actions (like sleep delays or terminal commands) by clicking the **"➕ Add Action"** button.
 
 Alternatively, you can use the physical hotkeys:
 

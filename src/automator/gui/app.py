@@ -230,6 +230,10 @@ class AutomatorGUI(ctk.CTk):
                 edit_btn = ctk.CTkButton(ctrl_frame, text="✏️", width=30, fg_color="transparent", hover_color="#333333", command=lambda idx=i, act=action: self.open_edit_action_dialog(idx, act))
                 edit_btn.pack(side="left", padx=2)
                 
+                # Duplicate button
+                dup_btn = ctk.CTkButton(ctrl_frame, text="📑", width=30, fg_color="transparent", hover_color="#333333", command=lambda idx=i: self.duplicate_action(idx))
+                dup_btn.pack(side="left", padx=2)
+                
                 # Delete button for this specific action
                 del_btn = ctk.CTkButton(ctrl_frame, text="❌", width=30, fg_color="transparent", text_color="#e74c3c", hover_color="#333333", command=lambda idx=i: self.delete_action(idx))
                 del_btn.pack(side="left", padx=2)
@@ -254,6 +258,25 @@ class AutomatorGUI(ctk.CTk):
                 self.load_workflow()
         except Exception as e:
             logger.error(f"Failed to delete action: {e}")
+
+    def duplicate_action(self, index):
+        workflow_path = self.current_workflow_path
+        try:
+            with open(workflow_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            if "actions" in data and 0 <= index < len(data["actions"]):
+                import copy
+                action_copy = copy.deepcopy(data["actions"][index])
+                data["actions"].insert(index + 1, action_copy)
+                logger.info(f"Duplicated action {index+1}")
+                
+                with open(workflow_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4)
+                    
+                self.load_workflow()
+        except Exception as e:
+            logger.error(f"Failed to duplicate action: {e}")
 
     def test_action(self, index):
         workflow_path = self.current_workflow_path
