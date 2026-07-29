@@ -4,7 +4,7 @@ import os
 import pyautogui
 from pydantic import ValidationError
 
-from ..models.workflow import Workflow, ClickAction, TypeAction
+from ..models.workflow import Workflow, ClickAction, TypeAction, LoopAction, ActionType
 from ..utils.logger import get_logger
 from ..utils.config import WORKFLOW_FILE
 from .vision import locate_template
@@ -34,16 +34,26 @@ class Player:
             return
             
         logger.info(f"Starting playback of {len(workflow.actions)} actions...")
+        self._play_actions(workflow.actions)
+        logger.info("Playback finished.")
         
-        for action in workflow.actions:
+    def _play_actions(self, actions: list['ActionType']):
+        for action in actions:
             time.sleep(action.time_offset)
             
             if isinstance(action, ClickAction):
                 self._do_click(action)
             elif isinstance(action, TypeAction):
                 self._do_type(action)
+            elif isinstance(action, LoopAction):
+                self._do_loop(action)
                 
-        logger.info("Playback finished.")
+    def _do_loop(self, action: LoopAction):
+        logger.info(f"Starting loop of {action.count} iterations for {len(action.actions)} actions...")
+        for i in range(action.count):
+            logger.info(f"  Loop iteration {i + 1}/{action.count}")
+            self._play_actions(action.actions)
+        logger.info("Loop finished.")
         
     def _do_click(self, action: ClickAction):
         click_x, click_y = action.x, action.y

@@ -15,7 +15,12 @@ class TypeAction(BaseAction):
     type: Literal["type"]
     key: str
 
-ActionType = Annotated[Union[ClickAction, TypeAction], Field(discriminator='type')]
+class LoopAction(BaseAction):
+    type: Literal["loop"]
+    count: int = Field(default=1, ge=1)
+    actions: List['ActionType']
+
+ActionType = Annotated[Union[ClickAction, TypeAction, LoopAction], Field(discriminator='type')]
 
 class Workflow(BaseModel):
     workflow_name: str
