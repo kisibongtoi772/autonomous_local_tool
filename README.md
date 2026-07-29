@@ -34,7 +34,7 @@ desktop-automator
 
 The GUI allows you to click buttons to Record, Stop, and Playback on the **Dashboard** tab. It features a **Live Log Console** that displays exactly what the automation is doing (e.g., clicking coordinates, finding templates) in real-time. 
 
-You can also switch to the **Workflow** tab to view a visual summary of all recorded steps without needing to open the raw JSON file.
+You can also switch to the **Workflow** tab to view a visual summary of all recorded steps without needing to open the raw JSON file. You can **delete individual steps** by clicking the "❌" button next to them, or **clear the entire workflow** using the "🗑️ Clear All" button.
 
 Alternatively, you can use the physical hotkeys:
 

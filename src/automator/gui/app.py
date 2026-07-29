@@ -103,9 +103,17 @@ class AutomatorGUI(ctk.CTk):
     def setup_workflow_tab(self):
         workflow_tab = self.tabview.tab("Workflow")
         
+        # Buttons Frame for Workflow Tab
+        btn_frame = ctk.CTkFrame(workflow_tab, fg_color="transparent")
+        btn_frame.pack(pady=10)
+
         # Refresh Button
-        self.refresh_btn = ctk.CTkButton(workflow_tab, text="🔄 Refresh Workflow", command=self.load_workflow)
-        self.refresh_btn.pack(pady=10)
+        self.refresh_btn = ctk.CTkButton(btn_frame, text="🔄 Refresh", command=self.load_workflow, width=150)
+        self.refresh_btn.grid(row=0, column=0, padx=10)
+        
+        # Clear All Button
+        self.clear_btn = ctk.CTkButton(btn_frame, text="🗑️ Clear All", command=self.clear_workflow, width=150, fg_color="#c0392b", hover_color="#e74c3c")
+        self.clear_btn.grid(row=0, column=1, padx=10)
         
         # Scrollable Frame for Steps
         self.workflow_frame = ctk.CTkScrollableFrame(workflow_tab, width=430, height=300)
@@ -148,13 +156,55 @@ class AutomatorGUI(ctk.CTk):
                     details += f" keys: {action.get('keys', [])}"
                 elif action_type == "run_command":
                     details += f" cmd: '{action.get('command', '')}'"
-                    
-                lbl = ctk.CTkLabel(self.workflow_frame, text=details, anchor="w", justify="left")
-                lbl.pack(fill="x", padx=10, pady=2)
+                
+                # Create a frame for each row to hold label and delete button
+                row_frame = ctk.CTkFrame(self.workflow_frame, fg_color="transparent")
+                row_frame.pack(fill="x", padx=5, pady=2)
+                
+                lbl = ctk.CTkLabel(row_frame, text=details, anchor="w", justify="left")
+                lbl.pack(side="left", fill="x", expand=True)
+                
+                # Delete button for this specific action
+                del_btn = ctk.CTkButton(row_frame, text="❌", width=30, fg_color="transparent", text_color="#e74c3c", hover_color="#333333", command=lambda idx=i: self.delete_action(idx))
+                del_btn.pack(side="right")
                 
         except Exception as e:
             lbl = ctk.CTkLabel(self.workflow_frame, text=f"Error loading workflow:\n{e}", text_color="#e74c3c")
             lbl.pack(pady=20)
+
+    def delete_action(self, index):
+        workflow_path = "workspace/workflow.json"
+        try:
+            with open(workflow_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            if "actions" in data and 0 <= index < len(data["actions"]):
+                deleted_action = data["actions"].pop(index)
+                logger.info(f"Deleted action {index+1}: {deleted_action.get('type')}")
+                
+                with open(workflow_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4)
+                    
+                self.load_workflow()
+        except Exception as e:
+            logger.error(f"Failed to delete action: {e}")
+
+    def clear_workflow(self):
+        workflow_path = "workspace/workflow.json"
+        try:
+            if os.path.exists(workflow_path):
+                with open(workflow_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                
+                data["actions"] = []
+                logger.info("Cleared all actions from workflow.")
+                
+                with open(workflow_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4)
+                    
+                self.load_workflow()
+        except Exception as e:
+            logger.error(f"Failed to clear workflow: {e}")
 
     def start_recording(self):
         if not self.recording:
