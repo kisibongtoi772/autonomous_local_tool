@@ -9,6 +9,15 @@ from PIL import Image
 from ..core.recorder import Recorder
 from ..core.player import Player
 from ..utils.logger import get_logger
+import sys
+
+# Eagerly load AXIsProcessTrusted on macOS main thread to prevent pyobjc lazy import KeyError in pynput
+if sys.platform == "darwin":
+    try:
+        import HIServices
+        HIServices.AXIsProcessTrusted()
+    except Exception:
+        pass
 
 logger = get_logger(__name__)
 
