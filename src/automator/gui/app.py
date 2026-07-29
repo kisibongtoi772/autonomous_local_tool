@@ -1,3 +1,4 @@
+import logging
 import customtkinter as ctk
 import threading
 from pynput import keyboard
@@ -7,12 +8,35 @@ from ..utils.logger import get_logger
 
 logger = get_logger(__name__)
 
+class GUILoggingHandler(logging.Handler):
+    def __init__(self, textbox):
+        super().__init__()
+        self.textbox = textbox
+        self.setFormatter(logging.Formatter('%(asctime)s - %(message)s', '%H:%M:%S'))
+
+    def emit(self, record):
+        msg = self.format(record)
+        # Use after to safely update UI from other threads
+        self.textbox.after(0, self.append_to_textbox, msg)
+        
+    def append_to_textbox(self, msg):
+        self.textbox.configure(state="normal")
+        self.textbox.insert("end", msg + "\n")
+        self.textbox.see("end")
+        # Keep only the last 100 lines to prevent memory issues
+        lines = int(self.textbox.index('end-1c').split('.')[0])
+        if lines > 100:
+            self.textbox.delete("1.0", f"{lines - 100}.0")
+        self.textbox.configure(state="disabled")
+
+logger = get_logger(__name__)
+
 class AutomatorGUI(ctk.CTk):
     def __init__(self):
         super().__init__()
 
         self.title("Desktop Automator")
-        self.geometry("400x300")
+        self.geometry("500x500")
         self.resizable(False, False)
         
         # Set theme
@@ -49,6 +73,19 @@ class AutomatorGUI(ctk.CTk):
         # Playback Button
         self.play_btn = ctk.CTkButton(self, text="▶️ Playback (F11)", command=self.playback, width=200)
         self.play_btn.pack(pady=10)
+
+        # Log Console
+        self.log_console = ctk.CTkTextbox(self, width=450, height=200, state="disabled", font=ctk.CTkFont(family="Courier", size=12))
+        self.log_console.pack(pady=10, padx=20, fill="both", expand=True)
+
+        # Setup GUI logging
+        gui_handler = GUILoggingHandler(self.log_console)
+        # Attach to the root logger or our specific logger
+        logging.getLogger("automator").addHandler(gui_handler)
+        # Also attach to main logger
+        logger.addHandler(gui_handler)
+        
+        logger.info("GUI started successfully.")
 
     def start_recording(self):
         if not self.recording:
