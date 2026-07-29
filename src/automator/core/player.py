@@ -19,7 +19,7 @@ class Player:
         self.workflow_path = workflow_path or WORKFLOW_FILE
         self.workflow: Optional[Workflow] = None
         
-    def load_workflow(self) -> bool:
+    def play(self) -> bool:
         if not os.path.exists(self.workflow_path):
             logger.error(f"Workflow file not found: {self.workflow_path}")
             return False
