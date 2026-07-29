@@ -26,16 +26,18 @@ A local desktop automation tool that records mouse and keyboard events and plays
 
 ## Usage
 
-Start the CLI tool:
+Start the tool to open the **Modern GUI Dashboard**:
 ```bash
 desktop-automator
 # or use the shorthand: dauto
 ```
 
+The GUI allows you to click buttons to Record, Stop, and Playback. Alternatively, you can use the physical hotkeys:
+
 ### Hotkeys:
-- **`F9`**: Start recording actions (clicks and keystrokes).
-- **`F10`**: Stop recording. This will generate a `workflow.json` file and a `templates/` directory containing image snippets of your clicks inside the `workspace/` folder.
-- **`F11`**: Playback the last recorded workflow.
+- **`F9` (Record)**: Start recording actions (clicks and keystrokes).
+- **`F10` (Stop)**: Stop recording. This will generate a `workflow.json` file and a `templates/` directory containing image snippets of your clicks inside the `workspace/` folder.
+- **`F11` (Playback)**: Playback the last recorded workflow.
 
 > **Note for macOS Users:**
 > You must grant **Accessibility** and **Screen Recording** permissions to your Terminal application (e.g., iTerm2 or Terminal) in `System Settings > Privacy & Security` for the automation tool to intercept global inputs and capture screen templates.
