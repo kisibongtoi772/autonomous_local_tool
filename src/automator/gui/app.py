@@ -1,6 +1,8 @@
 import logging
 import customtkinter as ctk
 import threading
+import json
+import os
 from pynput import keyboard
 from ..core.recorder import Recorder
 from ..core.player import Player
@@ -52,15 +54,28 @@ class AutomatorGUI(ctk.CTk):
     def setup_ui(self):
         # Title
         self.title_label = ctk.CTkLabel(self, text="Desktop Automator", font=ctk.CTkFont(size=24, weight="bold"))
-        self.title_label.pack(pady=20)
+        self.title_label.pack(pady=10)
+
+        # Tabview
+        self.tabview = ctk.CTkTabview(self, width=460, height=420)
+        self.tabview.pack(padx=20, pady=10, fill="both", expand=True)
+        
+        self.tabview.add("Dashboard")
+        self.tabview.add("Workflow")
+
+        self.setup_dashboard_tab()
+        self.setup_workflow_tab()
+
+    def setup_dashboard_tab(self):
+        dashboard = self.tabview.tab("Dashboard")
 
         # Status
-        self.status_label = ctk.CTkLabel(self, text="Status: Ready", font=ctk.CTkFont(size=14))
-        self.status_label.pack(pady=10)
+        self.status_label = ctk.CTkLabel(dashboard, text="Status: Ready", font=ctk.CTkFont(size=14))
+        self.status_label.pack(pady=5)
 
         # Buttons Frame
-        self.btn_frame = ctk.CTkFrame(self, fg_color="transparent")
-        self.btn_frame.pack(pady=20)
+        self.btn_frame = ctk.CTkFrame(dashboard, fg_color="transparent")
+        self.btn_frame.pack(pady=10)
 
         # Record Button
         self.record_btn = ctk.CTkButton(self.btn_frame, text="🔴 Record (F9)", command=self.start_recording, fg_color="#c0392b", hover_color="#e74c3c")
@@ -71,21 +86,75 @@ class AutomatorGUI(ctk.CTk):
         self.stop_btn.grid(row=0, column=1, padx=10, pady=10)
 
         # Playback Button
-        self.play_btn = ctk.CTkButton(self, text="▶️ Playback (F11)", command=self.playback, width=200)
-        self.play_btn.pack(pady=10)
+        self.play_btn = ctk.CTkButton(dashboard, text="▶️ Playback (F11)", command=self.playback, width=200)
+        self.play_btn.pack(pady=5)
 
         # Log Console
-        self.log_console = ctk.CTkTextbox(self, width=450, height=200, state="disabled", font=ctk.CTkFont(family="Courier", size=12))
-        self.log_console.pack(pady=10, padx=20, fill="both", expand=True)
+        self.log_console = ctk.CTkTextbox(dashboard, width=450, height=180, state="disabled", font=ctk.CTkFont(family="Courier", size=12))
+        self.log_console.pack(pady=10, padx=10, fill="both", expand=True)
 
         # Setup GUI logging
         gui_handler = GUILoggingHandler(self.log_console)
-        # Attach to the root logger or our specific logger
         logging.getLogger("automator").addHandler(gui_handler)
-        # Also attach to main logger
         logger.addHandler(gui_handler)
         
         logger.info("GUI started successfully.")
+
+    def setup_workflow_tab(self):
+        workflow_tab = self.tabview.tab("Workflow")
+        
+        # Refresh Button
+        self.refresh_btn = ctk.CTkButton(workflow_tab, text="🔄 Refresh Workflow", command=self.load_workflow)
+        self.refresh_btn.pack(pady=10)
+        
+        # Scrollable Frame for Steps
+        self.workflow_frame = ctk.CTkScrollableFrame(workflow_tab, width=430, height=300)
+        self.workflow_frame.pack(pady=10, padx=10, fill="both", expand=True)
+        
+        self.load_workflow()
+
+    def load_workflow(self):
+        # Clear existing widgets
+        for widget in self.workflow_frame.winfo_children():
+            widget.destroy()
+            
+        workflow_path = "workspace/workflow.json"
+        if not os.path.exists(workflow_path):
+            lbl = ctk.CTkLabel(self.workflow_frame, text="No workflow found. Record one first!")
+            lbl.pack(pady=20)
+            return
+            
+        try:
+            with open(workflow_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                
+            actions = data.get("actions", [])
+            if not actions:
+                lbl = ctk.CTkLabel(self.workflow_frame, text="Workflow is empty.")
+                lbl.pack(pady=20)
+                return
+                
+            for i, action in enumerate(actions):
+                action_type = action.get("type", "unknown")
+                details = f"[{i+1}] {action_type.upper()}"
+                
+                if action_type == "click":
+                    details += f" at ({action.get('x')}, {action.get('y')}) - {action.get('button', 'left')} click(s): {action.get('clicks', 1)}"
+                elif action_type == "type":
+                    details += f" text: '{action.get('text', '')}'"
+                elif action_type == "sleep":
+                    details += f" for {action.get('duration', 0)}s"
+                elif action_type == "hotkey":
+                    details += f" keys: {action.get('keys', [])}"
+                elif action_type == "run_command":
+                    details += f" cmd: '{action.get('command', '')}'"
+                    
+                lbl = ctk.CTkLabel(self.workflow_frame, text=details, anchor="w", justify="left")
+                lbl.pack(fill="x", padx=10, pady=2)
+                
+        except Exception as e:
+            lbl = ctk.CTkLabel(self.workflow_frame, text=f"Error loading workflow:\n{e}", text_color="#e74c3c")
+            lbl.pack(pady=20)
 
     def start_recording(self):
         if not self.recording:
