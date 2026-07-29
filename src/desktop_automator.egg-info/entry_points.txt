@@ -1,0 +1,3 @@
+[console_scripts]
+dauto = automator.main:main
+desktop-automator = automator.main:main

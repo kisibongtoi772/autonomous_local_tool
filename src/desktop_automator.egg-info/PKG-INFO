@@ -1,3 +1,16 @@
+Metadata-Version: 2.4
+Name: desktop_automator
+Version: 0.1.0
+Summary: A local desktop automation tool using a hybrid Computer Vision and Coordinate approach.
+Requires-Python: >=3.9
+Description-Content-Type: text/markdown
+Requires-Dist: pynput
+Requires-Dist: pyautogui
+Requires-Dist: opencv-python
+Requires-Dist: mss
+Requires-Dist: Pillow
+Requires-Dist: pydantic>=2.0.0
+
 # Desktop Automator (Hybrid Record & Playback)
 
 A local desktop automation tool that records mouse and keyboard events and plays them back. It uses a **hybrid approach** to ensure playback reliability: when you click, it captures a small template image around your cursor. During playback, it uses Computer Vision (via OpenCV) to find that exact image on the screen, gracefully falling back to absolute coordinates if the image is not found.
@@ -28,8 +41,7 @@ A local desktop automation tool that records mouse and keyboard events and plays
 
 Start the CLI tool:
 ```bash
-desktop-automator
-# or use the shorthand: dauto
+automator
 ```
 
 ### Hotkeys:

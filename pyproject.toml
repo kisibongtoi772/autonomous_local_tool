@@ -18,7 +18,8 @@ dependencies = [
 ]
 
 [project.scripts]
-automator = "automator.main:main"
+desktop-automator = "automator.main:main"
+dauto = "automator.main:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
