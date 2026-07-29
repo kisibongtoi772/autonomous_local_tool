@@ -20,7 +20,12 @@ class LoopAction(BaseAction):
     count: int = Field(default=1, ge=1)
     actions: List['ActionType']
 
-ActionType = Annotated[Union[ClickAction, TypeAction, LoopAction], Field(discriminator='type')]
+class RunCommandAction(BaseAction):
+    type: Literal["run_command"]
+    command: str
+    wait: bool = False
+
+ActionType = Annotated[Union[ClickAction, TypeAction, LoopAction, RunCommandAction], Field(discriminator='type')]
 
 class Workflow(BaseModel):
     workflow_name: str

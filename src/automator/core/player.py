@@ -4,7 +4,8 @@ import os
 import pyautogui
 from pydantic import ValidationError
 
-from ..models.workflow import Workflow, ClickAction, TypeAction, LoopAction, ActionType
+import subprocess
+from ..models.workflow import Workflow, ClickAction, TypeAction, LoopAction, RunCommandAction, ActionType
 from ..utils.logger import get_logger
 from ..utils.config import WORKFLOW_FILE
 from .vision import locate_template
@@ -47,7 +48,19 @@ class Player:
                 self._do_type(action)
             elif isinstance(action, LoopAction):
                 self._do_loop(action)
+            elif isinstance(action, RunCommandAction):
+                self._do_run_command(action)
                 
+    def _do_run_command(self, action: RunCommandAction):
+        logger.info(f"Executing command: {action.command} (wait={action.wait})")
+        try:
+            if action.wait:
+                subprocess.run(action.command, shell=True, check=True)
+            else:
+                subprocess.Popen(action.command, shell=True)
+        except Exception as e:
+            logger.error(f"Error executing command: {e}")
+
     def _do_loop(self, action: LoopAction):
         logger.info(f"Starting loop of {action.count} iterations for {len(action.actions)} actions...")
         for i in range(action.count):

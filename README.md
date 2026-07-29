@@ -44,6 +44,7 @@ automator
 
 ## Advanced Features
 - **Hierarchical Looping:** You can manually edit `workflow.json` to repeat blocks of actions. Use `{"type": "loop", "count": 5, "actions": [...]}` to repeat specific sequences.
+- **Run Subprocesses/Apps:** You can start applications or run shell scripts before executing clicks using `{"type": "run_command", "command": "open -a Calculator", "wait": false}`.
 
 ## Architecture
 - `src/automator/cli`: CLI interface and hotkeys.
