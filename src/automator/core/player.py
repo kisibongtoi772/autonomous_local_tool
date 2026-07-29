@@ -5,7 +5,7 @@ import pyautogui
 from pydantic import ValidationError
 
 import subprocess
-from ..models.workflow import Workflow, ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, ActionType
+from ..models.workflow import Workflow, ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, SleepAction, ActionType
 from ..utils.logger import get_logger
 from ..utils.config import WORKFLOW_FILE
 from .vision import locate_template
@@ -52,6 +52,12 @@ class Player:
                 self._do_run_command(action)
             elif isinstance(action, HotkeyAction):
                 self._do_hotkey(action)
+            elif isinstance(action, SleepAction):
+                self._do_sleep(action)
+                
+    def _do_sleep(self, action: SleepAction):
+        logger.info(f"Sleeping for {action.duration} seconds...")
+        time.sleep(action.duration)
                 
     def _do_hotkey(self, action: HotkeyAction):
         logger.info(f"Pressing hotkey: {' + '.join(action.keys)}")

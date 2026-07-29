@@ -29,7 +29,11 @@ class HotkeyAction(BaseAction):
     type: Literal["hotkey"]
     keys: List[str]
 
-ActionType = Annotated[Union[ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction], Field(discriminator='type')]
+class SleepAction(BaseAction):
+    type: Literal["sleep"]
+    duration: float = Field(..., gt=0.0)
+
+ActionType = Annotated[Union[ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, SleepAction], Field(discriminator='type')]
 
 class Workflow(BaseModel):
     workflow_name: str

@@ -46,6 +46,7 @@ automator
 - **Hierarchical Looping:** You can manually edit `workflow.json` to repeat blocks of actions. Use `{"type": "loop", "count": 5, "actions": [...]}` to repeat specific sequences.
 - **Run Subprocesses/Apps:** You can start applications or run shell scripts before executing clicks using `{"type": "run_command", "command": "open -a Calculator", "wait": false}`.
 - **Global Hotkeys:** Trigger multi-key shortcuts seamlessly (e.g. `{"type": "hotkey", "keys": ["cmd", "space"]}`).
+- **Explicit Sleep:** Insert hardcoded delays directly into your workflow (e.g. `{"type": "sleep", "duration": 3.5}`).
 
 ## Architecture
 - `src/automator/cli`: CLI interface and hotkeys.
