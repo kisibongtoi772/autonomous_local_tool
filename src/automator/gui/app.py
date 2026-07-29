@@ -203,16 +203,28 @@ class AutomatorGUI(ctk.CTk):
                 elif action_type == "run_command":
                     details += f" cmd: '{action.get('command', '')}'"
                 
-                # Create a frame for each row to hold label and delete button
+                # Create a frame for each row to hold label and buttons
                 row_frame = ctk.CTkFrame(self.workflow_frame, fg_color="transparent")
                 row_frame.pack(fill="x", padx=5, pady=2)
                 
                 lbl = ctk.CTkLabel(row_frame, text=details, anchor="w", justify="left")
                 lbl.pack(side="left", fill="x", expand=True)
                 
+                # Button frame for action controls
+                ctrl_frame = ctk.CTkFrame(row_frame, fg_color="transparent")
+                ctrl_frame.pack(side="right")
+
+                if i > 0:
+                    up_btn = ctk.CTkButton(ctrl_frame, text="⬆️", width=30, fg_color="transparent", hover_color="#333333", command=lambda idx=i: self.move_action_up(idx))
+                    up_btn.pack(side="left", padx=2)
+                
+                if i < len(actions) - 1:
+                    down_btn = ctk.CTkButton(ctrl_frame, text="⬇️", width=30, fg_color="transparent", hover_color="#333333", command=lambda idx=i: self.move_action_down(idx))
+                    down_btn.pack(side="left", padx=2)
+                
                 # Delete button for this specific action
-                del_btn = ctk.CTkButton(row_frame, text="❌", width=30, fg_color="transparent", text_color="#e74c3c", hover_color="#333333", command=lambda idx=i: self.delete_action(idx))
-                del_btn.pack(side="right")
+                del_btn = ctk.CTkButton(ctrl_frame, text="❌", width=30, fg_color="transparent", text_color="#e74c3c", hover_color="#333333", command=lambda idx=i: self.delete_action(idx))
+                del_btn.pack(side="left", padx=2)
                 
         except Exception as e:
             lbl = ctk.CTkLabel(self.workflow_frame, text=f"Error loading workflow:\n{e}", text_color="#e74c3c")
@@ -234,6 +246,29 @@ class AutomatorGUI(ctk.CTk):
                 self.load_workflow()
         except Exception as e:
             logger.error(f"Failed to delete action: {e}")
+
+    def move_action_up(self, index):
+        if index <= 0: return
+        self._swap_actions(index, index - 1)
+        
+    def move_action_down(self, index):
+        self._swap_actions(index, index + 1)
+        
+    def _swap_actions(self, idx1, idx2):
+        workflow_path = self.current_workflow_path
+        try:
+            with open(workflow_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                
+            if "actions" in data and 0 <= idx1 < len(data["actions"]) and 0 <= idx2 < len(data["actions"]):
+                data["actions"][idx1], data["actions"][idx2] = data["actions"][idx2], data["actions"][idx1]
+                
+                with open(workflow_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4)
+                    
+                self.load_workflow()
+        except Exception as e:
+            logger.error(f"Failed to swap actions: {e}")
 
     def clear_workflow(self):
         workflow_path = self.current_workflow_path
