@@ -123,9 +123,9 @@ class Player:
             else:
                 logger.warning(f"Template not found, falling back to ({action.x}, {action.y})")
                 
-        logger.info(f"Clicking at ({click_x}, {click_y}) with {action.button} button")
+        logger.info(f"Clicking at ({click_x}, {click_y}) with {action.button} button ({action.clicks} clicks)")
         try:
-            pyautogui.click(x=click_x, y=click_y, button=action.button)
+            pyautogui.click(x=click_x, y=click_y, button=action.button, clicks=action.clicks)
         except Exception as e:
             logger.error(f"Error clicking: {e}")
             

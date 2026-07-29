@@ -6,10 +6,11 @@ class BaseAction(BaseModel):
 
 class ClickAction(BaseAction):
     type: Literal["click"]
-    button: str
     x: int
     y: int
     template_image: Optional[str] = None
+    button: str = "left"
+    clicks: int = 1
 
 class TypeAction(BaseAction):
     type: Literal["type"]
