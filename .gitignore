@@ -9,6 +9,8 @@ venv/
 .venv/
 env.bak/
 venv.bak/
+*.egg-info/
+src/*.egg-info/
 
 # macOS
 .DS_Store
@@ -18,6 +20,4 @@ venv.bak/
 .idea/
 
 # Project Specific (User Data)
-# Uncomment these if you want to commit your recorded macros to git
-workflow.json
-templates/
+workspace/

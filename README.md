@@ -34,14 +34,14 @@ desktop-automator
 
 ### Hotkeys:
 - **`F9`**: Start recording actions (clicks and keystrokes).
-- **`F10`**: Stop recording. This will generate a `workflow.json` file and a `templates/` directory containing image snippets of your clicks.
+- **`F10`**: Stop recording. This will generate a `workflow.json` file and a `templates/` directory containing image snippets of your clicks inside the `workspace/` folder.
 - **`F11`**: Playback the last recorded workflow.
 
 > **Note for macOS Users:**
 > You must grant **Accessibility** and **Screen Recording** permissions to your Terminal application (e.g., iTerm2 or Terminal) in `System Settings > Privacy & Security` for the automation tool to intercept global inputs and capture screen templates.
 
 ## Advanced Features
-- **Hierarchical Looping:** You can manually edit `workflow.json` to repeat blocks of actions. Use `{"type": "loop", "count": 5, "actions": [...]}` to repeat specific sequences.
+- **Hierarchical Looping:** You can manually edit `workspace/workflow.json` to repeat blocks of actions. Use `{"type": "loop", "count": 5, "actions": [...]}` to repeat specific sequences.
 - **Run Subprocesses/Apps:** You can start applications or run shell scripts before executing clicks using `{"type": "run_command", "command": "open -a Calculator", "wait": false}`.
 - **Global Hotkeys:** Trigger multi-key shortcuts seamlessly (e.g. `{"type": "hotkey", "keys": ["cmd", "space"]}`).
 - **Explicit Sleep:** Insert hardcoded delays directly into your workflow (e.g. `{"type": "sleep", "duration": 3.5}`).
