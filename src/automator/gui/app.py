@@ -154,11 +154,15 @@ class AutomatorGUI(ctk.CTk):
         self.refresh_btn.grid(row=0, column=0, padx=10)
         
         # Clear All Button
-        self.clear_btn = ctk.CTkButton(btn_frame, text="🗑️ Clear All", command=self.clear_workflow, width=150, fg_color="#c0392b", hover_color="#e74c3c")
+        self.clear_btn = ctk.CTkButton(btn_frame, text="🗑️ Clear All", command=self.clear_workflow, width=120, fg_color="#c0392b", hover_color="#e74c3c")
         self.clear_btn.grid(row=0, column=1, padx=10)
+
+        # Add Action Button
+        self.add_action_btn = ctk.CTkButton(btn_frame, text="➕ Add Action", command=self.open_add_action_dialog, width=120, fg_color="#27ae60", hover_color="#2ecc71")
+        self.add_action_btn.grid(row=0, column=2, padx=10)
         
         # Scrollable Frame for Steps
-        self.workflow_frame = ctk.CTkScrollableFrame(workflow_tab, width=430, height=300)
+        self.workflow_frame = ctk.CTkScrollableFrame(workflow_tab, width=430, height=280)
         self.workflow_frame.pack(pady=10, padx=10, fill="both", expand=True)
         
         self.load_workflow()
@@ -247,6 +251,79 @@ class AutomatorGUI(ctk.CTk):
                 self.load_workflow()
         except Exception as e:
             logger.error(f"Failed to clear workflow: {e}")
+
+    def open_add_action_dialog(self):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title("Add Action")
+        dialog.geometry("300x350")
+        dialog.transient(self)
+        
+        # Type selection
+        ctk.CTkLabel(dialog, text="Action Type:").pack(pady=5)
+        type_var = ctk.StringVar(value="sleep")
+        type_dropdown = ctk.CTkOptionMenu(dialog, variable=type_var, values=["sleep", "type", "run_command", "hotkey"])
+        type_dropdown.pack(pady=5)
+        
+        # Dynamic inputs frame
+        input_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        input_frame.pack(pady=10, fill="both", expand=True)
+        
+        # Widgets that will be swapped
+        val_label = ctk.CTkLabel(input_frame, text="Duration (seconds):")
+        val_entry = ctk.CTkEntry(input_frame, width=200)
+        val_label.pack(pady=5)
+        val_entry.pack(pady=5)
+        
+        def on_type_change(*args):
+            t = type_var.get()
+            val_entry.delete(0, "end")
+            if t == "sleep":
+                val_label.configure(text="Duration (seconds):")
+            elif t == "type":
+                val_label.configure(text="Text to type:")
+            elif t == "run_command":
+                val_label.configure(text="Terminal Command:")
+            elif t == "hotkey":
+                val_label.configure(text="Keys (comma separated, e.g. cmd,c):")
+                
+        type_var.trace_add("write", on_type_change)
+        
+        def save_action():
+            t = type_var.get()
+            val = val_entry.get()
+            
+            new_action = {"type": t, "time_offset": 0.5}
+            
+            try:
+                if t == "sleep":
+                    new_action["duration"] = float(val) if val else 1.0
+                elif t == "type":
+                    new_action["key"] = val
+                elif t == "run_command":
+                    new_action["command"] = val
+                    new_action["wait"] = True
+                elif t == "hotkey":
+                    new_action["keys"] = [k.strip() for k in val.split(",")]
+                    
+                workflow_path = self.current_workflow_path
+                with open(workflow_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    
+                if "actions" not in data:
+                    data["actions"] = []
+                    
+                data["actions"].append(new_action)
+                
+                with open(workflow_path, "w", encoding="utf-8") as f:
+                    json.dump(data, f, indent=4)
+                    
+                logger.info(f"Manually added action: {t}")
+                self.load_workflow()
+                dialog.destroy()
+            except Exception as e:
+                logger.error(f"Error adding action: {e}")
+                
+        ctk.CTkButton(dialog, text="Add to Workflow", command=save_action).pack(pady=20)
 
     def start_recording(self):
         if not self.recording:
