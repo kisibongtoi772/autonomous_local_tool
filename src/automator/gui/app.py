@@ -222,6 +222,10 @@ class AutomatorGUI(ctk.CTk):
                     down_btn = ctk.CTkButton(ctrl_frame, text="⬇️", width=30, fg_color="transparent", hover_color="#333333", command=lambda idx=i: self.move_action_down(idx))
                     down_btn.pack(side="left", padx=2)
                 
+                # Edit button
+                edit_btn = ctk.CTkButton(ctrl_frame, text="✏️", width=30, fg_color="transparent", hover_color="#333333", command=lambda idx=i, act=action: self.open_edit_action_dialog(idx, act))
+                edit_btn.pack(side="left", padx=2)
+                
                 # Delete button for this specific action
                 del_btn = ctk.CTkButton(ctrl_frame, text="❌", width=30, fg_color="transparent", text_color="#e74c3c", hover_color="#333333", command=lambda idx=i: self.delete_action(idx))
                 del_btn.pack(side="left", padx=2)
@@ -359,6 +363,76 @@ class AutomatorGUI(ctk.CTk):
                 logger.error(f"Error adding action: {e}")
                 
         ctk.CTkButton(dialog, text="Add to Workflow", command=save_action).pack(pady=20)
+
+    def open_edit_action_dialog(self, index, action_dict):
+        dialog = ctk.CTkToplevel(self)
+        dialog.title(f"Edit Action {index+1}")
+        dialog.geometry("300x250")
+        dialog.transient(self)
+        
+        t = action_dict.get("type", "unknown")
+        ctk.CTkLabel(dialog, text=f"Action Type: {t.upper()}").pack(pady=10)
+        
+        input_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        input_frame.pack(pady=10, fill="both", expand=True)
+        
+        val_label = ctk.CTkLabel(input_frame, text="Value:")
+        val_entry = ctk.CTkEntry(input_frame, width=200)
+        val_label.pack(pady=5)
+        val_entry.pack(pady=5)
+        
+        if t == "sleep":
+            val_label.configure(text="Duration (seconds):")
+            val_entry.insert(0, str(action_dict.get("duration", 1.0)))
+        elif t == "type":
+            val_label.configure(text="Text to type:")
+            val_entry.insert(0, str(action_dict.get("key", "")))
+        elif t == "run_command":
+            val_label.configure(text="Terminal Command:")
+            val_entry.insert(0, str(action_dict.get("command", "")))
+        elif t == "hotkey":
+            val_label.configure(text="Keys (comma separated):")
+            val_entry.insert(0, ",".join(action_dict.get("keys", [])))
+        elif t == "click":
+            val_label.configure(text="Click coords (x,y):")
+            val_entry.insert(0, f"{action_dict.get('x')},{action_dict.get('y')}")
+        else:
+            val_entry.configure(state="disabled")
+            
+        def save_edit():
+            val = val_entry.get()
+            try:
+                if t == "sleep":
+                    action_dict["duration"] = float(val) if val else 1.0
+                elif t == "type":
+                    action_dict["key"] = val
+                elif t == "run_command":
+                    action_dict["command"] = val
+                elif t == "hotkey":
+                    action_dict["keys"] = [k.strip() for k in val.split(",")]
+                elif t == "click":
+                    coords = val.split(",")
+                    if len(coords) == 2:
+                        action_dict["x"] = int(coords[0].strip())
+                        action_dict["y"] = int(coords[1].strip())
+                        
+                workflow_path = self.current_workflow_path
+                with open(workflow_path, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    
+                if "actions" in data and 0 <= index < len(data["actions"]):
+                    data["actions"][index] = action_dict
+                    
+                    with open(workflow_path, "w", encoding="utf-8") as f:
+                        json.dump(data, f, indent=4)
+                        
+                    logger.info(f"Edited action {index+1}")
+                    self.load_workflow()
+                    dialog.destroy()
+            except Exception as e:
+                logger.error(f"Error editing action: {e}")
+                
+        ctk.CTkButton(dialog, text="Save Changes", command=save_edit).pack(pady=20)
 
     def start_recording(self):
         if not self.recording:
