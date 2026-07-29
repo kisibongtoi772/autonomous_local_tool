@@ -25,7 +25,11 @@ class RunCommandAction(BaseAction):
     command: str
     wait: bool = False
 
-ActionType = Annotated[Union[ClickAction, TypeAction, LoopAction, RunCommandAction], Field(discriminator='type')]
+class HotkeyAction(BaseAction):
+    type: Literal["hotkey"]
+    keys: List[str]
+
+ActionType = Annotated[Union[ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction], Field(discriminator='type')]
 
 class Workflow(BaseModel):
     workflow_name: str

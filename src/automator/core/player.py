@@ -5,7 +5,7 @@ import pyautogui
 from pydantic import ValidationError
 
 import subprocess
-from ..models.workflow import Workflow, ClickAction, TypeAction, LoopAction, RunCommandAction, ActionType
+from ..models.workflow import Workflow, ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, ActionType
 from ..utils.logger import get_logger
 from ..utils.config import WORKFLOW_FILE
 from .vision import locate_template
@@ -50,6 +50,15 @@ class Player:
                 self._do_loop(action)
             elif isinstance(action, RunCommandAction):
                 self._do_run_command(action)
+            elif isinstance(action, HotkeyAction):
+                self._do_hotkey(action)
+                
+    def _do_hotkey(self, action: HotkeyAction):
+        logger.info(f"Pressing hotkey: {' + '.join(action.keys)}")
+        try:
+            pyautogui.hotkey(*action.keys)
+        except Exception as e:
+            logger.error(f"Error pressing hotkey: {e}")
                 
     def _do_run_command(self, action: RunCommandAction):
         logger.info(f"Executing command: {action.command} (wait={action.wait})")
