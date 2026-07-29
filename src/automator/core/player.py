@@ -5,7 +5,7 @@ import pyautogui
 from pydantic import ValidationError
 
 import subprocess
-from ..models.workflow import Workflow, ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, SleepAction, ActionType
+from ..models.workflow import Workflow, ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, SleepAction, ScrollAction, ActionType
 from ..utils.logger import get_logger
 from ..utils.config import WORKFLOW_FILE
 from .vision import locate_template
@@ -54,6 +54,15 @@ class Player:
                 self._do_hotkey(action)
             elif isinstance(action, SleepAction):
                 self._do_sleep(action)
+            elif isinstance(action, ScrollAction):
+                self._do_scroll(action)
+                
+    def _do_scroll(self, action: ScrollAction):
+        logger.info(f"Scrolling {action.amount} units")
+        try:
+            pyautogui.scroll(action.amount)
+        except Exception as e:
+            logger.error(f"Error scrolling: {e}")
                 
     def _do_sleep(self, action: SleepAction):
         logger.info(f"Sleeping for {action.duration} seconds...")

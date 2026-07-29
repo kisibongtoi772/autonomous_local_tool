@@ -47,6 +47,7 @@ automator
 - **Run Subprocesses/Apps:** You can start applications or run shell scripts before executing clicks using `{"type": "run_command", "command": "open -a Calculator", "wait": false}`.
 - **Global Hotkeys:** Trigger multi-key shortcuts seamlessly (e.g. `{"type": "hotkey", "keys": ["cmd", "space"]}`).
 - **Explicit Sleep:** Insert hardcoded delays directly into your workflow (e.g. `{"type": "sleep", "duration": 3.5}`).
+- **Scroll Simulation:** Simulate mouse scroll wheels (e.g. `{"type": "scroll", "amount": -10}`).
 
 ## Architecture
 - `src/automator/cli`: CLI interface and hotkeys.
