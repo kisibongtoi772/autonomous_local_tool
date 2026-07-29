@@ -1,2 +1,0 @@
-[console_scripts]
-automator = automator.main:main
