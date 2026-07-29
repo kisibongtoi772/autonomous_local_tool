@@ -28,7 +28,6 @@ class Player:
             with open(self.workflow_path, 'r', encoding='utf-8') as f:
                 data = json.load(f)
             self.workflow = Workflow.model_validate(data)
-            return True
         except ValidationError as e:
             logger.error(f"Invalid workflow format: {e}")
             return False
