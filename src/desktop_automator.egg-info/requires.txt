@@ -1,0 +1,6 @@
+pynput
+pyautogui
+opencv-python
+mss
+Pillow
+pydantic>=2.0.0
