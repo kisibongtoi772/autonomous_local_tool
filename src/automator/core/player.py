@@ -5,9 +5,9 @@ import pyautogui
 from pydantic import ValidationError
 
 import subprocess
-from ..models.workflow import Workflow, ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, SleepAction, ScrollAction, ScreenshotAction, ActionType
+from ..models.workflow import Workflow, ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, SleepAction, ScrollAction, ScreenshotAction, AssertTemplateAction, ActionType
 from ..utils.logger import get_logger
-from ..utils.config import WORKFLOW_FILE
+from ..utils.config import WORKFLOW_FILE, TEMPLATE_DIR
 from .vision import locate_template
 
 logger = get_logger(__name__)
@@ -58,6 +58,17 @@ class Player:
                 self._do_scroll(action)
             elif isinstance(action, ScreenshotAction):
                 self._do_screenshot(action)
+            elif isinstance(action, AssertTemplateAction):
+                self._do_assert_template(action)
+                
+    def _do_assert_template(self, action: AssertTemplateAction):
+        logger.info(f"Asserting template exists: {action.template}")
+        template_path = os.path.join(TEMPLATE_DIR, action.template)
+        location = locate_template(template_path)
+        if location is None:
+            logger.error(f"Assertion failed! Template {action.template} not found on screen.")
+            raise RuntimeError(f"Assertion failed: Template {action.template} not found.")
+        logger.info(f"Assertion passed: Template {action.template} found at {location}")
                 
     def _do_screenshot(self, action: ScreenshotAction):
         logger.info(f"Taking screenshot and saving to {action.filename}")

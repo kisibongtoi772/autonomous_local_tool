@@ -41,7 +41,11 @@ class ScreenshotAction(BaseAction):
     type: Literal["screenshot"]
     filename: str
 
-ActionType = Annotated[Union[ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, SleepAction, ScrollAction, ScreenshotAction], Field(discriminator='type')]
+class AssertTemplateAction(BaseAction):
+    type: Literal["assert_template"]
+    template: str
+
+ActionType = Annotated[Union[ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, SleepAction, ScrollAction, ScreenshotAction, AssertTemplateAction], Field(discriminator='type')]
 
 class Workflow(BaseModel):
     workflow_name: str

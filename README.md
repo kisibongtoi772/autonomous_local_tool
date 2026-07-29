@@ -46,6 +46,7 @@ automator
 - **Explicit Sleep:** Insert hardcoded delays directly into your workflow (e.g. `{"type": "sleep", "duration": 3.5}`).
 - **Scroll Simulation:** Simulate mouse scroll wheels (e.g. `{"type": "scroll", "amount": -10}`).
 - **Take Screenshots:** Capture screen states at any point in your workflow (e.g. `{"type": "screenshot", "filename": "state_1.png"}`).
+- **Robust Verification (Assert):** Fail the workflow if an expected image template does not appear on screen (e.g. `{"type": "assert_template", "template": "success_btn.png"}`).
 
 ## Architecture
 - `src/automator/cli`: CLI interface and hotkeys.
