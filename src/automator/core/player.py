@@ -5,7 +5,7 @@ import pyautogui
 from pydantic import ValidationError
 
 import subprocess
-from ..models.workflow import Workflow, ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, SleepAction, ScrollAction, ActionType
+from ..models.workflow import Workflow, ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, SleepAction, ScrollAction, ScreenshotAction, ActionType
 from ..utils.logger import get_logger
 from ..utils.config import WORKFLOW_FILE
 from .vision import locate_template
@@ -56,6 +56,15 @@ class Player:
                 self._do_sleep(action)
             elif isinstance(action, ScrollAction):
                 self._do_scroll(action)
+            elif isinstance(action, ScreenshotAction):
+                self._do_screenshot(action)
+                
+    def _do_screenshot(self, action: ScreenshotAction):
+        logger.info(f"Taking screenshot and saving to {action.filename}")
+        try:
+            pyautogui.screenshot(action.filename)
+        except Exception as e:
+            logger.error(f"Error taking screenshot: {e}")
                 
     def _do_scroll(self, action: ScrollAction):
         logger.info(f"Scrolling {action.amount} units")

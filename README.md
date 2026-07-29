@@ -21,9 +21,6 @@ A local desktop automation tool that records mouse and keyboard events and plays
    ```bash
    python3 -m venv venv
    source venv/bin/activate
-   ```
-
-   ```bash
    pip install -e .
    ```
 
@@ -48,6 +45,7 @@ automator
 - **Global Hotkeys:** Trigger multi-key shortcuts seamlessly (e.g. `{"type": "hotkey", "keys": ["cmd", "space"]}`).
 - **Explicit Sleep:** Insert hardcoded delays directly into your workflow (e.g. `{"type": "sleep", "duration": 3.5}`).
 - **Scroll Simulation:** Simulate mouse scroll wheels (e.g. `{"type": "scroll", "amount": -10}`).
+- **Take Screenshots:** Capture screen states at any point in your workflow (e.g. `{"type": "screenshot", "filename": "state_1.png"}`).
 
 ## Architecture
 - `src/automator/cli`: CLI interface and hotkeys.

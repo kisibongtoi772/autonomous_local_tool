@@ -37,7 +37,11 @@ class ScrollAction(BaseAction):
     type: Literal["scroll"]
     amount: int
 
-ActionType = Annotated[Union[ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, SleepAction, ScrollAction], Field(discriminator='type')]
+class ScreenshotAction(BaseAction):
+    type: Literal["screenshot"]
+    filename: str
+
+ActionType = Annotated[Union[ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, SleepAction, ScrollAction, ScreenshotAction], Field(discriminator='type')]
 
 class Workflow(BaseModel):
     workflow_name: str
