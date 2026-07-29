@@ -4,7 +4,7 @@ import threading
 import json
 import os
 import glob
-from pynput import keyboard
+from pynput import keyboard, mouse
 from PIL import Image
 from ..core.recorder import Recorder
 from ..core.player import Player
@@ -56,6 +56,7 @@ class AutomatorGUI(ctk.CTk):
 
         self.setup_ui()
         self.start_hotkey_listener()
+        self.start_mouse_listener()
 
     def setup_ui(self):
         # Title
@@ -548,11 +549,25 @@ class AutomatorGUI(ctk.CTk):
                     self.after(0, self.stop_recording)
                 elif key == keyboard.Key.f11:
                     self.after(0, self.playback)
+                else:
+                    if self.recording and self.recorder:
+                        self.recorder.on_press(key)
             except Exception as e:
                 logger.error(f"Error handling hotkey: {e}")
 
-        self.listener = keyboard.Listener(on_press=on_press)
-        self.listener.start()
+        self.keyboard_listener = keyboard.Listener(on_press=on_press)
+        self.keyboard_listener.start()
+
+    def start_mouse_listener(self):
+        def on_click(x, y, button, pressed):
+            try:
+                if self.recording and self.recorder:
+                    self.recorder.on_click(x, y, button, pressed)
+            except Exception as e:
+                logger.error(f"Error handling mouse click: {e}")
+
+        self.mouse_listener = mouse.Listener(on_click=on_click)
+        self.mouse_listener.start()
 
 def run_gui():
     app = AutomatorGUI()
