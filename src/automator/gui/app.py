@@ -273,10 +273,21 @@ class AutomatorGUI(ctk.CTk):
              ).pack(pady=(6, 2), fill="x")
 
         wf_mgmt_row = ctk.CTkFrame(sel, fg_color="transparent")
-        wf_mgmt_row.pack(fill="x")
-        _btn(wf_mgmt_row, "Rename", self._rename_workflow, width=52, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"], font=ctk.CTkFont("SF Pro Text", 10)).pack(side="left", padx=(0, 2))
-        _btn(wf_mgmt_row, "Dupe", self._duplicate_workflow_file, width=52, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"], font=ctk.CTkFont("SF Pro Text", 10)).pack(side="left", padx=(0, 2))
-        _btn(wf_mgmt_row, "Delete", self._delete_workflow_file, danger=True, width=58, font=ctk.CTkFont("SF Pro Text", 10)).pack(side="left")
+        wf_mgmt_row.pack(fill="x", pady=(2, 0))
+        wf_mgmt_row.grid_columnconfigure((0, 1, 2), weight=1)
+
+        _btn(wf_mgmt_row, "Rename", self._rename_workflow, width=10,
+             fg_color="transparent", border_width=1, border_color=T["border"],
+             text_color=T["dim"], hover_color=T["hover"], font=ctk.CTkFont(*FONT_SM)
+             ).grid(row=0, column=0, padx=(0, 4), sticky="ew")
+        _btn(wf_mgmt_row, "Dupe", self._duplicate_workflow_file, width=10,
+             fg_color="transparent", border_width=1, border_color=T["border"],
+             text_color=T["dim"], hover_color=T["hover"], font=ctk.CTkFont(*FONT_SM)
+             ).grid(row=0, column=1, padx=(0, 4), sticky="ew")
+        _btn(wf_mgmt_row, "Delete", self._delete_workflow_file, width=10,
+             fg_color="transparent", border_width=1, border_color=T["border"],
+             text_color=T["err"], hover_color="#2A1515", font=ctk.CTkFont(*FONT_SM)
+             ).grid(row=0, column=2, sticky="ew")
 
         _sep(sb).pack(fill="x", padx=0, pady=4)
 
