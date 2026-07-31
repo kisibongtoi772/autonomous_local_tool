@@ -551,7 +551,7 @@ class AutomatorGUI(ctk.CTk):
         self._wf_search_var.trace_add("write", lambda *_: self._refresh_workflow())
         search_entry = ctk.CTkEntry(
             tb, placeholder_text="Filter actions...",
-            variable=self._wf_search_var, width=150,
+            textvariable=self._wf_search_var, width=150,
             fg_color=T["raised"], border_color=T["border"],
             text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
             corner_radius=6
