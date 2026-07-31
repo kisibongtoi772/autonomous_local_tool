@@ -149,7 +149,7 @@ class LogHandler(logging.Handler):
 # ── Shared widget factory ─────────────────────────────────────────────────────
 def _btn(parent, text: str, command, width=None, primary=False, danger=False, **kw):
     fg = T["accent"] if primary else (T["err"] if danger else T["raised"])
-    hv = T["accent_d"] if primary else (T["err"] + "CC" if danger else T["hover"])
+    hv = T["accent_d"] if primary else ("#C03030" if danger else T["hover"])
     defaults = dict(
         fg_color=fg, hover_color=hv,
         text_color=T["text"],
