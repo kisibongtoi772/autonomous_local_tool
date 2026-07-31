@@ -1,8 +1,10 @@
 """
-Desktop Automator — Professional GUI
-Layout: Header | Sidebar (left) | Content (right)
+Desktop Automator — Professional Dashboard
+Stack: CustomTkinter (lightweight, native, no extra runtime)
+Design: Minimal · Typography-driven · Zero emoji icons
 """
 from __future__ import annotations
+
 import copy
 import json
 import logging
@@ -26,7 +28,7 @@ from ..utils.config import (
     WORKSPACE_DIR, VARIABLES_FILE, RUN_HISTORY_FILE, SCHEDULES_FILE
 )
 
-# ── macOS: eagerly load HIServices so pynput doesn't crash on background threads
+# macOS: pre-load HIServices on main thread to prevent pynput crash on bg threads
 if sys.platform == "darwin":
     try:
         import HIServices
@@ -36,65 +38,39 @@ if sys.platform == "darwin":
 
 logger = get_logger(__name__)
 
-# ── Colour palette ────────────────────────────────────────────────────────────
-C = {
-    "bg":           "#0F1117",
-    "sidebar":      "#161B22",
-    "card":         "#1C2128",
-    "card_hover":   "#21262D",
-    "accent":       "#58A6FF",
-    "accent2":      "#3FB950",
-    "danger":       "#F85149",
-    "warning":      "#E3B341",
-    "muted":        "#8B949E",
-    "border":       "#30363D",
-    "text":         "#E6EDF3",
-    "text_dim":     "#8B949E",
-    "record_red":   "#DA3633",
-    "play_green":   "#238636",
+# ── Design tokens ─────────────────────────────────────────────────────────────
+T = {
+    # Backgrounds
+    "bg":       "#0A0C10",
+    "surface":  "#111318",
+    "raised":   "#181C22",
+    "hover":    "#1E232C",
+    "border":   "#262B35",
+
+    # Accent (single blue accent — no rainbow)
+    "accent":   "#3B82F6",
+    "accent_d": "#2563EB",
+
+    # Status
+    "ok":       "#22C55E",
+    "warn":     "#F59E0B",
+    "err":      "#EF4444",
+
+    # Text
+    "text":     "#E2E8F0",
+    "dim":      "#64748B",
+    "label":    "#94A3B8",
 }
 
-ICON = {
-    "dashboard": "  Dashboard",
-    "workflow":  "  Workflow",
-    "scheduler": "  Scheduler",
-    "variables": "  Variables",
-    "history":   "  History",
-}
+FONT_MONO  = ("Menlo", 11)
+FONT_BODY  = ("SF Pro Text", 12)
+FONT_BOLD  = ("SF Pro Text", 12, "bold")
+FONT_SM    = ("SF Pro Text", 10)
+FONT_HEAD  = ("SF Pro Display", 16, "bold")
+FONT_NUM   = ("SF Pro Display", 24, "bold")
 
 
-# ── Log handler ───────────────────────────────────────────────────────────────
-class ColourLogHandler(logging.Handler):
-    LEVEL_COLOURS = {
-        logging.DEBUG:   "#8B949E",
-        logging.INFO:    "#58A6FF",
-        logging.WARNING: "#E3B341",
-        logging.ERROR:   "#F85149",
-        logging.CRITICAL:"#FF6E6E",
-    }
-
-    def __init__(self, textbox: ctk.CTkTextbox):
-        super().__init__()
-        self.textbox = textbox
-        self.setFormatter(logging.Formatter("%(asctime)s  %(message)s", "%H:%M:%S"))
-
-    def emit(self, record):
-        msg = self.format(record)
-        colour = self.LEVEL_COLOURS.get(record.levelno, "#E6EDF3")
-        self.textbox.after(0, self._append, msg, colour)
-
-    def _append(self, msg, colour):
-        tb = self.textbox
-        tb.configure(state="normal")
-        tb.insert("end", msg + "\n", colour)
-        tb.see("end")
-        lines = int(tb.index("end-1c").split(".")[0])
-        if lines > 150:
-            tb.delete("1.0", f"{lines - 150}.0")
-        tb.configure(state="disabled")
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
+# ── Utilities ─────────────────────────────────────────────────────────────────
 def load_json(path: str, default=None):
     if os.path.exists(path):
         try:
@@ -111,443 +87,531 @@ def save_json(path: str, data):
 
 
 def get_workflow_files():
-    files = glob.glob(os.path.join(WORKSPACE_DIR, "*.json"))
-    exclude = {
+    excluded = {
         os.path.basename(VARIABLES_FILE),
         os.path.basename(RUN_HISTORY_FILE),
         os.path.basename(SCHEDULES_FILE),
     }
-    return [os.path.basename(f) for f in files if os.path.basename(f) not in exclude] or ["workflow.json"]
+    files = [
+        os.path.basename(f)
+        for f in glob.glob(os.path.join(WORKSPACE_DIR, "*.json"))
+        if os.path.basename(f) not in excluded
+    ]
+    return files or ["workflow.json"]
 
 
-ACTION_ICONS = {
-    "click":            "🖱",
-    "type":             "⌨",
-    "sleep":            "⏱",
-    "hotkey":           "🔑",
-    "run_command":      "⚙",
-    "scroll":           "↕",
-    "screenshot":       "📷",
-    "loop":             "🔁",
-    "assert_template":  "🔍",
-    "clipboard":        "📋",
-    "if_template":      "🔀",
+ACTION_LABELS = {
+    "click":           "Click",
+    "type":            "Type",
+    "sleep":           "Sleep",
+    "hotkey":          "Hotkey",
+    "run_command":     "Command",
+    "scroll":          "Scroll",
+    "screenshot":      "Screenshot",
+    "loop":            "Loop",
+    "assert_template": "Assert",
+    "clipboard":       "Clipboard",
+    "if_template":     "Conditional",
 }
 
-ACTION_TYPE_KEYS = list(ACTION_ICONS.keys())
+
+# ── Log handler ───────────────────────────────────────────────────────────────
+class LogHandler(logging.Handler):
+    _COLOURS = {
+        logging.DEBUG:    T["dim"],
+        logging.INFO:     T["text"],
+        logging.WARNING:  T["warn"],
+        logging.ERROR:    T["err"],
+        logging.CRITICAL: T["err"],
+    }
+
+    def __init__(self, textbox: ctk.CTkTextbox):
+        super().__init__()
+        self.textbox = textbox
+        self.setFormatter(logging.Formatter("%(asctime)s  %(levelname)-5s  %(message)s", "%H:%M:%S"))
+
+    def emit(self, record):
+        msg  = self.format(record)
+        col  = self._COLOURS.get(record.levelno, T["text"])
+        self.textbox.after(0, self._write, msg, col)
+
+    def _write(self, msg: str, col: str):
+        tb = self.textbox
+        tb.configure(state="normal")
+        tb.insert("end", msg + "\n", col)
+        tb.see("end")
+        lines = int(tb.index("end-1c").split(".")[0])
+        if lines > 200:
+            tb.delete("1.0", f"{lines - 200}.0")
+        tb.configure(state="disabled")
+
+
+# ── Shared widget factory ─────────────────────────────────────────────────────
+def _btn(parent, text: str, command, width=None, primary=False, danger=False, **kw):
+    fg = T["accent"] if primary else (T["err"] if danger else T["raised"])
+    hv = T["accent_d"] if primary else (T["err"] + "CC" if danger else T["hover"])
+    b  = ctk.CTkButton(
+        parent, text=text, command=command,
+        fg_color=fg, hover_color=hv,
+        text_color=T["text"],
+        font=ctk.CTkFont(*FONT_BODY),
+        border_width=0 if (primary or danger) else 1,
+        border_color=T["border"],
+        corner_radius=6, height=32,
+        width=width or 120,
+        **kw
+    )
+    return b
+
+
+def _label(parent, text: str, size=12, weight="normal", colour=None, **kw):
+    return ctk.CTkLabel(
+        parent, text=text,
+        font=ctk.CTkFont("SF Pro Text", size, weight),
+        text_color=colour or T["text"], **kw
+    )
+
+
+def _sep(parent):
+    return ctk.CTkFrame(parent, height=1, fg_color=T["border"], corner_radius=0)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Main Application
+# Application
 # ═══════════════════════════════════════════════════════════════════════════════
 class AutomatorGUI(ctk.CTk):
+
     def __init__(self):
         super().__init__()
-
         ctk.set_appearance_mode("dark")
         ctk.set_default_color_theme("blue")
 
         self.title("Desktop Automator")
-        self.geometry("920x660")
-        self.minsize(820, 580)
-        self.configure(fg_color=C["bg"])
+        self.geometry("960x640")
+        self.minsize(800, 560)
+        self.configure(fg_color=T["bg"])
 
         # State
-        self.recording = False
-        self.recorder: Recorder | None = None
-        self.current_workflow_path = os.path.join(WORKSPACE_DIR, "workflow.json")
-        self.file_var = ctk.StringVar(value="workflow.json")
-        self._active_tab = "dashboard"
-        self._tab_buttons: dict[str, ctk.CTkButton] = {}
-        self._content_frames: dict[str, ctk.CTkFrame] = {}
+        self.recording   = False
+        self.recorder:  Recorder | None = None
+        self.file_var    = ctk.StringVar(value="workflow.json")
+        self._active_nav = "dashboard"
+        self._nav_btns:    dict[str, ctk.CTkButton] = {}
+        self._panels:      dict[str, ctk.CTkFrame]  = {}
 
         # Services
-        self.scheduler = WorkflowScheduler()
+        self.scheduler   = WorkflowScheduler()
         self.var_manager = VariableManager()
 
         os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
-        self._build_ui()
+        self._build()
         self._start_listeners()
-        self.scheduler.set_play_callback(self._scheduled_play)
+        self.scheduler.set_play_callback(self._run_scheduled)
         self.scheduler.start()
 
-    # ── Layout ────────────────────────────────────────────────────────────────
+    # ── Top-level layout ──────────────────────────────────────────────────────
 
-    def _build_ui(self):
+    def _build(self):
         self.grid_columnconfigure(1, weight=1)
-        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=1)
 
-        self._build_header()
         self._build_sidebar()
-        self._build_content_area()
-        self._switch_tab("dashboard")
+        self._build_main()
+        self._nav_to("dashboard")
 
-    def _build_header(self):
-        hdr = ctk.CTkFrame(self, height=52, fg_color=C["sidebar"], corner_radius=0)
-        hdr.grid(row=0, column=0, columnspan=2, sticky="ew")
-        hdr.grid_propagate(False)
-        hdr.grid_columnconfigure(1, weight=1)
-
-        # Logo
-        logo = ctk.CTkLabel(
-            hdr, text="⚡ Desktop Automator",
-            font=ctk.CTkFont(family="SF Pro Display", size=18, weight="bold"),
-            text_color=C["accent"]
-        )
-        logo.grid(row=0, column=0, padx=20, pady=10, sticky="w")
-
-        # Status badge
-        self.status_badge = ctk.CTkLabel(
-            hdr, text="● IDLE",
-            font=ctk.CTkFont(size=12, weight="bold"),
-            text_color=C["accent2"],
-            fg_color=C["card"], corner_radius=8,
-            padx=10, pady=4
-        )
-        self.status_badge.grid(row=0, column=2, padx=20, pady=10, sticky="e")
+    # ── Sidebar ───────────────────────────────────────────────────────────────
 
     def _build_sidebar(self):
-        sb = ctk.CTkFrame(self, width=180, fg_color=C["sidebar"], corner_radius=0)
-        sb.grid(row=1, column=0, sticky="nsew")
+        sb = ctk.CTkFrame(self, width=190, fg_color=T["surface"], corner_radius=0)
+        sb.grid(row=0, column=0, sticky="nsew")
         sb.grid_propagate(False)
 
-        # Workflow selector at top of sidebar
-        sel_frame = ctk.CTkFrame(sb, fg_color=C["card"], corner_radius=8)
-        sel_frame.pack(padx=12, pady=(16, 8), fill="x")
+        # App name
+        ctk.CTkLabel(
+            sb, text="Desktop\nAutomator",
+            font=ctk.CTkFont("SF Pro Display", 15, "bold"),
+            text_color=T["text"], justify="left"
+        ).pack(padx=18, pady=(22, 4), anchor="w")
 
-        ctk.CTkLabel(sel_frame, text="Workflow", font=ctk.CTkFont(size=10),
-                     text_color=C["muted"]).pack(padx=10, pady=(6, 0), anchor="w")
+        _label(sb, "Local Automation Tool", size=10, colour=T["dim"]).pack(
+            padx=18, pady=(0, 16), anchor="w")
+
+        _sep(sb).pack(fill="x", padx=0)
+
+        # Workflow selector
+        sel = ctk.CTkFrame(sb, fg_color="transparent")
+        sel.pack(fill="x", padx=12, pady=12)
+
+        _label(sel, "Workflow", size=10, colour=T["dim"]).pack(anchor="w", pady=(0, 4))
         self.file_dropdown = ctk.CTkOptionMenu(
-            sel_frame, variable=self.file_var,
+            sel, variable=self.file_var,
             values=get_workflow_files(),
             command=self._on_file_select,
-            fg_color=C["card_hover"], button_color=C["border"],
-            button_hover_color=C["accent"], text_color=C["text"],
-            font=ctk.CTkFont(size=12), width=140, dynamic_resizing=False
+            fg_color=T["raised"], button_color=T["border"],
+            button_hover_color=T["hover"],
+            text_color=T["text"],
+            font=ctk.CTkFont(*FONT_BODY),
+            width=166, dynamic_resizing=False,
+            corner_radius=6
         )
-        self.file_dropdown.pack(padx=8, pady=(2, 6))
+        self.file_dropdown.pack(fill="x")
 
-        new_btn = ctk.CTkButton(
-            sel_frame, text="+ New Workflow", height=28,
-            fg_color="transparent", border_width=1, border_color=C["border"],
-            hover_color=C["card_hover"], text_color=C["accent"],
-            font=ctk.CTkFont(size=11), command=self._create_new_workflow
-        )
-        new_btn.pack(padx=8, pady=(0, 8), fill="x")
+        _btn(sel, "New Workflow", self._new_workflow, width=166,
+             fg_color="transparent",
+             border_width=1, border_color=T["border"],
+             text_color=T["dim"],
+             hover_color=T["hover"]
+             ).pack(pady=(6, 0), fill="x")
 
-        # Nav tabs
-        tabs = [
-            ("dashboard", "🏠", "Dashboard"),
-            ("workflow",  "📋", "Workflow"),
-            ("scheduler", "🕐", "Scheduler"),
-            ("variables", "📦", "Variables"),
-            ("history",   "📜", "History"),
+        _sep(sb).pack(fill="x", padx=0, pady=4)
+
+        # Nav items
+        nav_items = [
+            ("dashboard", "Dashboard"),
+            ("workflow",  "Workflow Editor"),
+            ("scheduler", "Scheduler"),
+            ("variables", "Variables"),
+            ("history",   "Run History"),
         ]
-        for key, icon, label in tabs:
-            btn = ctk.CTkButton(
-                sb, text=f" {icon}  {label}", anchor="w",
-                height=40, corner_radius=8,
-                fg_color="transparent", hover_color=C["card_hover"],
-                text_color=C["text_dim"], font=ctk.CTkFont(size=13),
-                command=lambda k=key: self._switch_tab(k)
+        for key, label in nav_items:
+            b = ctk.CTkButton(
+                sb, text=label, anchor="w",
+                height=36, corner_radius=6,
+                fg_color="transparent",
+                hover_color=T["hover"],
+                text_color=T["dim"],
+                font=ctk.CTkFont(*FONT_BODY),
+                command=lambda k=key: self._nav_to(k)
             )
-            btn.pack(padx=10, pady=2, fill="x")
-            self._tab_buttons[key] = btn
+            b.pack(padx=10, pady=2, fill="x")
+            self._nav_btns[key] = b
 
-        # Version at bottom
-        ctk.CTkLabel(sb, text="v0.2.0", font=ctk.CTkFont(size=10),
-                     text_color=C["muted"]).pack(side="bottom", pady=10)
+        # Status indicator at bottom
+        _sep(sb).pack(fill="x", padx=0, side="bottom")
+        self._status_row = ctk.CTkFrame(sb, fg_color="transparent")
+        self._status_row.pack(side="bottom", fill="x", padx=14, pady=10)
 
-    def _build_content_area(self):
-        container = ctk.CTkFrame(self, fg_color=C["bg"], corner_radius=0)
-        container.grid(row=1, column=1, sticky="nsew")
-        container.grid_rowconfigure(0, weight=1)
-        container.grid_columnconfigure(0, weight=1)
+        self._status_dot = ctk.CTkLabel(
+            self._status_row, text="●", width=14,
+            font=ctk.CTkFont("SF Pro Text", 10),
+            text_color=T["ok"]
+        )
+        self._status_dot.pack(side="left")
+
+        self._status_text = _label(self._status_row, "Idle", size=11, colour=T["label"])
+        self._status_text.pack(side="left", padx=(4, 0))
+
+    # ── Main content area ─────────────────────────────────────────────────────
+
+    def _build_main(self):
+        main = ctk.CTkFrame(self, fg_color=T["bg"], corner_radius=0)
+        main.grid(row=0, column=1, sticky="nsew")
+        main.grid_rowconfigure(0, weight=1)
+        main.grid_columnconfigure(0, weight=1)
 
         for key, builder in [
             ("dashboard", self._build_dashboard),
-            ("workflow",  self._build_workflow_tab),
-            ("scheduler", self._build_scheduler_tab),
-            ("variables", self._build_variables_tab),
-            ("history",   self._build_history_tab),
+            ("workflow",  self._build_workflow),
+            ("scheduler", self._build_scheduler),
+            ("variables", self._build_variables),
+            ("history",   self._build_history),
         ]:
-            frame = ctk.CTkFrame(container, fg_color=C["bg"], corner_radius=0)
-            frame.grid(row=0, column=0, sticky="nsew")
-            self._content_frames[key] = frame
-            builder(frame)
+            f = ctk.CTkFrame(main, fg_color=T["bg"], corner_radius=0)
+            f.grid(row=0, column=0, sticky="nsew")
+            self._panels[key] = f
+            builder(f)
 
-    def _switch_tab(self, key: str):
-        for k, btn in self._tab_buttons.items():
+    def _nav_to(self, key: str):
+        for k, b in self._nav_btns.items():
             if k == key:
-                btn.configure(fg_color=C["card"], text_color=C["accent"])
+                b.configure(fg_color=T["raised"], text_color=T["text"])
             else:
-                btn.configure(fg_color="transparent", text_color=C["text_dim"])
+                b.configure(fg_color="transparent", text_color=T["dim"])
 
-        for k, frame in self._content_frames.items():
+        for k, f in self._panels.items():
             if k == key:
-                frame.tkraise()
-            # else: stays in grid
+                f.tkraise()
 
-        self._active_tab = key
+        self._active_nav = key
 
-        # Refresh data for tabs that need live data
-        if key == "workflow":
-            self._refresh_workflow_list()
-        elif key == "history":
-            self._refresh_history()
-        elif key == "variables":
-            self._refresh_variables()
-        elif key == "scheduler":
-            self._refresh_scheduler()
+        # Refresh live data
+        refresh = {
+            "workflow":  self._refresh_workflow,
+            "variables": self._refresh_variables,
+            "history":   self._refresh_history,
+            "scheduler": self._refresh_scheduler,
+        }
+        if key in refresh:
+            refresh[key]()
 
-    # ── Dashboard Tab ─────────────────────────────────────────────────────────
+    # ── PANEL: Dashboard ──────────────────────────────────────────────────────
 
-    def _build_dashboard(self, parent: ctk.CTkFrame):
-        parent.grid_columnconfigure(0, weight=1)
-        parent.grid_rowconfigure(2, weight=1)
+    def _build_dashboard(self, p: ctk.CTkFrame):
+        p.grid_columnconfigure(0, weight=1)
+        p.grid_rowconfigure(2, weight=1)
 
-        # Stats row
-        stats = ctk.CTkFrame(parent, fg_color="transparent")
-        stats.grid(row=0, column=0, padx=20, pady=(20, 8), sticky="ew")
-        stats.grid_columnconfigure((0, 1, 2), weight=1)
+        # Page header
+        self._page_header(p, "Dashboard", row=0)
 
-        self._stat_workflows = self._make_stat_card(stats, "Workflows", "0", C["accent"], col=0)
-        self._stat_actions   = self._make_stat_card(stats, "Actions", "0", C["accent2"], col=1)
-        self._stat_runs      = self._make_stat_card(stats, "Total Runs", "0", C["warning"], col=2)
+        # Stats + controls in one top section
+        top = ctk.CTkFrame(p, fg_color="transparent")
+        top.grid(row=1, column=0, sticky="ew", padx=24, pady=(0, 12))
+        top.grid_columnconfigure((0, 1, 2), weight=1)
 
-        # Control panel
-        ctrl = ctk.CTkFrame(parent, fg_color=C["card"], corner_radius=12)
-        ctrl.grid(row=1, column=0, padx=20, pady=8, sticky="ew")
-        ctrl.grid_columnconfigure((0, 1, 2), weight=1)
+        self._stat_wf   = self._stat_card(top, "Workflows",  0)
+        self._stat_acts = self._stat_card(top, "Actions",    1)
+        self._stat_runs = self._stat_card(top, "Total Runs", 2)
+
+        # Controls card
+        ctrl = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
+        ctrl.grid(row=2, column=0, sticky="nsew", padx=24, pady=(0, 12))
+        ctrl.grid_columnconfigure(0, weight=1)
+        ctrl.grid_rowconfigure(1, weight=1)
+
+        ctrl_hdr = ctk.CTkFrame(ctrl, fg_color="transparent")
+        ctrl_hdr.grid(row=0, column=0, sticky="ew", padx=16, pady=(12, 8))
+        _label(ctrl_hdr, "Controls", size=11, colour=T["dim"]).pack(side="left")
+        _label(ctrl_hdr, "F9  Record   F10  Stop   F11  Playback",
+               size=10, colour=T["border"]).pack(side="right")
+
+        btn_row = ctk.CTkFrame(ctrl, fg_color="transparent")
+        btn_row.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 12))
 
         self.record_btn = ctk.CTkButton(
-            ctrl, text="⏺  Record (F9)", height=44,
-            fg_color=C["record_red"], hover_color="#c1272a",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            command=self.start_recording
+            btn_row, text="Record", height=36, width=110,
+            fg_color=T["err"], hover_color="#CC3333",
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BOLD),
+            corner_radius=6, command=self.start_recording
         )
-        self.record_btn.grid(row=0, column=0, padx=16, pady=16, sticky="ew")
+        self.record_btn.pack(side="left", padx=(0, 8))
 
         self.stop_btn = ctk.CTkButton(
-            ctrl, text="⏹  Stop (F10)", height=44,
-            fg_color=C["border"], hover_color=C["card_hover"],
-            text_color=C["muted"], font=ctk.CTkFont(size=14, weight="bold"),
-            state="disabled", command=self.stop_recording
+            btn_row, text="Stop", height=36, width=90,
+            fg_color=T["raised"], hover_color=T["hover"],
+            text_color=T["dim"], font=ctk.CTkFont(*FONT_BOLD),
+            border_width=1, border_color=T["border"],
+            corner_radius=6, state="disabled", command=self.stop_recording
         )
-        self.stop_btn.grid(row=0, column=1, padx=8, pady=16, sticky="ew")
+        self.stop_btn.pack(side="left", padx=(0, 8))
 
         self.play_btn = ctk.CTkButton(
-            ctrl, text="▶  Playback (F11)", height=44,
-            fg_color=C["play_green"], hover_color="#1a6b27",
-            font=ctk.CTkFont(size=14, weight="bold"),
-            command=self.playback
+            btn_row, text="Playback", height=36, width=110,
+            fg_color=T["accent"], hover_color=T["accent_d"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BOLD),
+            corner_radius=6, command=self.playback
         )
-        self.play_btn.grid(row=0, column=2, padx=16, pady=16, sticky="ew")
+        self.play_btn.pack(side="left")
 
         # Log console
-        log_frame = ctk.CTkFrame(parent, fg_color=C["card"], corner_radius=12)
-        log_frame.grid(row=2, column=0, padx=20, pady=(0, 20), sticky="nsew")
-        log_frame.grid_rowconfigure(1, weight=1)
-        log_frame.grid_columnconfigure(0, weight=1)
+        log_wrap = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
+        log_wrap.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0, 24))
+        log_wrap.grid_rowconfigure(1, weight=1)
+        log_wrap.grid_columnconfigure(0, weight=1)
 
-        hdr = ctk.CTkFrame(log_frame, fg_color="transparent")
-        hdr.grid(row=0, column=0, padx=14, pady=(10, 0), sticky="ew")
-        ctk.CTkLabel(hdr, text="Activity Log", font=ctk.CTkFont(size=13, weight="bold"),
-                     text_color=C["text"]).pack(side="left")
-        ctk.CTkButton(hdr, text="Clear", width=60, height=24,
-                      fg_color="transparent", border_width=1, border_color=C["border"],
-                      text_color=C["muted"], font=ctk.CTkFont(size=11),
-                      command=self._clear_log).pack(side="right")
+        p.grid_rowconfigure(3, weight=2)
 
-        self.log_console = ctk.CTkTextbox(
-            log_frame, fg_color="#0D1117", text_color=C["text"],
-            font=ctk.CTkFont(family="Menlo", size=12),
-            state="disabled", corner_radius=8, wrap="word"
+        lhdr = ctk.CTkFrame(log_wrap, fg_color="transparent")
+        lhdr.grid(row=0, column=0, sticky="ew", padx=14, pady=(10, 4))
+        _label(lhdr, "Activity Log", size=11, colour=T["dim"]).pack(side="left")
+        _btn(lhdr, "Clear", self._clear_log, width=60,
+             height=24,
+             fg_color="transparent",
+             border_width=1, border_color=T["border"],
+             text_color=T["dim"]
+             ).pack(side="right")
+
+        self.log_box = ctk.CTkTextbox(
+            log_wrap,
+            fg_color=T["bg"],
+            text_color=T["text"],
+            font=ctk.CTkFont(*FONT_MONO),
+            state="disabled",
+            corner_radius=6,
+            wrap="word",
+            border_width=0
         )
-        self.log_console.grid(row=1, column=0, padx=12, pady=(6, 12), sticky="nsew")
+        self.log_box.grid(row=1, column=0, padx=12, pady=(0, 12), sticky="nsew")
 
-        # Tag colours for log levels
-        for level, colour in ColourLogHandler.LEVEL_COLOURS.items():
-            self.log_console.tag_config(colour, foreground=colour)
+        for col in (T["text"], T["dim"], T["warn"], T["err"]):
+            self.log_box.tag_config(col, foreground=col)
 
         # Attach log handler
-        handler = ColourLogHandler(self.log_console)
+        handler = LogHandler(self.log_box)
         logging.getLogger("automator").addHandler(handler)
-        logger.info("GUI started successfully. Welcome to Desktop Automator!")
-        self._update_stats()
+        logger.info("Desktop Automator ready.")
+        self._refresh_stats()
 
-    def _make_stat_card(self, parent, label: str, value: str, colour: str, col: int):
-        card = ctk.CTkFrame(parent, fg_color=C["card"], corner_radius=12)
-        card.grid(row=0, column=col, padx=6, pady=0, sticky="ew")
-        ctk.CTkLabel(card, text=label, font=ctk.CTkFont(size=11),
-                     text_color=C["muted"]).pack(padx=14, pady=(12, 2), anchor="w")
-        val_lbl = ctk.CTkLabel(card, text=value,
-                               font=ctk.CTkFont(size=28, weight="bold"), text_color=colour)
-        val_lbl.pack(padx=14, pady=(0, 12), anchor="w")
-        return val_lbl
+    def _stat_card(self, parent, label: str, col: int) -> ctk.CTkLabel:
+        card = ctk.CTkFrame(parent, fg_color=T["surface"], corner_radius=8)
+        card.grid(row=0, column=col, padx=(0 if col == 0 else 8, 0), pady=(0, 12), sticky="ew")
+        _label(card, label, size=10, colour=T["dim"]).pack(padx=14, pady=(12, 2), anchor="w")
+        val = ctk.CTkLabel(card, text="0",
+                           font=ctk.CTkFont("SF Pro Display", 26, "bold"),
+                           text_color=T["text"])
+        val.pack(padx=14, pady=(0, 12), anchor="w")
+        return val
 
-    def _update_stats(self):
-        wf_files = get_workflow_files()
-        self._stat_workflows.configure(text=str(len(wf_files)))
-
-        actions = 0
-        for f in wf_files:
-            data = load_json(os.path.join(WORKSPACE_DIR, f), {})
-            actions += len(data.get("actions", []))
-        self._stat_actions.configure(text=str(actions))
-
+    def _refresh_stats(self):
+        wf = get_workflow_files()
+        self._stat_wf.configure(text=str(len(wf)))
+        total = sum(len(load_json(os.path.join(WORKSPACE_DIR, f), {}).get("actions", [])) for f in wf)
+        self._stat_acts.configure(text=str(total))
         history = load_json(RUN_HISTORY_FILE, [])
         self._stat_runs.configure(text=str(len(history)))
 
     def _clear_log(self):
-        self.log_console.configure(state="normal")
-        self.log_console.delete("1.0", "end")
-        self.log_console.configure(state="disabled")
+        self.log_box.configure(state="normal")
+        self.log_box.delete("1.0", "end")
+        self.log_box.configure(state="disabled")
 
-    # ── Workflow Tab ──────────────────────────────────────────────────────────
+    # ── PANEL: Workflow Editor ─────────────────────────────────────────────────
 
-    def _build_workflow_tab(self, parent: ctk.CTkFrame):
-        parent.grid_rowconfigure(1, weight=1)
-        parent.grid_columnconfigure(0, weight=1)
+    def _build_workflow(self, p: ctk.CTkFrame):
+        p.grid_columnconfigure(0, weight=1)
+        p.grid_rowconfigure(1, weight=1)
+
+        self._page_header(p, "Workflow Editor", row=0)
 
         # Toolbar
-        tb = ctk.CTkFrame(parent, fg_color=C["card"], corner_radius=12)
-        tb.grid(row=0, column=0, padx=20, pady=(20, 8), sticky="ew")
+        tb = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
+        tb.grid(row=0, column=0, sticky="ew", padx=24, pady=(56, 8))
 
-        for text, color, cmd in [
-            ("🔄  Refresh", "transparent", self._refresh_workflow_list),
-            ("➕  Add Action", C["play_green"],  self._open_add_dialog),
-            ("🗑  Clear All",  C["record_red"],  self._clear_workflow),
+        for text, cmd, primary in [
+            ("Refresh",    self._refresh_workflow, False),
+            ("Add Action", self._open_add_dialog,  True),
+            ("Clear All",  self._clear_workflow,   False),
         ]:
-            ctk.CTkButton(tb, text=text, height=34, fg_color=color,
-                          border_width=0 if color != "transparent" else 1,
-                          border_color=C["border"],
-                          hover_color=C["card_hover"] if color == "transparent" else None,
-                          text_color=C["text"],
-                          font=ctk.CTkFont(size=12), command=cmd).pack(
-                side="left", padx=8, pady=10)
+            _btn(tb, text, cmd, primary=primary,
+                 danger=(text == "Clear All")).pack(side="left", padx=(8, 0), pady=8)
 
-        # Action list
-        self.workflow_list_frame = ctk.CTkScrollableFrame(
-            parent, fg_color="transparent", corner_radius=0)
-        self.workflow_list_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="nsew")
-        self.workflow_list_frame.grid_columnconfigure(0, weight=1)
+        # Column headers
+        hdr = ctk.CTkFrame(p, fg_color="transparent")
+        hdr.grid(row=1, column=0, sticky="ew", padx=24)
+        hdr.grid_columnconfigure(2, weight=1)
 
-    def _refresh_workflow_list(self):
-        for w in self.workflow_list_frame.winfo_children():
+        for col, txt, w in [
+            (0, "#",     40),
+            (1, "Type",  90),
+            (2, "Summary", 0),
+            (3, "Actions", 120),
+        ]:
+            anchor = "w" if col in (1, 2) else "center"
+            _label(hdr, txt, size=10, colour=T["dim"], anchor=anchor, width=w
+                   ).grid(row=0, column=col, padx=(12 if col == 0 else 4), pady=4, sticky="ew")
+
+        _sep(p).grid(row=2, column=0, sticky="ew", padx=24)
+
+        # Scrollable list
+        self._wf_list = ctk.CTkScrollableFrame(
+            p, fg_color="transparent", corner_radius=0,
+            scrollbar_button_color=T["border"],
+            scrollbar_button_hover_color=T["hover"]
+        )
+        self._wf_list.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0, 24))
+        self._wf_list.grid_columnconfigure(2, weight=1)
+        p.grid_rowconfigure(3, weight=1)
+
+    def _refresh_workflow(self):
+        for w in self._wf_list.winfo_children():
             w.destroy()
 
-        path = self.current_workflow_path
+        path = os.path.join(WORKSPACE_DIR, self.file_var.get())
         if not os.path.exists(path):
-            ctk.CTkLabel(self.workflow_list_frame, text="No workflow found. Record one first!",
-                         text_color=C["muted"]).pack(pady=30)
+            _label(self._wf_list, "No workflow file found.", colour=T["dim"]).pack(pady=30)
             return
 
-        data = load_json(path, {})
+        data    = load_json(path, {})
         actions = data.get("actions", [])
+
         if not actions:
-            ctk.CTkLabel(self.workflow_list_frame, text="Workflow is empty.",
-                         text_color=C["muted"]).pack(pady=30)
+            _label(self._wf_list, "Workflow is empty. Record or add actions.", colour=T["dim"]).pack(pady=30)
             return
 
         for i, action in enumerate(actions):
             self._render_action_row(i, action, len(actions))
 
     def _render_action_row(self, i: int, action: dict, total: int):
-        atype = action.get("type", "unknown")
-        icon  = ACTION_ICONS.get(atype, "•")
-
-        row = ctk.CTkFrame(self.workflow_list_frame, fg_color=C["card"], corner_radius=8)
-        row.pack(fill="x", pady=3)
-        row.grid_columnconfigure(1, weight=1)
-
-        # Index badge
-        idx_lbl = ctk.CTkLabel(row, text=f"#{i+1}", width=36,
-                               font=ctk.CTkFont(size=11, weight="bold"),
-                               text_color=C["muted"])
-        idx_lbl.grid(row=0, column=0, padx=(10, 0), pady=10)
-
-        # Icon + summary
+        atype   = action.get("type", "unknown")
+        label   = ACTION_LABELS.get(atype, atype.upper())
         summary = self._action_summary(atype, action)
-        info = ctk.CTkLabel(row, text=f"{icon}  {atype.upper()}  —  {summary}",
-                            anchor="w", font=ctk.CTkFont(size=12), text_color=C["text"])
-        info.grid(row=0, column=1, padx=8, pady=10, sticky="ew")
 
-        # Thumbnail for click actions
-        tmpl = action.get("template_image")
-        if atype == "click" and tmpl and os.path.exists(tmpl):
-            try:
-                pil_img = Image.open(tmpl).resize((36, 36))
-                ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=(36, 36))
-                ctk.CTkLabel(row, image=ctk_img, text="").grid(row=0, column=2, padx=6, pady=6)
-            except Exception:
-                pass
+        row = ctk.CTkFrame(self._wf_list, fg_color=T["raised"], corner_radius=6)
+        row.pack(fill="x", pady=2)
+        row.grid_columnconfigure(2, weight=1)
 
-        # Controls
+        # Index
+        _label(row, str(i + 1), size=10, colour=T["dim"],
+               anchor="center", width=40).grid(row=0, column=0, padx=(10, 0), pady=8)
+
+        # Type badge
+        badge = ctk.CTkFrame(row, fg_color=T["border"], corner_radius=4, width=80)
+        badge.grid(row=0, column=1, padx=8, pady=8)
+        _label(badge, label, size=10, colour=T["label"]).pack(padx=8, pady=3)
+
+        # Summary
+        _label(row, summary, size=11, colour=T["text"],
+               anchor="w").grid(row=0, column=2, padx=4, pady=8, sticky="ew")
+
+        # Controls — plain text buttons only
         ctrl = ctk.CTkFrame(row, fg_color="transparent")
-        ctrl.grid(row=0, column=3, padx=8, pady=6)
+        ctrl.grid(row=0, column=3, padx=8, pady=4)
 
-        icon_btn = lambda parent, txt, cmd: ctk.CTkButton(
-            parent, text=txt, width=32, height=28,
-            fg_color="transparent", hover_color=C["border"],
-            text_color=C["muted"], font=ctk.CTkFont(size=14), command=cmd
-        )
-        icon_btn(ctrl, "▶", lambda idx=i: self._test_action(idx)).pack(side="left", padx=1)
+        def _ctrl_btn(parent, txt, cmd):
+            return ctk.CTkButton(
+                parent, text=txt, width=32, height=26,
+                fg_color="transparent", hover_color=T["hover"],
+                text_color=T["dim"], font=ctk.CTkFont("SF Pro Text", 11),
+                corner_radius=4, border_width=0, command=cmd
+            )
+
+        _ctrl_btn(ctrl, "Run",  lambda idx=i: self._test_action(idx)).pack(side="left", padx=1)
         if i > 0:
-            icon_btn(ctrl, "▲", lambda idx=i: self._move_up(idx)).pack(side="left", padx=1)
+            _ctrl_btn(ctrl, "Up",  lambda idx=i: self._move_up(idx)).pack(side="left", padx=1)
         if i < total - 1:
-            icon_btn(ctrl, "▼", lambda idx=i: self._move_down(idx)).pack(side="left", padx=1)
-        icon_btn(ctrl, "✏", lambda idx=i, a=action: self._open_edit_dialog(idx, a)).pack(side="left", padx=1)
-        icon_btn(ctrl, "⧉", lambda idx=i: self._duplicate_action(idx)).pack(side="left", padx=1)
-        del_btn = ctk.CTkButton(ctrl, text="✕", width=32, height=28,
-                                fg_color="transparent", hover_color="#3a1a1a",
-                                text_color=C["danger"], font=ctk.CTkFont(size=14),
-                                command=lambda idx=i: self._delete_action(idx))
+            _ctrl_btn(ctrl, "Dn",  lambda idx=i: self._move_down(idx)).pack(side="left", padx=1)
+        _ctrl_btn(ctrl, "Edit", lambda idx=i, a=action: self._open_edit_dialog(idx, a)).pack(side="left", padx=1)
+        _ctrl_btn(ctrl, "Dupe", lambda idx=i: self._duplicate_action(idx)).pack(side="left", padx=1)
+
+        del_btn = ctk.CTkButton(
+            ctrl, text="Del", width=32, height=26,
+            fg_color="transparent", hover_color="#2A1515",
+            text_color=T["err"], font=ctk.CTkFont("SF Pro Text", 11),
+            corner_radius=4, command=lambda idx=i: self._delete_action(idx)
+        )
         del_btn.pack(side="left", padx=1)
 
-    def _action_summary(self, atype: str, action: dict) -> str:
+    def _action_summary(self, atype: str, a: dict) -> str:
         if atype == "click":
-            return f"({action.get('x')}, {action.get('y')})  {action.get('button','left')} ×{action.get('clicks',1)}"
-        if atype == "type":
-            return repr(action.get("key", ""))
-        if atype == "sleep":
-            return f"{action.get('duration', 0)}s"
-        if atype == "hotkey":
-            return " + ".join(action.get("keys", []))
-        if atype == "run_command":
-            return action.get("command", "")[:50]
-        if atype == "scroll":
-            return f"{action.get('amount', 0)} units"
-        if atype == "screenshot":
-            return action.get("filename", "")
-        if atype == "clipboard":
-            return f"{action.get('action','set')}  {action.get('text','')[:30]}"
+            return f"({a.get('x')}, {a.get('y')})  button={a.get('button','left')}  clicks={a.get('clicks',1)}"
+        if atype == "type":      return repr(a.get("key", ""))
+        if atype == "sleep":     return f"{a.get('duration', 0)} s"
+        if atype == "hotkey":    return " + ".join(a.get("keys", []))
+        if atype == "run_command": return a.get("command", "")[:60]
+        if atype == "scroll":    return f"amount={a.get('amount', 0)}"
+        if atype == "screenshot": return a.get("filename", "")
+        if atype == "clipboard": return f"{a.get('action','set')}  {a.get('text','')[:40]}"
         if atype == "if_template":
-            t = action.get("template", "")
-            then = len(action.get("then_actions", []))
-            else_ = len(action.get("else_actions", []))
-            return f"template={t}  then×{then} else×{else_}"
+            return (f"template={a.get('template','')}  "
+                    f"then×{len(a.get('then_actions',[]))}  else×{len(a.get('else_actions',[]))}")
+        if atype == "loop":      return f"repeat={a.get('count',1)}  steps={len(a.get('actions',[]))}"
         return ""
 
     def _modify_workflow(self, mutator):
-        """Read workflow, apply mutator(data), save, refresh."""
-        path = self.current_workflow_path
+        path = os.path.join(WORKSPACE_DIR, self.file_var.get())
         data = load_json(path, {"workflow_name": "workflow", "created_at": "", "actions": []})
         mutator(data)
         save_json(path, data)
-        self._refresh_workflow_list()
-        self._update_stats()
+        self._refresh_workflow()
+        self._refresh_stats()
 
     def _delete_action(self, idx: int):
-        def m(d): d["actions"].pop(idx)
-        self._modify_workflow(m)
+        self._modify_workflow(lambda d: d["actions"].pop(idx))
         logger.info(f"Deleted action #{idx+1}")
 
     def _duplicate_action(self, idx: int):
         def m(d): d["actions"].insert(idx + 1, copy.deepcopy(d["actions"][idx]))
         self._modify_workflow(m)
-        logger.info(f"Duplicated action #{idx+1}")
 
     def _move_up(self, idx: int):
         if idx <= 0: return
@@ -561,471 +625,474 @@ class AutomatorGUI(ctk.CTk):
         self._modify_workflow(m)
 
     def _clear_workflow(self):
-        def m(d): d["actions"] = []
-        self._modify_workflow(m)
-        logger.info("Cleared all actions.")
+        self._modify_workflow(lambda d: d.update({"actions": []}))
+        logger.info("Workflow cleared.")
 
     def _test_action(self, idx: int):
-        data = load_json(self.current_workflow_path, {})
-        actions = data.get("actions", [])
-        if 0 <= idx < len(actions):
-            def run():
-                player = Player()
-                player.play_single_action(actions[idx])
-            threading.Thread(target=run, daemon=True).start()
+        data = load_json(os.path.join(WORKSPACE_DIR, self.file_var.get()), {})
+        acts = data.get("actions", [])
+        if 0 <= idx < len(acts):
+            threading.Thread(
+                target=lambda: Player().play_single_action(acts[idx]),
+                daemon=True
+            ).start()
 
     def _open_add_dialog(self):
-        dlg = self._make_dialog("Add Action", "400x360")
+        dlg = self._dialog("Add Action", "400x340")
 
-        ctk.CTkLabel(dlg, text="Action Type", text_color=C["muted"],
-                     font=ctk.CTkFont(size=11)).pack(padx=20, pady=(16, 2), anchor="w")
+        _label(dlg, "Type", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
         type_var = ctk.StringVar(value="sleep")
-        ctk.CTkOptionMenu(dlg, variable=type_var, values=ACTION_TYPE_KEYS,
-                          width=360).pack(padx=20)
+        ctk.CTkOptionMenu(
+            dlg, variable=type_var, values=list(ACTION_LABELS.keys()),
+            fg_color=T["raised"], button_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
+            width=360, corner_radius=6
+        ).pack(padx=20)
 
-        ctk.CTkLabel(dlg, text="Value", text_color=C["muted"],
-                     font=ctk.CTkFont(size=11)).pack(padx=20, pady=(12, 2), anchor="w")
-        val_entry = ctk.CTkEntry(dlg, width=360, placeholder_text="e.g. 1.5 for sleep")
-        val_entry.pack(padx=20)
-
-        hint = ctk.CTkLabel(dlg, text="Duration in seconds", text_color=C["muted"],
-                            font=ctk.CTkFont(size=10))
-        hint.pack(padx=20, anchor="w")
+        _label(dlg, "Value", size=10, colour=T["dim"]).pack(padx=20, pady=(12, 2), anchor="w")
+        entry = ctk.CTkEntry(
+            dlg, width=360, fg_color=T["raised"], border_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6
+        )
+        entry.pack(padx=20)
 
         HINTS = {
-            "sleep": "Duration in seconds (e.g. 1.5)",
-            "type": "Text or key to type (e.g. hello or Key.enter)",
-            "run_command": "Shell command (e.g. open /Applications/Safari.app)",
-            "hotkey": "Keys comma-separated (e.g. cmd,c)",
-            "scroll": "Scroll amount (positive=up, negative=down)",
-            "screenshot": "Filename (e.g. state.png)",
-            "assert_template": "Template filename in workspace/templates/",
-            "clipboard": "Format: set|copy|paste  [optional text]",
-            "if_template": "Template filename (then/else actions via Edit)",
-            "click": "x,y (e.g. 500,300)",
-            "loop": "count (e.g. 3)",
+            "sleep": "seconds  (e.g. 1.5)",
+            "type": "text or key  (e.g. hello  or  Key.enter)",
+            "run_command": "shell command  (e.g. open /Applications/Safari.app)",
+            "hotkey": "keys comma-separated  (e.g. cmd,c)",
+            "scroll": "amount  (positive=up  negative=down)",
+            "screenshot": "filename  (e.g. state.png)",
+            "assert_template": "template filename in workspace/templates/",
+            "clipboard": "action text  (e.g. set Hello World)",
+            "if_template": "template filename  (add branches via Edit)",
+            "click": "x,y  (e.g. 500,300)",
+            "loop": "count  (e.g. 3)",
         }
+        hint = _label(dlg, HINTS.get("sleep", ""), size=10, colour=T["dim"])
+        hint.pack(padx=20, pady=(3, 0), anchor="w")
 
-        def on_type_change(*_):
-            hint.configure(text=HINTS.get(type_var.get(), ""))
-
-        type_var.trace_add("write", on_type_change)
+        type_var.trace_add("write", lambda *_: hint.configure(text=HINTS.get(type_var.get(), "")))
 
         def save():
-            t = type_var.get()
-            val = val_entry.get().strip()
-            new_action: dict = {"type": t, "time_offset": 0.5}
+            t   = type_var.get()
+            val = entry.get().strip()
+            a:  dict = {"type": t, "time_offset": 0.5}
             try:
-                if t == "sleep":     new_action["duration"] = float(val) if val else 1.0
-                elif t == "type":    new_action["key"] = val
-                elif t == "run_command": new_action["command"] = val; new_action["wait"] = True
-                elif t == "hotkey":  new_action["keys"] = [k.strip() for k in val.split(",")]
-                elif t == "scroll":  new_action["amount"] = int(val) if val else -3
-                elif t == "screenshot": new_action["filename"] = val or "screenshot.png"
-                elif t == "assert_template": new_action["template"] = val
+                if   t == "sleep":     a["duration"] = float(val or 1)
+                elif t == "type":      a["key"] = val
+                elif t == "run_command": a["command"] = val; a["wait"] = True
+                elif t == "hotkey":    a["keys"] = [k.strip() for k in val.split(",")]
+                elif t == "scroll":    a["amount"] = int(val or -3)
+                elif t == "screenshot": a["filename"] = val or "screenshot.png"
+                elif t == "assert_template": a["template"] = val
                 elif t == "clipboard":
                     parts = val.split(None, 1)
-                    new_action["action"] = parts[0] if parts else "set"
-                    new_action["text"] = parts[1] if len(parts) > 1 else ""
+                    a["action"] = parts[0] if parts else "set"
+                    a["text"]   = parts[1] if len(parts) > 1 else ""
                 elif t == "click":
-                    coords = [v.strip() for v in val.split(",")]
-                    new_action["x"] = int(coords[0]) if len(coords) > 0 else 0
-                    new_action["y"] = int(coords[1]) if len(coords) > 1 else 0
-                elif t == "loop":    new_action["count"] = int(val) if val else 1; new_action["actions"] = []
-                elif t == "if_template": new_action["template"] = val; new_action["then_actions"] = []; new_action["else_actions"] = []
-
-                def m(d): d.setdefault("actions", []).append(new_action)
-                self._modify_workflow(m)
+                    x, y = [v.strip() for v in val.split(",")]
+                    a["x"] = int(x); a["y"] = int(y)
+                elif t == "loop": a["count"] = int(val or 1); a["actions"] = []
+                elif t == "if_template": a["template"] = val; a["then_actions"] = []; a["else_actions"] = []
+                self._modify_workflow(lambda d: d.setdefault("actions", []).append(a))
                 logger.info(f"Added action: {t}")
                 dlg.destroy()
             except Exception as e:
-                logger.error(f"Error adding action: {e}")
+                logger.error(f"Add action error: {e}")
 
-        ctk.CTkButton(dlg, text="Add to Workflow", height=38,
-                      fg_color=C["accent"], hover_color=C["play_green"],
-                      font=ctk.CTkFont(size=13, weight="bold"),
-                      command=save).pack(pady=16, padx=20, fill="x")
+        _btn(dlg, "Add to Workflow", save, primary=True, width=360).pack(pady=16, padx=20)
 
     def _open_edit_dialog(self, idx: int, action: dict):
         atype = action.get("type", "unknown")
-        dlg = self._make_dialog(f"Edit Action #{idx+1} — {atype.upper()}", "400x260")
+        dlg   = self._dialog(f"Edit  #{idx+1}  —  {ACTION_LABELS.get(atype, atype)}", "400x240")
 
-        ctk.CTkLabel(dlg, text="Value", text_color=C["muted"],
-                     font=ctk.CTkFont(size=11)).pack(padx=20, pady=(16, 2), anchor="w")
-        entry = ctk.CTkEntry(dlg, width=360)
+        _label(dlg, "Value", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
+        entry = ctk.CTkEntry(
+            dlg, width=360, fg_color=T["raised"], border_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6
+        )
         entry.pack(padx=20)
 
-        cur = ""
-        if atype == "sleep":     cur = str(action.get("duration", 1.0))
-        elif atype == "type":    cur = action.get("key", "")
-        elif atype == "run_command": cur = action.get("command", "")
-        elif atype == "hotkey":  cur = ",".join(action.get("keys", []))
-        elif atype == "click":   cur = f"{action.get('x',0)},{action.get('y',0)}"
-        elif atype == "scroll":  cur = str(action.get("amount", 0))
-        elif atype == "clipboard": cur = f"{action.get('action','set')} {action.get('text','')}"
-        elif atype == "screenshot": cur = action.get("filename", "")
-        elif atype == "assert_template": cur = action.get("template", "")
-        elif atype == "if_template": cur = action.get("template", "")
+        cur = {
+            "sleep":           str(action.get("duration", 1.0)),
+            "type":            action.get("key", ""),
+            "run_command":     action.get("command", ""),
+            "hotkey":          ",".join(action.get("keys", [])),
+            "click":           f"{action.get('x',0)},{action.get('y',0)}",
+            "scroll":          str(action.get("amount", 0)),
+            "clipboard":       f"{action.get('action','set')} {action.get('text','')}",
+            "screenshot":      action.get("filename", ""),
+            "assert_template": action.get("template", ""),
+            "if_template":     action.get("template", ""),
+        }.get(atype, "")
         entry.insert(0, cur)
 
         def save():
             val = entry.get().strip()
+            upd = copy.deepcopy(action)
             try:
-                updated = copy.deepcopy(action)
-                if atype == "sleep":     updated["duration"] = float(val)
-                elif atype == "type":    updated["key"] = val
-                elif atype == "run_command": updated["command"] = val
-                elif atype == "hotkey":  updated["keys"] = [k.strip() for k in val.split(",")]
+                if   atype == "sleep":            upd["duration"] = float(val)
+                elif atype == "type":             upd["key"] = val
+                elif atype == "run_command":      upd["command"] = val
+                elif atype == "hotkey":           upd["keys"] = [k.strip() for k in val.split(",")]
                 elif atype == "click":
-                    parts = [v.strip() for v in val.split(",")]
-                    updated["x"] = int(parts[0]); updated["y"] = int(parts[1])
-                elif atype == "scroll":  updated["amount"] = int(val)
+                    x, y = [v.strip() for v in val.split(",")]
+                    upd["x"] = int(x); upd["y"] = int(y)
+                elif atype == "scroll":           upd["amount"] = int(val)
                 elif atype == "clipboard":
                     parts = val.split(None, 1)
-                    updated["action"] = parts[0] if parts else "set"
-                    updated["text"] = parts[1] if len(parts) > 1 else ""
-                elif atype == "screenshot": updated["filename"] = val
-                elif atype in ("assert_template", "if_template"): updated["template"] = val
+                    upd["action"] = parts[0] if parts else "set"
+                    upd["text"]   = parts[1] if len(parts) > 1 else ""
+                elif atype == "screenshot":       upd["filename"] = val
+                elif atype in ("assert_template","if_template"): upd["template"] = val
 
                 def m(d):
                     if 0 <= idx < len(d.get("actions", [])):
-                        d["actions"][idx] = updated
+                        d["actions"][idx] = upd
                 self._modify_workflow(m)
                 logger.info(f"Edited action #{idx+1}")
                 dlg.destroy()
             except Exception as e:
-                logger.error(f"Error editing action: {e}")
+                logger.error(f"Edit error: {e}")
 
-        ctk.CTkButton(dlg, text="Save Changes", height=38,
-                      fg_color=C["accent"],
-                      font=ctk.CTkFont(size=13, weight="bold"),
-                      command=save).pack(pady=16, padx=20, fill="x")
+        _btn(dlg, "Save Changes", save, primary=True, width=360).pack(pady=16, padx=20)
 
-    # ── Scheduler Tab ─────────────────────────────────────────────────────────
+    # ── PANEL: Scheduler ──────────────────────────────────────────────────────
 
-    def _build_scheduler_tab(self, parent: ctk.CTkFrame):
-        parent.grid_rowconfigure(1, weight=1)
-        parent.grid_columnconfigure(0, weight=1)
+    def _build_scheduler(self, p: ctk.CTkFrame):
+        p.grid_columnconfigure(0, weight=1)
+        p.grid_rowconfigure(1, weight=1)
+        self._page_header(p, "Scheduler", row=0)
 
-        # Add Schedule form
-        form = ctk.CTkFrame(parent, fg_color=C["card"], corner_radius=12)
-        form.grid(row=0, column=0, padx=20, pady=(20, 8), sticky="ew")
+        form = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
+        form.grid(row=0, column=0, sticky="ew", padx=24, pady=(56, 8))
         form.grid_columnconfigure((0, 1, 2), weight=1)
 
-        ctk.CTkLabel(form, text="Workflow File", text_color=C["muted"],
-                     font=ctk.CTkFont(size=11)).grid(row=0, column=0, padx=12, pady=(12, 2), sticky="w")
-        self.sched_file_var = ctk.StringVar()
-        ctk.CTkOptionMenu(form, variable=self.sched_file_var, values=get_workflow_files(),
-                          width=160).grid(row=1, column=0, padx=12, pady=(0, 12), sticky="ew")
+        fields = [
+            ("Workflow", 0), ("Interval", 1), ("Value (N or HH:MM)", 2)
+        ]
+        for label, col in fields:
+            _label(form, label, size=10, colour=T["dim"]).grid(
+                row=0, column=col, padx=12, pady=(12, 2), sticky="w")
 
-        ctk.CTkLabel(form, text="Interval Type", text_color=C["muted"],
-                     font=ctk.CTkFont(size=11)).grid(row=0, column=1, padx=12, pady=(12, 2), sticky="w")
-        self.sched_type_var = ctk.StringVar(value="minutes")
-        ctk.CTkOptionMenu(form, variable=self.sched_type_var,
-                          values=["minutes", "hours", "daily_at"],
-                          width=140).grid(row=1, column=1, padx=12, pady=(0, 12), sticky="ew")
+        self._sched_file = ctk.StringVar()
+        ctk.CTkOptionMenu(
+            form, variable=self._sched_file,
+            values=get_workflow_files(),
+            fg_color=T["raised"], button_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
+            width=160, corner_radius=6
+        ).grid(row=1, column=0, padx=12, pady=(0, 12), sticky="ew")
 
-        ctk.CTkLabel(form, text="Value (number or HH:MM)", text_color=C["muted"],
-                     font=ctk.CTkFont(size=11)).grid(row=0, column=2, padx=12, pady=(12, 2), sticky="w")
-        self.sched_val_entry = ctk.CTkEntry(form, placeholder_text="e.g. 30 or 09:00")
-        self.sched_val_entry.grid(row=1, column=2, padx=12, pady=(0, 12), sticky="ew")
+        self._sched_type = ctk.StringVar(value="minutes")
+        ctk.CTkOptionMenu(
+            form, variable=self._sched_type,
+            values=["minutes", "hours", "daily_at"],
+            fg_color=T["raised"], button_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
+            width=130, corner_radius=6
+        ).grid(row=1, column=1, padx=12, pady=(0, 12), sticky="ew")
 
-        ctk.CTkButton(form, text="+ Add Schedule", height=34,
-                      fg_color=C["accent"], font=ctk.CTkFont(size=12, weight="bold"),
-                      command=self._add_schedule).grid(
+        self._sched_val = ctk.CTkEntry(
+            form, fg_color=T["raised"], border_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
+            corner_radius=6, placeholder_text="e.g. 30 or 09:00"
+        )
+        self._sched_val.grid(row=1, column=2, padx=12, pady=(0, 12), sticky="ew")
+
+        _btn(form, "Add Schedule", self._add_schedule, primary=True).grid(
             row=2, column=0, columnspan=3, padx=12, pady=(0, 12), sticky="ew")
 
-        # List
-        self.sched_list_frame = ctk.CTkScrollableFrame(parent, fg_color="transparent")
-        self.sched_list_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="nsew")
-        self.sched_list_frame.grid_columnconfigure(0, weight=1)
+        # List header
+        lhdr = ctk.CTkFrame(p, fg_color="transparent")
+        lhdr.grid(row=1, column=0, sticky="ew", padx=24, pady=(8, 4))
+        for col, txt in enumerate(["Workflow", "Schedule", "Runs", "Last Run", ""]):
+            _label(lhdr, txt, size=10, colour=T["dim"]).grid(row=0, column=col, padx=6, sticky="w")
+        lhdr.grid_columnconfigure(0, weight=1)
+
+        _sep(p).grid(row=2, column=0, sticky="ew", padx=24)
+
+        self._sched_list = ctk.CTkScrollableFrame(p, fg_color="transparent")
+        self._sched_list.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0, 24))
+        self._sched_list.grid_columnconfigure(0, weight=1)
+        p.grid_rowconfigure(3, weight=1)
 
     def _refresh_scheduler(self):
-        for w in self.sched_list_frame.winfo_children():
+        for w in self._sched_list.winfo_children():
             w.destroy()
         jobs = self.scheduler.get_all()
         if not jobs:
-            ctk.CTkLabel(self.sched_list_frame, text="No scheduled jobs yet.",
-                         text_color=C["muted"]).pack(pady=30)
+            _label(self._sched_list, "No scheduled jobs.", colour=T["dim"]).pack(pady=24)
             return
         for job in jobs:
-            self._render_schedule_row(job)
+            row = ctk.CTkFrame(self._sched_list, fg_color=T["raised"], corner_radius=6)
+            row.pack(fill="x", pady=2)
+            row.grid_columnconfigure(0, weight=1)
 
-    def _render_schedule_row(self, job: dict):
-        row = ctk.CTkFrame(self.sched_list_frame, fg_color=C["card"], corner_radius=8)
-        row.pack(fill="x", pady=3)
-        row.grid_columnconfigure(0, weight=1)
+            txt = (f"{os.path.basename(job.get('workflow_file',''))}    "
+                   f"{job.get('interval_value','')} {job.get('interval_type','')}    "
+                   f"Runs: {job.get('run_count',0)}    "
+                   f"Last: {job.get('last_run') or '—'}")
+            _label(row, txt, size=11, colour=T["text"], anchor="w").grid(
+                row=0, column=0, padx=12, pady=10, sticky="ew")
 
-        ctk.CTkLabel(row, text=job.get("label", ""),
-                     font=ctk.CTkFont(size=12), text_color=C["text"], anchor="w").grid(
-            row=0, column=0, padx=12, pady=8, sticky="ew")
-
-        meta = f"Runs: {job.get('run_count', 0)}  •  Last: {job.get('last_run') or '—'}"
-        ctk.CTkLabel(row, text=meta, font=ctk.CTkFont(size=10),
-                     text_color=C["muted"], anchor="w").grid(row=1, column=0, padx=12, pady=(0, 8), sticky="w")
-
-        ctk.CTkButton(row, text="Remove", width=80, height=28,
-                      fg_color="transparent", border_width=1, border_color=C["danger"],
-                      text_color=C["danger"], hover_color="#3a1a1a",
-                      command=lambda jid=job["id"]: self._remove_schedule(jid)).grid(
-            row=0, column=1, rowspan=2, padx=12, pady=8)
+            _btn(row, "Remove", lambda jid=job["id"]: self._remove_schedule(jid),
+                 danger=True, width=70, height=28).grid(row=0, column=1, padx=10, pady=8)
 
     def _add_schedule(self):
-        f = self.sched_file_var.get()
-        t = self.sched_type_var.get()
-        v = self.sched_val_entry.get().strip()
+        f = self._sched_file.get()
+        t = self._sched_type.get()
+        v = self._sched_val.get().strip()
         if not f or not v:
-            logger.warning("Scheduler: workflow file and value are required.")
-            return
-        wf_path = os.path.join(WORKSPACE_DIR, f)
-        self.scheduler.add(workflow_file=wf_path, interval_type=t, interval_value=v)
+            logger.warning("Scheduler: file and value required."); return
+        self.scheduler.add(os.path.join(WORKSPACE_DIR, f), t, v)
         self._refresh_scheduler()
 
     def _remove_schedule(self, job_id: int):
         self.scheduler.remove(job_id)
         self._refresh_scheduler()
 
-    def _scheduled_play(self, workflow_file: str):
-        player = Player(workflow_path=workflow_file)
-        player.play()
-        self.after(0, self._update_stats)
+    def _run_scheduled(self, wf_path: str):
+        Player(workflow_path=wf_path).play()
+        self.after(0, self._refresh_stats)
 
-    # ── Variables Tab ─────────────────────────────────────────────────────────
+    # ── PANEL: Variables ──────────────────────────────────────────────────────
 
-    def _build_variables_tab(self, parent: ctk.CTkFrame):
-        parent.grid_rowconfigure(1, weight=1)
-        parent.grid_columnconfigure(0, weight=1)
+    def _build_variables(self, p: ctk.CTkFrame):
+        p.grid_columnconfigure(0, weight=1)
+        p.grid_rowconfigure(1, weight=1)
+        self._page_header(p, "Variables", row=0)
 
-        # Add variable form
-        form = ctk.CTkFrame(parent, fg_color=C["card"], corner_radius=12)
-        form.grid(row=0, column=0, padx=20, pady=(20, 8), sticky="ew")
+        form = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
+        form.grid(row=0, column=0, sticky="ew", padx=24, pady=(56, 8))
         form.grid_columnconfigure((0, 1), weight=1)
 
-        ctk.CTkLabel(form, text="Key", text_color=C["muted"],
-                     font=ctk.CTkFont(size=11)).grid(row=0, column=0, padx=12, pady=(12, 2), sticky="w")
-        self.var_key_entry = ctk.CTkEntry(form, placeholder_text="e.g. username")
-        self.var_key_entry.grid(row=1, column=0, padx=12, pady=(0, 12), sticky="ew")
+        _label(form, "Key", size=10, colour=T["dim"]).grid(row=0, column=0, padx=12, pady=(12,2), sticky="w")
+        self._var_key = ctk.CTkEntry(
+            form, fg_color=T["raised"], border_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
+            corner_radius=6, placeholder_text="e.g. username"
+        )
+        self._var_key.grid(row=1, column=0, padx=12, pady=(0, 12), sticky="ew")
 
-        ctk.CTkLabel(form, text="Value", text_color=C["muted"],
-                     font=ctk.CTkFont(size=11)).grid(row=0, column=1, padx=12, pady=(12, 2), sticky="w")
-        self.var_val_entry = ctk.CTkEntry(form, placeholder_text="e.g. john_doe")
-        self.var_val_entry.grid(row=1, column=1, padx=12, pady=(0, 12), sticky="ew")
+        _label(form, "Value", size=10, colour=T["dim"]).grid(row=0, column=1, padx=12, pady=(12,2), sticky="w")
+        self._var_val = ctk.CTkEntry(
+            form, fg_color=T["raised"], border_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
+            corner_radius=6, placeholder_text="e.g. john_doe"
+        )
+        self._var_val.grid(row=1, column=1, padx=12, pady=(0, 12), sticky="ew")
 
-        ctk.CTkButton(form, text="Set Variable", height=34,
-                      fg_color=C["accent"], font=ctk.CTkFont(size=12, weight="bold"),
-                      command=self._set_variable).grid(
-            row=2, column=0, columnspan=2, padx=12, pady=(0, 12), sticky="ew")
+        _btn(form, "Set Variable", self._set_variable, primary=True).grid(
+            row=2, column=0, columnspan=2, padx=12, pady=(0, 6), sticky="ew")
+        _label(form, "Use  {{variable_name}}  inside TypeAction to inject the value at runtime.",
+               size=10, colour=T["dim"]).grid(
+            row=3, column=0, columnspan=2, padx=12, pady=(0, 10), sticky="w")
 
-        hint = ctk.CTkLabel(form, text="Use {{variable_name}} in TypeAction to inject value at runtime.",
-                            text_color=C["muted"], font=ctk.CTkFont(size=10))
-        hint.grid(row=3, column=0, columnspan=2, padx=12, pady=(0, 10))
+        # List header
+        lhdr = ctk.CTkFrame(p, fg_color="transparent")
+        lhdr.grid(row=1, column=0, sticky="ew", padx=24, pady=(8, 4))
+        lhdr.grid_columnconfigure(0, weight=1)
+        for col, txt in enumerate(["Variable", "Value", ""]):
+            _label(lhdr, txt, size=10, colour=T["dim"]).grid(row=0, column=col, padx=6, sticky="w")
 
-        # List
-        self.var_list_frame = ctk.CTkScrollableFrame(parent, fg_color="transparent")
-        self.var_list_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="nsew")
-        self.var_list_frame.grid_columnconfigure(0, weight=1)
+        _sep(p).grid(row=2, column=0, sticky="ew", padx=24)
+
+        self._var_list = ctk.CTkScrollableFrame(p, fg_color="transparent")
+        self._var_list.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0, 24))
+        self._var_list.grid_columnconfigure(1, weight=1)
+        p.grid_rowconfigure(3, weight=1)
 
     def _refresh_variables(self):
-        for w in self.var_list_frame.winfo_children():
+        for w in self._var_list.winfo_children():
             w.destroy()
         self.var_manager.load()
         if not self.var_manager.variables:
-            ctk.CTkLabel(self.var_list_frame, text="No variables defined yet.",
-                         text_color=C["muted"]).pack(pady=30)
+            _label(self._var_list, "No variables defined.", colour=T["dim"]).pack(pady=24)
             return
         for key, value in self.var_manager.variables.items():
-            row = ctk.CTkFrame(self.var_list_frame, fg_color=C["card"], corner_radius=8)
-            row.pack(fill="x", pady=3)
-            row.grid_columnconfigure(0, weight=1)
-            ctk.CTkLabel(row, text=f"  {{{{{key}}}}}  →  {value}",
-                         font=ctk.CTkFont(family="Menlo", size=12),
-                         text_color=C["text"], anchor="w").grid(row=0, column=0, padx=12, pady=10, sticky="ew")
-            ctk.CTkButton(row, text="Delete", width=70, height=28,
-                          fg_color="transparent", border_width=1, border_color=C["danger"],
-                          text_color=C["danger"], hover_color="#3a1a1a",
-                          command=lambda k=key: self._delete_variable(k)).grid(
-                row=0, column=1, padx=10, pady=8)
+            row = ctk.CTkFrame(self._var_list, fg_color=T["raised"], corner_radius=6)
+            row.pack(fill="x", pady=2)
+            row.grid_columnconfigure(1, weight=1)
+            _label(row, f"{{{{{key}}}}}", size=11, colour=T["accent"],
+                   font=ctk.CTkFont(*FONT_MONO)).grid(row=0, column=0, padx=12, pady=10, sticky="w")
+            _label(row, value, size=11, colour=T["text"], anchor="w").grid(
+                row=0, column=1, padx=8, pady=10, sticky="ew")
+            _btn(row, "Delete", lambda k=key: self._del_variable(k),
+                 danger=True, width=70, height=28).grid(row=0, column=2, padx=10, pady=8)
 
     def _set_variable(self):
-        key = self.var_key_entry.get().strip()
-        val = self.var_val_entry.get().strip()
-        if not key:
-            logger.warning("Variable key cannot be empty.")
-            return
-        self.var_manager.set(key, val)
-        self.var_key_entry.delete(0, "end")
-        self.var_val_entry.delete(0, "end")
-        logger.info(f"Variable set: {{{{{key}}}}} = {val!r}")
+        k, v = self._var_key.get().strip(), self._var_val.get().strip()
+        if not k: logger.warning("Variable key required."); return
+        self.var_manager.set(k, v)
+        self._var_key.delete(0, "end"); self._var_val.delete(0, "end")
+        logger.info(f"Variable set: {{{{{k}}}}} = {v!r}")
         self._refresh_variables()
 
-    def _delete_variable(self, key: str):
+    def _del_variable(self, key: str):
         self.var_manager.delete(key)
         logger.info(f"Deleted variable: {key}")
         self._refresh_variables()
 
-    # ── History Tab ───────────────────────────────────────────────────────────
+    # ── PANEL: History ────────────────────────────────────────────────────────
 
-    def _build_history_tab(self, parent: ctk.CTkFrame):
-        parent.grid_rowconfigure(1, weight=1)
-        parent.grid_columnconfigure(0, weight=1)
+    def _build_history(self, p: ctk.CTkFrame):
+        p.grid_columnconfigure(0, weight=1)
+        p.grid_rowconfigure(1, weight=1)
+        self._page_header(p, "Run History", row=0)
 
-        tb = ctk.CTkFrame(parent, fg_color=C["card"], corner_radius=12)
-        tb.grid(row=0, column=0, padx=20, pady=(20, 8), sticky="ew")
-        ctk.CTkButton(tb, text="🗑  Clear History", height=32,
-                      fg_color="transparent", border_width=1, border_color=C["border"],
-                      text_color=C["muted"], hover_color=C["card_hover"],
-                      command=self._clear_history).pack(side="right", padx=10, pady=8)
-        ctk.CTkLabel(tb, text="Run History (latest first)", font=ctk.CTkFont(size=13, weight="bold"),
-                     text_color=C["text"]).pack(side="left", padx=14, pady=8)
+        tb = ctk.CTkFrame(p, fg_color="transparent")
+        tb.grid(row=0, column=0, sticky="ew", padx=24, pady=(56, 4))
+        _btn(tb, "Clear History", self._clear_history, danger=True).pack(side="right")
 
-        self.history_frame = ctk.CTkScrollableFrame(parent, fg_color="transparent")
-        self.history_frame.grid(row=1, column=0, padx=20, pady=(0, 20), sticky="nsew")
-        self.history_frame.grid_columnconfigure(0, weight=1)
+        lhdr = ctk.CTkFrame(p, fg_color="transparent")
+        lhdr.grid(row=1, column=0, sticky="ew", padx=24, pady=(4, 2))
+        lhdr.grid_columnconfigure(1, weight=1)
+        for col, txt in enumerate(["Status", "Workflow", "Time", "Actions", "Duration"]):
+            _label(lhdr, txt, size=10, colour=T["dim"]).grid(row=0, column=col, padx=6, sticky="w")
+
+        _sep(p).grid(row=2, column=0, sticky="ew", padx=24)
+
+        self._hist_list = ctk.CTkScrollableFrame(p, fg_color="transparent")
+        self._hist_list.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0, 24))
+        self._hist_list.grid_columnconfigure(1, weight=1)
+        p.grid_rowconfigure(3, weight=1)
 
     def _refresh_history(self):
-        for w in self.history_frame.winfo_children():
+        for w in self._hist_list.winfo_children():
             w.destroy()
         history = load_json(RUN_HISTORY_FILE, [])
         if not history:
-            ctk.CTkLabel(self.history_frame, text="No runs recorded yet.",
-                         text_color=C["muted"]).pack(pady=30)
+            _label(self._hist_list, "No runs recorded yet.", colour=T["dim"]).pack(pady=24)
             return
         for entry in history:
             success = entry.get("success", False)
-            colour = C["accent2"] if success else C["danger"]
-            status = "✓ SUCCESS" if success else "✗ FAILED"
-            row = ctk.CTkFrame(self.history_frame, fg_color=C["card"], corner_radius=8)
-            row.pack(fill="x", pady=3)
+            row = ctk.CTkFrame(self._hist_list, fg_color=T["raised"], corner_radius=6)
+            row.pack(fill="x", pady=2)
             row.grid_columnconfigure(1, weight=1)
 
-            ctk.CTkLabel(row, text=status, font=ctk.CTkFont(size=12, weight="bold"),
-                         text_color=colour, width=80).grid(row=0, column=0, padx=12, pady=10)
+            # Status badge
+            sbadge = ctk.CTkFrame(row, fg_color=T["ok"] if success else T["err"],
+                                  corner_radius=4, width=60)
+            sbadge.grid(row=0, column=0, padx=(10, 8), pady=8)
+            _label(sbadge, "OK" if success else "FAIL", size=10, colour="#000000").pack(padx=6, pady=2)
 
-            info = (f"{entry.get('workflow','?')}  •  "
-                    f"{entry.get('timestamp','')}  •  "
-                    f"{entry.get('action_count', 0)} actions  •  "
-                    f"{entry.get('duration_sec', 0)}s")
-            ctk.CTkLabel(row, text=info, font=ctk.CTkFont(size=11),
-                         text_color=C["text"], anchor="w").grid(row=0, column=1, padx=8, pady=10, sticky="ew")
+            _label(row, entry.get("workflow", "?"), size=11, colour=T["text"], anchor="w").grid(
+                row=0, column=1, padx=4, pady=8, sticky="ew")
+            _label(row, entry.get("timestamp", ""), size=10, colour=T["dim"]).grid(
+                row=0, column=2, padx=8, pady=8)
+            _label(row, str(entry.get("action_count", 0)), size=10, colour=T["dim"]).grid(
+                row=0, column=3, padx=8, pady=8)
+            _label(row, f"{entry.get('duration_sec',0)}s", size=10, colour=T["dim"]).grid(
+                row=0, column=4, padx=8, pady=8)
 
             if entry.get("error"):
-                ctk.CTkLabel(row, text=entry["error"], font=ctk.CTkFont(size=10),
-                             text_color=C["danger"], anchor="w").grid(
-                    row=1, column=0, columnspan=2, padx=12, pady=(0, 8), sticky="ew")
+                _label(row, entry["error"], size=10, colour=T["err"], anchor="w").grid(
+                    row=1, column=0, columnspan=5, padx=12, pady=(0, 6), sticky="ew")
 
     def _clear_history(self):
         save_json(RUN_HISTORY_FILE, [])
         self._refresh_history()
-        self._update_stats()
+        self._refresh_stats()
         logger.info("Run history cleared.")
 
     # ── Recording / Playback ──────────────────────────────────────────────────
 
     def start_recording(self):
-        if self.recording:
-            return
+        if self.recording: return
         self.recording = True
-        self.recorder = Recorder(workflow_path=self.current_workflow_path)
+        path = os.path.join(WORKSPACE_DIR, self.file_var.get())
+        self.recorder = Recorder(workflow_path=path)
         self.recorder.start()
-        logger.info(f"Recording started → {self.file_var.get()}")
-        self._set_status("● REC", C["record_red"])
+        logger.info(f"Recording  →  {self.file_var.get()}")
+        self._set_status("Recording", T["err"])
         self.record_btn.configure(state="disabled")
-        self.stop_btn.configure(state="normal", fg_color=C["warning"], text_color=C["bg"])
+        self.stop_btn.configure(state="normal", fg_color=T["warn"], text_color=T["bg"])
         self.play_btn.configure(state="disabled")
 
     def stop_recording(self):
-        if not self.recording or not self.recorder:
-            return
+        if not self.recording or not self.recorder: return
         self.recorder.stop()
         self.recording = False
-        logger.info(f"Recording stopped. Saved → {self.file_var.get()}")
-        self._set_status("● IDLE", C["accent2"])
+        logger.info(f"Stopped  →  saved to  {self.file_var.get()}")
+        self._set_status("Idle", T["ok"])
         self.record_btn.configure(state="normal")
-        self.stop_btn.configure(state="disabled", fg_color=C["border"], text_color=C["muted"])
+        self.stop_btn.configure(state="disabled", fg_color=T["raised"], text_color=T["dim"])
         self.play_btn.configure(state="normal")
-        self._update_stats()
         self.file_dropdown.configure(values=get_workflow_files())
-        if self._active_tab == "workflow":
-            self._refresh_workflow_list()
+        self._refresh_stats()
 
     def playback(self):
-        if self.recording:
-            return
-        logger.info(f"Playback started → {self.file_var.get()}")
-        self._set_status("▶ PLAY", C["accent"])
+        if self.recording: return
+        logger.info(f"Playback  →  {self.file_var.get()}")
+        self._set_status("Playing", T["accent"])
         self.play_btn.configure(state="disabled")
 
         def run():
             try:
-                player = Player(workflow_path=self.current_workflow_path)
-                player.play()
+                Player(workflow_path=os.path.join(WORKSPACE_DIR, self.file_var.get())).play()
             except Exception as e:
                 logger.error(f"Playback error: {e}")
             finally:
-                self.after(0, self._on_playback_done)
+                self.after(0, self._on_done)
 
         threading.Thread(target=run, daemon=True).start()
 
-    def _on_playback_done(self):
-        self._set_status("● IDLE", C["accent2"])
+    def _on_done(self):
+        self._set_status("Idle", T["ok"])
         self.play_btn.configure(state="normal")
-        self._update_stats()
-        if self._active_tab == "history":
+        self._refresh_stats()
+        if self._active_nav == "history":
             self._refresh_history()
 
     def _set_status(self, text: str, colour: str):
-        self.status_badge.configure(text=text, text_color=colour)
+        self._status_dot.configure(text_color=colour)
+        self._status_text.configure(text=text)
 
     # ── Workflow file management ───────────────────────────────────────────────
 
     def _on_file_select(self, choice: str):
-        self.current_workflow_path = os.path.join(WORKSPACE_DIR, choice)
-        logger.info(f"Selected workflow: {choice}")
-        if self._active_tab == "workflow":
-            self._refresh_workflow_list()
-        self._update_stats()
+        self.file_var.set(choice)
+        logger.info(f"Workflow: {choice}")
+        if self._active_nav == "workflow":
+            self._refresh_workflow()
+        self._refresh_stats()
 
-    def _create_new_workflow(self):
-        dlg = self._make_dialog("New Workflow", "360x180")
-        ctk.CTkLabel(dlg, text="Workflow name (without .json):",
-                     text_color=C["muted"], font=ctk.CTkFont(size=11)).pack(padx=20, pady=(20, 4), anchor="w")
-        entry = ctk.CTkEntry(dlg, width=320, placeholder_text="e.g. daily_backup")
+    def _new_workflow(self):
+        dlg = self._dialog("New Workflow", "360x160")
+        _label(dlg, "Workflow name (without .json):", size=10, colour=T["dim"]).pack(
+            padx=20, pady=(16, 4), anchor="w")
+        entry = ctk.CTkEntry(
+            dlg, width=320, fg_color=T["raised"], border_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6,
+            placeholder_text="e.g. daily_backup"
+        )
         entry.pack(padx=20)
 
         def create():
             name = entry.get().strip()
-            if not name:
-                return
+            if not name: return
             filename = f"{name}.json"
-            path = os.path.join(WORKSPACE_DIR, filename)
+            path     = os.path.join(WORKSPACE_DIR, filename)
             save_json(path, {"workflow_name": name, "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "actions": []})
-            self.current_workflow_path = path
             self.file_var.set(filename)
             self.file_dropdown.configure(values=get_workflow_files())
-            self.sched_file_var.set(filename)
-            logger.info(f"Created new workflow: {filename}")
+            logger.info(f"Created workflow: {filename}")
             dlg.destroy()
-            if self._active_tab == "workflow":
-                self._refresh_workflow_list()
 
-        ctk.CTkButton(dlg, text="Create", height=36,
-                      fg_color=C["accent"], font=ctk.CTkFont(size=13, weight="bold"),
-                      command=create).pack(pady=16, padx=20, fill="x")
+        _btn(dlg, "Create", create, primary=True, width=320).pack(pady=14, padx=20)
 
-    # ── Input Listeners ───────────────────────────────────────────────────────
+    # ── Input listeners ───────────────────────────────────────────────────────
 
     def _start_listeners(self):
         def on_press(key):
             try:
-                if key == keyboard.Key.f9:
-                    self.after(0, self.start_recording)
-                elif key == keyboard.Key.f10:
-                    self.after(0, self.stop_recording)
-                elif key == keyboard.Key.f11:
-                    self.after(0, self.playback)
-                else:
-                    if self.recording and self.recorder:
-                        self.recorder.on_press(key)
+                if   key == keyboard.Key.f9:  self.after(0, self.start_recording)
+                elif key == keyboard.Key.f10: self.after(0, self.stop_recording)
+                elif key == keyboard.Key.f11: self.after(0, self.playback)
+                elif self.recording and self.recorder:
+                    self.recorder.on_press(key)
             except Exception:
                 pass
 
@@ -1041,15 +1108,25 @@ class AutomatorGUI(ctk.CTk):
         self.mouse_listener = mouse.Listener(on_click=on_click)
         self.mouse_listener.start()
 
-    # ── Utility ───────────────────────────────────────────────────────────────
+    # ── Shared UI helpers ─────────────────────────────────────────────────────
 
-    def _make_dialog(self, title: str, geometry: str) -> ctk.CTkToplevel:
+    def _page_header(self, parent, title: str, row: int):
+        hdr = ctk.CTkFrame(parent, fg_color="transparent", height=44)
+        hdr.grid(row=row, column=0, sticky="ew", padx=24, pady=(20, 0))
+        hdr.grid_propagate(False)
+        ctk.CTkLabel(
+            hdr, text=title,
+            font=ctk.CTkFont("SF Pro Display", 18, "bold"),
+            text_color=T["text"]
+        ).pack(side="left", anchor="w")
+
+    def _dialog(self, title: str, geometry: str) -> ctk.CTkToplevel:
         dlg = ctk.CTkToplevel(self)
         dlg.title(title)
         dlg.geometry(geometry)
         dlg.transient(self)
         dlg.grab_set()
-        dlg.configure(fg_color=C["bg"])
+        dlg.configure(fg_color=T["bg"])
         return dlg
 
 
