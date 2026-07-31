@@ -1,8 +1,15 @@
 from typing import Union, List, Literal, Optional, Annotated
 from pydantic import BaseModel, Field
 
+
 class BaseAction(BaseModel):
     time_offset: float = Field(default=0.0, ge=0.0)
+    # Reliability fields — optional on every action
+    retry_count: int = Field(default=0, ge=0,
+        description="How many times to retry this action if it fails (0 = no retry)")
+    retry_delay: float = Field(default=0.5, ge=0.0,
+        description="Seconds to wait between retries")
+
 
 class ClickAction(BaseAction):
     type: Literal["click"]
@@ -12,39 +19,48 @@ class ClickAction(BaseAction):
     button: str = "left"
     clicks: int = 1
 
+
 class TypeAction(BaseAction):
     type: Literal["type"]
     key: str
+
 
 class LoopAction(BaseAction):
     type: Literal["loop"]
     count: int = Field(default=1, ge=1)
     actions: List['ActionType']
 
+
 class RunCommandAction(BaseAction):
     type: Literal["run_command"]
     command: str
     wait: bool = False
 
+
 class HotkeyAction(BaseAction):
     type: Literal["hotkey"]
     keys: List[str]
+
 
 class SleepAction(BaseAction):
     type: Literal["sleep"]
     duration: float = Field(..., gt=0.0)
 
+
 class ScrollAction(BaseAction):
     type: Literal["scroll"]
     amount: int
+
 
 class ScreenshotAction(BaseAction):
     type: Literal["screenshot"]
     filename: str
 
+
 class AssertTemplateAction(BaseAction):
     type: Literal["assert_template"]
     template: str
+
 
 class ClipboardAction(BaseAction):
     """Set clipboard to a fixed text value then optionally paste it."""
@@ -52,21 +68,44 @@ class ClipboardAction(BaseAction):
     text: str = ""
     action: Literal["copy", "paste", "set"] = "set"
 
+
 class IfTemplateAction(BaseAction):
-    """Branch execution: if template is found on screen, run 'then_actions', else run 'else_actions'."""
+    """Branch execution based on template presence."""
     type: Literal["if_template"]
     template: str
     then_actions: List['ActionType'] = Field(default_factory=list)
     else_actions: List['ActionType'] = Field(default_factory=list)
 
+
+class WaitForTemplateAction(BaseAction):
+    """Poll screen until template appears or timeout is reached."""
+    type: Literal["wait_for_template"]
+    template: str
+    timeout: float = Field(default=10.0, gt=0.0,
+        description="Max seconds to wait before raising an error")
+    interval: float = Field(default=0.5, gt=0.0,
+        description="Polling interval in seconds")
+    on_timeout: Literal["error", "continue"] = Field(default="error",
+        description="'error' stops the workflow; 'continue' logs a warning and moves on")
+
+
+class RunWorkflowAction(BaseAction):
+    """Invoke another workflow file as a subroutine (synchronous)."""
+    type: Literal["run_workflow"]
+    workflow_file: str = Field(
+        description="Filename relative to workspace/ (e.g. setup_app.json)")
+
+
 ActionType = Annotated[
     Union[
         ClickAction, TypeAction, LoopAction, RunCommandAction,
         HotkeyAction, SleepAction, ScrollAction, ScreenshotAction,
-        AssertTemplateAction, ClipboardAction, IfTemplateAction
+        AssertTemplateAction, ClipboardAction, IfTemplateAction,
+        WaitForTemplateAction, RunWorkflowAction,
     ],
     Field(discriminator='type')
 ]
+
 
 class Workflow(BaseModel):
     workflow_name: str

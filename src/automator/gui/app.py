@@ -13,7 +13,7 @@ import sys
 import glob
 import threading
 import time
-from typing import Any
+from typing import Any, Callable
 
 import customtkinter as ctk
 from PIL import Image
@@ -101,17 +101,19 @@ def get_workflow_files():
 
 
 ACTION_LABELS = {
-    "click":           "Click",
-    "type":            "Type",
-    "sleep":           "Sleep",
-    "hotkey":          "Hotkey",
-    "run_command":     "Command",
-    "scroll":          "Scroll",
-    "screenshot":      "Screenshot",
-    "loop":            "Loop",
-    "assert_template": "Assert",
-    "clipboard":       "Clipboard",
-    "if_template":     "Conditional",
+    "click":            "Click",
+    "type":             "Type",
+    "sleep":            "Sleep",
+    "hotkey":           "Hotkey",
+    "run_command":      "Command",
+    "scroll":           "Scroll",
+    "screenshot":       "Screenshot",
+    "loop":             "Loop",
+    "assert_template":  "Assert",
+    "clipboard":        "Clipboard",
+    "if_template":      "Conditional",
+    "wait_for_template":"Wait For",
+    "run_workflow":      "Sub-Workflow",
 }
 
 
@@ -193,12 +195,17 @@ class AutomatorGUI(ctk.CTk):
         self.configure(fg_color=T["bg"])
 
         # State
-        self.recording   = False
-        self.recorder:  Recorder | None = None
+        self.recording    = False
+        self.recorder:   Recorder | None = None
+        self._player:    Player | None   = None   # Active player (for stop)
         self.file_var    = ctk.StringVar(value="workflow.json")
         self._active_nav = "dashboard"
         self._nav_btns:    dict[str, ctk.CTkButton] = {}
         self._panels:      dict[str, ctk.CTkFrame]  = {}
+
+        # Playback settings
+        self._speed_var   = ctk.DoubleVar(value=1.0)
+        self._step_mode   = ctk.BooleanVar(value=False)
 
         # Services
         self.scheduler   = WorkflowScheduler()
@@ -377,7 +384,7 @@ class AutomatorGUI(ctk.CTk):
                size=10, colour=T["border"]).pack(side="right")
 
         btn_row = ctk.CTkFrame(ctrl, fg_color="transparent")
-        btn_row.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 12))
+        btn_row.grid(row=1, column=0, sticky="ew", padx=16, pady=(0, 8))
 
         self.record_btn = ctk.CTkButton(
             btn_row, text="Record", height=36, width=110,
@@ -402,7 +409,45 @@ class AutomatorGUI(ctk.CTk):
             text_color=T["text"], font=ctk.CTkFont(*FONT_BOLD),
             corner_radius=6, command=self.playback
         )
-        self.play_btn.pack(side="left")
+        self.play_btn.pack(side="left", padx=(0, 8))
+
+        self.stop_play_btn = ctk.CTkButton(
+            btn_row, text="Stop Playback", height=36, width=120,
+            fg_color=T["raised"], hover_color="#2A1515",
+            text_color=T["dim"], font=ctk.CTkFont(*FONT_BODY),
+            border_width=1, border_color=T["border"],
+            corner_radius=6, state="disabled", command=self._stop_playback
+        )
+        self.stop_play_btn.pack(side="left")
+
+        # ── Playback options row ─────────────────────────────────────────────
+        opt_row = ctk.CTkFrame(ctrl, fg_color="transparent")
+        opt_row.grid(row=2, column=0, sticky="ew", padx=16, pady=(0, 12))
+
+        _label(opt_row, "Speed", size=10, colour=T["dim"]).pack(side="left")
+
+        self._speed_label = _label(opt_row, "1.0x", size=10, colour=T["label"])
+        self._speed_label.pack(side="left", padx=(8, 0))
+
+        speed_slider = ctk.CTkSlider(
+            opt_row, from_=0.25, to=4.0, number_of_steps=15,
+            variable=self._speed_var,
+            width=140, height=16,
+            button_color=T["accent"], button_hover_color=T["accent_d"],
+            progress_color=T["border"], fg_color=T["raised"],
+            command=self._on_speed_change
+        )
+        speed_slider.pack(side="left", padx=(6, 20))
+
+        ctk.CTkCheckBox(
+            opt_row, text="Step-by-step",
+            variable=self._step_mode,
+            font=ctk.CTkFont(*FONT_SM),
+            text_color=T["label"],
+            fg_color=T["accent"], hover_color=T["accent_d"],
+            border_color=T["border"], checkmark_color=T["text"],
+            width=14, height=14, corner_radius=3
+        ).pack(side="left")
 
         # Log console
         log_wrap = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
@@ -596,6 +641,9 @@ class AutomatorGUI(ctk.CTk):
             return (f"template={a.get('template','')}  "
                     f"then×{len(a.get('then_actions',[]))}  else×{len(a.get('else_actions',[]))}")
         if atype == "loop":      return f"repeat={a.get('count',1)}  steps={len(a.get('actions',[]))}"
+        if atype == "wait_for_template":
+            return f"template={a.get('template','')}  timeout={a.get('timeout',10)}s  on_timeout={a.get('on_timeout','error')}"
+        if atype == "run_workflow":     return f"file={a.get('workflow_file','')}"
         return ""
 
     def _modify_workflow(self, mutator):
@@ -669,6 +717,8 @@ class AutomatorGUI(ctk.CTk):
             "if_template": "template filename  (add branches via Edit)",
             "click": "x,y  (e.g. 500,300)",
             "loop": "count  (e.g. 3)",
+            "wait_for_template": "template,timeout  (e.g. btn.png,15  or just  btn.png)",
+            "run_workflow": "filename in workspace/  (e.g. setup.json)",
         }
         hint = _label(dlg, HINTS.get("sleep", ""), size=10, colour=T["dim"])
         hint.pack(padx=20, pady=(3, 0), anchor="w")
@@ -696,6 +746,11 @@ class AutomatorGUI(ctk.CTk):
                     a["x"] = int(x); a["y"] = int(y)
                 elif t == "loop": a["count"] = int(val or 1); a["actions"] = []
                 elif t == "if_template": a["template"] = val; a["then_actions"] = []; a["else_actions"] = []
+                elif t == "wait_for_template":
+                    parts = [v.strip() for v in val.split(",")]
+                    a["template"] = parts[0] if parts else val
+                    a["timeout"]  = float(parts[1]) if len(parts) > 1 else 10.0
+                elif t == "run_workflow": a["workflow_file"] = val
                 self._modify_workflow(lambda d: d.setdefault("actions", []).append(a))
                 logger.info(f"Added action: {t}")
                 dlg.destroy()
@@ -716,16 +771,18 @@ class AutomatorGUI(ctk.CTk):
         entry.pack(padx=20)
 
         cur = {
-            "sleep":           str(action.get("duration", 1.0)),
-            "type":            action.get("key", ""),
-            "run_command":     action.get("command", ""),
-            "hotkey":          ",".join(action.get("keys", [])),
-            "click":           f"{action.get('x',0)},{action.get('y',0)}",
-            "scroll":          str(action.get("amount", 0)),
-            "clipboard":       f"{action.get('action','set')} {action.get('text','')}",
-            "screenshot":      action.get("filename", ""),
-            "assert_template": action.get("template", ""),
-            "if_template":     action.get("template", ""),
+            "sleep":            str(action.get("duration", 1.0)),
+            "type":             action.get("key", ""),
+            "run_command":      action.get("command", ""),
+            "hotkey":           ",".join(action.get("keys", [])),
+            "click":            f"{action.get('x',0)},{action.get('y',0)}",
+            "scroll":           str(action.get("amount", 0)),
+            "clipboard":        f"{action.get('action','set')} {action.get('text','')}",
+            "screenshot":       action.get("filename", ""),
+            "assert_template":  action.get("template", ""),
+            "if_template":      action.get("template", ""),
+            "wait_for_template":f"{action.get('template','')},{action.get('timeout',10)}",
+            "run_workflow":     action.get("workflow_file", ""),
         }.get(atype, "")
         entry.insert(0, cur)
 
@@ -1011,6 +1068,7 @@ class AutomatorGUI(ctk.CTk):
         self.record_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal", fg_color=T["warn"], text_color=T["bg"])
         self.play_btn.configure(state="disabled")
+        self.stop_play_btn.configure(state="disabled")
 
     def stop_recording(self):
         if not self.recording or not self.recorder: return
@@ -1021,28 +1079,96 @@ class AutomatorGUI(ctk.CTk):
         self.record_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled", fg_color=T["raised"], text_color=T["dim"])
         self.play_btn.configure(state="normal")
+        self.stop_play_btn.configure(state="disabled")
         self.file_dropdown.configure(values=get_workflow_files())
         self._refresh_stats()
 
     def playback(self):
         if self.recording: return
-        logger.info(f"Playback  →  {self.file_var.get()}")
+        speed = round(self._speed_var.get(), 2)
+        step  = self._step_mode.get()
+        logger.info(f"Playback  →  {self.file_var.get()}  speed={speed}x  step={step}")
         self._set_status("Playing", T["accent"])
         self.play_btn.configure(state="disabled")
+        self.stop_play_btn.configure(state="normal", text_color=T["err"])
+
+        step_cb = self._make_step_callback() if step else None
 
         def run():
             try:
-                Player(workflow_path=os.path.join(WORKSPACE_DIR, self.file_var.get())).play()
+                p = Player(
+                    workflow_path=os.path.join(WORKSPACE_DIR, self.file_var.get()),
+                    speed=speed,
+                    step_callback=step_cb,
+                )
+                self._player = p
+                p.play()
             except Exception as e:
                 logger.error(f"Playback error: {e}")
             finally:
+                self._player = None
                 self.after(0, self._on_done)
 
         threading.Thread(target=run, daemon=True).start()
 
+    def _stop_playback(self):
+        """Signal the active player to stop after the current action."""
+        if self._player:
+            self._player.stop()
+            logger.info("Stop signal sent to player.")
+        self.stop_play_btn.configure(state="disabled", text_color=T["dim"])
+
+    def _on_speed_change(self, val):
+        self._speed_label.configure(text=f"{round(val, 2)}x")
+
+    def _make_step_callback(self) -> Callable:
+        """Return a blocking step callback that shows a confirmation dialog."""
+        import queue
+        q: queue.Queue[str] = queue.Queue()
+
+        def callback(action_dict: dict) -> str:
+            self.after(0, self._show_step_dialog, action_dict, q)
+            return q.get()  # Block the player thread until user responds
+
+        return callback
+
+    def _show_step_dialog(self, action_dict: dict, q):
+        """Tiny overlay asking the user to run / skip / stop."""
+        atype   = action_dict.get("type", "?")
+        label   = ACTION_LABELS.get(atype, atype)
+        summary = self._action_summary(atype, action_dict)
+
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Step Confirm")
+        dlg.geometry("360x160")
+        dlg.transient(self)
+        dlg.configure(fg_color=T["surface"])
+        dlg.attributes("-topmost", True)
+        dlg.resizable(False, False)
+
+        _label(dlg, f"Next:  {label}", size=12, colour=T["label"]).pack(
+            padx=20, pady=(16, 2), anchor="w")
+        _label(dlg, summary[:80] or "—", size=11, colour=T["text"]).pack(
+            padx=20, pady=(0, 14), anchor="w")
+
+        row = ctk.CTkFrame(dlg, fg_color="transparent")
+        row.pack(padx=20)
+
+        def choose(val: str):
+            dlg.destroy()
+            q.put(val)
+
+        _btn(row, "Run",  lambda: choose("run"),  primary=True, width=90).pack(side="left", padx=(0, 6))
+        _btn(row, "Skip", lambda: choose("skip"), width=90).pack(side="left", padx=(0, 6))
+        _btn(row, "Stop", lambda: choose("stop"), danger=True, width=90).pack(side="left")
+
+        # If dialog is closed by X, treat as stop
+        dlg.protocol("WM_DELETE_WINDOW", lambda: choose("stop"))
+
     def _on_done(self):
         self._set_status("Idle", T["ok"])
         self.play_btn.configure(state="normal")
+        self.stop_play_btn.configure(state="disabled", text_color=T["dim"])
         self._refresh_stats()
         if self._active_nav == "history":
             self._refresh_history()
