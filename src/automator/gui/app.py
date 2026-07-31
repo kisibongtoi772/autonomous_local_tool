@@ -270,7 +270,13 @@ class AutomatorGUI(ctk.CTk):
              border_width=1, border_color=T["border"],
              text_color=T["dim"],
              hover_color=T["hover"]
-             ).pack(pady=(6, 0), fill="x")
+             ).pack(pady=(6, 2), fill="x")
+
+        wf_mgmt_row = ctk.CTkFrame(sel, fg_color="transparent")
+        wf_mgmt_row.pack(fill="x")
+        _btn(wf_mgmt_row, "Rename", self._rename_workflow, width=52, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"], font=ctk.CTkFont("SF Pro Text", 10)).pack(side="left", padx=(0, 2))
+        _btn(wf_mgmt_row, "Dupe", self._duplicate_workflow_file, width=52, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"], font=ctk.CTkFont("SF Pro Text", 10)).pack(side="left", padx=(0, 2))
+        _btn(wf_mgmt_row, "Delete", self._delete_workflow_file, danger=True, width=58, font=ctk.CTkFont("SF Pro Text", 10)).pack(side="left")
 
         _sep(sb).pack(fill="x", padx=0, pady=4)
 
@@ -449,6 +455,19 @@ class AutomatorGUI(ctk.CTk):
             width=14, height=14, corner_radius=3
         ).pack(side="left")
 
+        # ── Progress Bar & Step Indicator ────────────────────────────────────
+        prog_row = ctk.CTkFrame(ctrl, fg_color="transparent")
+        prog_row.grid(row=3, column=0, sticky="ew", padx=16, pady=(0, 12))
+
+        self.progress_bar = ctk.CTkProgressBar(
+            prog_row, height=6, fg_color=T["raised"], progress_color=T["accent"], corner_radius=3
+        )
+        self.progress_bar.pack(side="left", fill="x", expand=True, padx=(0, 12))
+        self.progress_bar.set(0.0)
+
+        self.progress_label = _label(prog_row, "Ready", size=10, colour=T["dim"])
+        self.progress_label.pack(side="right")
+
         # Log console
         log_wrap = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
         log_wrap.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0, 24))
@@ -523,13 +542,21 @@ class AutomatorGUI(ctk.CTk):
         tb = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
         tb.grid(row=0, column=0, sticky="ew", padx=24, pady=(56, 8))
 
-        for text, cmd, primary in [
-            ("Refresh",    self._refresh_workflow, False),
-            ("Add Action", self._open_add_dialog,  True),
-            ("Clear All",  self._clear_workflow,   False),
-        ]:
-            _btn(tb, text, cmd, primary=primary,
-                 danger=(text == "Clear All")).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "Refresh",    self._refresh_workflow, False).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "Add Action", self._open_add_dialog,  True).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
+
+        self._wf_search_var = ctk.StringVar()
+        self._wf_search_var.trace_add("write", lambda *_: self._refresh_workflow())
+        search_entry = ctk.CTkEntry(
+            tb, placeholder_text="Filter actions...",
+            variable=self._wf_search_var, width=150,
+            fg_color=T["raised"], border_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
+            corner_radius=6
+        )
+        search_entry.pack(side="right", padx=8, pady=8)
 
         # Column headers
         hdr = ctk.CTkFrame(p, fg_color="transparent")
@@ -569,13 +596,23 @@ class AutomatorGUI(ctk.CTk):
 
         data    = load_json(path, {})
         actions = data.get("actions", [])
+        query   = self._wf_search_var.get().strip().lower() if hasattr(self, "_wf_search_var") else ""
 
         if not actions:
             _label(self._wf_list, "Workflow is empty. Record or add actions.", colour=T["dim"]).pack(pady=30)
             return
 
+        rendered_count = 0
         for i, action in enumerate(actions):
+            atype = action.get("type", "").lower()
+            summary = self._action_summary(action.get("type", ""), action).lower()
+            if query and query not in atype and query not in summary and query not in str(action).lower():
+                continue
             self._render_action_row(i, action, len(actions))
+            rendered_count += 1
+
+        if query and rendered_count == 0:
+            _label(self._wf_list, f"No actions match '{query}'", colour=T["dim"]).pack(pady=30)
 
     def _render_action_row(self, i: int, action: dict, total: int):
         atype   = action.get("type", "unknown")
@@ -612,6 +649,9 @@ class AutomatorGUI(ctk.CTk):
             )
 
         _ctrl_btn(ctrl, "Run",  lambda idx=i: self._test_action(idx)).pack(side="left", padx=1)
+        tmpl_file = action.get("template") or action.get("template_image")
+        if tmpl_file:
+            _ctrl_btn(ctrl, "Img", lambda t=tmpl_file: self._show_template_preview_dialog(t)).pack(side="left", padx=1)
         if i > 0:
             _ctrl_btn(ctrl, "Up",  lambda idx=i: self._move_up(idx)).pack(side="left", padx=1)
         if i < total - 1:
@@ -1100,6 +1140,7 @@ class AutomatorGUI(ctk.CTk):
                     workflow_path=os.path.join(WORKSPACE_DIR, self.file_var.get()),
                     speed=speed,
                     step_callback=step_cb,
+                    progress_callback=self._on_progress_update,
                 )
                 self._player = p
                 p.play()
@@ -1165,10 +1206,23 @@ class AutomatorGUI(ctk.CTk):
         # If dialog is closed by X, treat as stop
         dlg.protocol("WM_DELETE_WINDOW", lambda: choose("stop"))
 
+    def _on_progress_update(self, step: int, total: int, action_dict: dict):
+        self.after(0, self._update_progress_ui, step, total, action_dict)
+
+    def _update_progress_ui(self, step: int, total: int, action_dict: dict):
+        pct = step / max(1, total)
+        self.progress_bar.set(pct)
+        atype = action_dict.get("type", "?")
+        label = ACTION_LABELS.get(atype, atype)
+        self.progress_label.configure(text=f"Step {step}/{total}: {label}", text_color=T["text"])
+
     def _on_done(self):
         self._set_status("Idle", T["ok"])
         self.play_btn.configure(state="normal")
         self.stop_play_btn.configure(state="disabled", text_color=T["dim"])
+        if hasattr(self, "progress_bar"):
+            self.progress_bar.set(0.0)
+            self.progress_label.configure(text="Ready", text_color=T["dim"])
         self._refresh_stats()
         if self._active_nav == "history":
             self._refresh_history()
@@ -1187,7 +1241,7 @@ class AutomatorGUI(ctk.CTk):
         self._refresh_stats()
 
     def _new_workflow(self):
-        dlg = self._dialog("New Workflow", "360x160")
+        dlg = self._dialog("New Workflow", "360x260")
         _label(dlg, "Workflow name (without .json):", size=10, colour=T["dim"]).pack(
             padx=20, pady=(16, 4), anchor="w")
         entry = ctk.CTkEntry(
@@ -1197,18 +1251,202 @@ class AutomatorGUI(ctk.CTk):
         )
         entry.pack(padx=20)
 
+        _label(dlg, "Starter Template:", size=10, colour=T["dim"]).pack(
+            padx=20, pady=(12, 4), anchor="w")
+        preset_var = ctk.StringVar(value="Blank (Empty)")
+        presets = ["Blank (Empty)", "App Launcher & Wait", "Auto Clipboard Injector", "Loop Clicker"]
+        ctk.CTkOptionMenu(
+            dlg, variable=preset_var, values=presets,
+            fg_color=T["raised"], button_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
+            width=320, corner_radius=6
+        ).pack(padx=20)
+
         def create():
             name = entry.get().strip()
             if not name: return
             filename = f"{name}.json"
             path     = os.path.join(WORKSPACE_DIR, filename)
-            save_json(path, {"workflow_name": name, "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "actions": []})
+
+            actions = []
+            chosen = preset_var.get()
+            if chosen == "App Launcher & Wait":
+                actions = [
+                    {"type": "run_command", "command": "open -a Safari", "wait": False, "time_offset": 0.5},
+                    {"type": "wait_for_template", "template": "safari_logo.png", "timeout": 10.0, "time_offset": 0.5}
+                ]
+            elif chosen == "Auto Clipboard Injector":
+                actions = [
+                    {"type": "clipboard", "action": "set", "text": "{{my_var}}", "time_offset": 0.5},
+                    {"type": "clipboard", "action": "paste", "time_offset": 0.5}
+                ]
+            elif chosen == "Loop Clicker":
+                actions = [
+                    {"type": "loop", "count": 5, "actions": [
+                        {"type": "click", "x": 500, "y": 300, "button": "left", "clicks": 1, "time_offset": 0.5},
+                        {"type": "sleep", "duration": 1.0, "time_offset": 0.0}
+                    ], "time_offset": 0.5}
+                ]
+
+            save_json(path, {"workflow_name": name, "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"), "actions": actions})
             self.file_var.set(filename)
             self.file_dropdown.configure(values=get_workflow_files())
-            logger.info(f"Created workflow: {filename}")
+            logger.info(f"Created workflow: {filename} (preset={chosen})")
             dlg.destroy()
+            if self._active_nav == "workflow":
+                self._refresh_workflow()
+            self._refresh_stats()
 
-        _btn(dlg, "Create", create, primary=True, width=320).pack(pady=14, padx=20)
+        _btn(dlg, "Create Workflow", create, primary=True, width=320).pack(pady=16, padx=20)
+
+    def _rename_workflow(self):
+        old_filename = self.file_var.get()
+        old_name = os.path.splitext(old_filename)[0]
+        dlg = self._dialog("Rename Workflow", "360x160")
+        _label(dlg, f"New name for '{old_filename}':", size=10, colour=T["dim"]).pack(
+            padx=20, pady=(16, 4), anchor="w")
+        entry = ctk.CTkEntry(
+            dlg, width=320, fg_color=T["raised"], border_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6
+        )
+        entry.insert(0, old_name)
+        entry.pack(padx=20)
+
+        def apply_rename():
+            new_name = entry.get().strip()
+            if not new_name or new_name == old_name:
+                dlg.destroy()
+                return
+            new_filename = f"{new_name}.json"
+            old_path = os.path.join(WORKSPACE_DIR, old_filename)
+            new_path = os.path.join(WORKSPACE_DIR, new_filename)
+
+            if os.path.exists(new_path):
+                logger.warning(f"File '{new_filename}' already exists.")
+                return
+
+            try:
+                os.rename(old_path, new_path)
+                # Update json workflow_name field
+                data = load_json(new_path, {})
+                data["workflow_name"] = new_name
+                save_json(new_path, data)
+
+                self.file_var.set(new_filename)
+                self.file_dropdown.configure(values=get_workflow_files())
+                logger.info(f"Renamed: {old_filename} -> {new_filename}")
+                dlg.destroy()
+                if self._active_nav == "workflow":
+                    self._refresh_workflow()
+                self._refresh_stats()
+            except Exception as e:
+                logger.error(f"Rename failed: {e}")
+
+        _btn(dlg, "Apply Rename", apply_rename, primary=True, width=320).pack(pady=14, padx=20)
+
+    def _duplicate_workflow_file(self):
+        cur_filename = self.file_var.get()
+        cur_path = os.path.join(WORKSPACE_DIR, cur_filename)
+        if not os.path.exists(cur_path):
+            return
+
+        base_name = os.path.splitext(cur_filename)[0]
+        dupe_filename = f"{base_name}_copy.json"
+        dupe_path = os.path.join(WORKSPACE_DIR, dupe_filename)
+
+        data = load_json(cur_path, {})
+        data["workflow_name"] = f"{base_name}_copy"
+        save_json(dupe_path, data)
+
+        self.file_var.set(dupe_filename)
+        self.file_dropdown.configure(values=get_workflow_files())
+        logger.info(f"Duplicated workflow: {cur_filename} -> {dupe_filename}")
+        if self._active_nav == "workflow":
+            self._refresh_workflow()
+        self._refresh_stats()
+
+    def _delete_workflow_file(self):
+        cur_filename = self.file_var.get()
+        files = get_workflow_files()
+        if len(files) <= 1:
+            logger.warning("Cannot delete the only remaining workflow file.")
+            return
+
+        dlg = self._dialog("Delete Workflow", "360x160")
+        _label(dlg, f"Are you sure you want to delete '{cur_filename}'?", size=11, colour=T["err"]).pack(
+            padx=20, pady=(20, 14), anchor="w")
+
+        row = ctk.CTkFrame(dlg, fg_color="transparent")
+        row.pack(padx=20)
+
+        def confirm_delete():
+            cur_path = os.path.join(WORKSPACE_DIR, cur_filename)
+            try:
+                if os.path.exists(cur_path):
+                    os.remove(cur_path)
+                logger.info(f"Deleted workflow file: {cur_filename}")
+                new_files = get_workflow_files()
+                self.file_var.set(new_files[0])
+                self.file_dropdown.configure(values=new_files)
+                dlg.destroy()
+                if self._active_nav == "workflow":
+                    self._refresh_workflow()
+                self._refresh_stats()
+            except Exception as e:
+                logger.error(f"Delete failed: {e}")
+
+        _btn(row, "Delete File", confirm_delete, danger=True, width=150).pack(side="left", padx=(0, 10))
+        _btn(row, "Cancel", dlg.destroy, width=150).pack(side="left")
+
+    def _show_template_preview_dialog(self, tmpl_filename: str):
+        path = os.path.join(TEMPLATES_DIR, tmpl_filename)
+        if not os.path.exists(path):
+            logger.warning(f"Template image not found: {path}")
+            return
+
+        dlg = self._dialog(f"Template — {tmpl_filename}", "440x360")
+        try:
+            pil_img = Image.open(path)
+            w, h = pil_img.size
+            _label(dlg, f"File: {tmpl_filename}  ({w} × {h} px)", size=11, colour=T["dim"]).pack(padx=20, pady=(12, 6))
+
+            max_size = (380, 240)
+            pil_img.thumbnail(max_size)
+            ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=pil_img.size)
+
+            img_lbl = ctk.CTkLabel(dlg, image=ctk_img, text="")
+            img_lbl.pack(padx=20, pady=10)
+        except Exception as e:
+            _label(dlg, f"Error loading image: {e}", colour=T["err"]).pack(pady=30)
+
+    def _open_template_gallery_dialog(self):
+        dlg = self._dialog("Template Gallery", "560x420")
+        files = glob.glob(os.path.join(TEMPLATES_DIR, "*.png"))
+        if not files:
+            _label(dlg, "No template images captured yet in workspace/templates/.", colour=T["dim"]).pack(pady=40)
+            return
+
+        scroll = ctk.CTkScrollableFrame(dlg, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=16, pady=16)
+
+        for path in files:
+            fname = os.path.basename(path)
+            card = ctk.CTkFrame(scroll, fg_color=T["raised"], corner_radius=6)
+            card.pack(fill="x", pady=4)
+            card.grid_columnconfigure(1, weight=1)
+
+            try:
+                pil_img = Image.open(path)
+                w, h = pil_img.size
+                preview = pil_img.copy()
+                preview.thumbnail((48, 48))
+                ctk_img = ctk.CTkImage(light_image=preview, dark_image=preview, size=preview.size)
+                ctk.CTkLabel(card, image=ctk_img, text="").grid(row=0, column=0, padx=8, pady=8)
+                _label(card, f"{fname}\n{w} × {h} px", size=11, colour=T["text"], anchor="w", justify="left").grid(row=0, column=1, padx=8, pady=8, sticky="ew")
+            except Exception:
+                _label(card, fname, size=11, colour=T["text"], anchor="w").grid(row=0, column=1, padx=8, pady=8, sticky="ew")
+
+            _btn(card, "View", lambda f=fname: self._show_template_preview_dialog(f), width=60, height=26).grid(row=0, column=2, padx=8, pady=8)
 
     # ── Input listeners ───────────────────────────────────────────────────────
 

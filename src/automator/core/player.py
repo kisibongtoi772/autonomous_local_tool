@@ -40,22 +40,24 @@ class Player:
         workflow_path: str | None = None,
         speed: float = 1.0,
         step_callback: Callable[[dict], str] | None = None,
+        progress_callback: Callable[[int, int, dict], None] | None = None,
         _depth: int = 0,
     ):
         """
         Args:
-            workflow_path:  Path to the workflow JSON file.
-            speed:          Multiplier applied to all time_offset and sleep durations.
-                            0.5 = half speed (slower), 2.0 = double speed (faster).
-            step_callback:  Optional callable for interactive step-by-step mode.
-                            Called before each action with the raw action dict.
-                            Must return: "run" | "skip" | "stop"
-            _depth:         Internal recursion guard for run_workflow (max 10 levels).
+            workflow_path:     Path to the workflow JSON file.
+            speed:             Multiplier applied to all time_offset and sleep durations.
+            step_callback:     Optional callable for interactive step-by-step mode.
+                               Must return: "run" | "skip" | "stop"
+            progress_callback: Optional callable for real-time progress update.
+                               Called as progress_callback(step_index_1_based, total_steps, raw_action_dict)
+            _depth:            Internal recursion guard for run_workflow (max 10 levels).
         """
         self.workflow_path = workflow_path or WORKFLOW_FILE
         self.workflow: Optional[Workflow] = None
         self.speed = max(0.1, speed)
         self.step_callback = step_callback
+        self.progress_callback = progress_callback
         self._depth = _depth
         self.var_manager = VariableManager()
         self._stop_requested = False
@@ -123,9 +125,16 @@ class Player:
     # ── Core execution loop ───────────────────────────────────────────────────
 
     def _play_actions(self, actions: List[ActionType]):
-        for action in actions:
+        total_steps = len(actions)
+        for idx, action in enumerate(actions, start=1):
             if self._stop_requested:
                 return
+
+            if self.progress_callback is not None:
+                try:
+                    self.progress_callback(idx, total_steps, action.model_dump())
+                except Exception:
+                    pass
 
             # ── Step-by-step confirmation ────────────────────────────────────
             if self.step_callback is not None:
@@ -317,6 +326,7 @@ class Player:
             workflow_path=wf_path,
             speed=self.speed,
             step_callback=self.step_callback,
+            progress_callback=self.progress_callback,
             _depth=self._depth + 1,
         )
         sub.var_manager = self.var_manager   # Share variables
