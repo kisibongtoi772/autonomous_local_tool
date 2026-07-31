@@ -46,7 +46,27 @@ class AssertTemplateAction(BaseAction):
     type: Literal["assert_template"]
     template: str
 
-ActionType = Annotated[Union[ClickAction, TypeAction, LoopAction, RunCommandAction, HotkeyAction, SleepAction, ScrollAction, ScreenshotAction, AssertTemplateAction], Field(discriminator='type')]
+class ClipboardAction(BaseAction):
+    """Set clipboard to a fixed text value then optionally paste it."""
+    type: Literal["clipboard"]
+    text: str = ""
+    action: Literal["copy", "paste", "set"] = "set"
+
+class IfTemplateAction(BaseAction):
+    """Branch execution: if template is found on screen, run 'then_actions', else run 'else_actions'."""
+    type: Literal["if_template"]
+    template: str
+    then_actions: List['ActionType'] = Field(default_factory=list)
+    else_actions: List['ActionType'] = Field(default_factory=list)
+
+ActionType = Annotated[
+    Union[
+        ClickAction, TypeAction, LoopAction, RunCommandAction,
+        HotkeyAction, SleepAction, ScrollAction, ScreenshotAction,
+        AssertTemplateAction, ClipboardAction, IfTemplateAction
+    ],
+    Field(discriminator='type')
+]
 
 class Workflow(BaseModel):
     workflow_name: str
