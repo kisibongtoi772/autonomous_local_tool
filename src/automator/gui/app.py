@@ -150,8 +150,7 @@ class LogHandler(logging.Handler):
 def _btn(parent, text: str, command, width=None, primary=False, danger=False, **kw):
     fg = T["accent"] if primary else (T["err"] if danger else T["raised"])
     hv = T["accent_d"] if primary else (T["err"] + "CC" if danger else T["hover"])
-    b  = ctk.CTkButton(
-        parent, text=text, command=command,
+    defaults = dict(
         fg_color=fg, hover_color=hv,
         text_color=T["text"],
         font=ctk.CTkFont(*FONT_BODY),
@@ -159,8 +158,10 @@ def _btn(parent, text: str, command, width=None, primary=False, danger=False, **
         border_color=T["border"],
         corner_radius=6, height=32,
         width=width or 120,
-        **kw
     )
+    # kw overrides defaults — prevents duplicate keyword errors
+    defaults.update(kw)
+    b = ctk.CTkButton(parent, text=text, command=command, **defaults)
     return b
 
 
