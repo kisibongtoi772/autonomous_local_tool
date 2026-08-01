@@ -1146,20 +1146,34 @@ class AutomatorGUI(ctk.CTk):
     def start_recording(self):
         if self.recording: return
         self.recording = True
-        path = os.path.join(WORKSPACE_DIR, self.file_var.get())
-        self.recorder = Recorder(workflow_path=path)
-        self.recorder.start()
-        logger.info(f"Recording  →  {self.file_var.get()}")
-        self._set_status("Recording", T["err"])
+        
+        self._set_status("Prepare...", T["warn"])
         self.record_btn.configure(state="disabled")
         self.stop_btn.configure(state="normal", fg_color=T["warn"], text_color=T["bg"])
         self.play_btn.configure(state="disabled")
         self.stop_play_btn.configure(state="disabled")
 
+        def _do_start():
+            if not self.recording:
+                return # Aborted during countdown
+            path = os.path.join(WORKSPACE_DIR, self.file_var.get())
+            self.recorder = Recorder(workflow_path=path)
+            self.recorder.start()
+            logger.info(f"Recording  →  {self.file_var.get()}")
+            self._set_status("Recording", T["err"])
+            
+        from .countdown_overlay import CountdownOverlay
+        self._countdown = CountdownOverlay(self, on_complete=_do_start)
+
     def stop_recording(self):
-        if not self.recording or not self.recorder: return
-        self.recorder.stop()
+        if not self.recording: return
         self.recording = False
+        
+        if hasattr(self, '_countdown') and self._countdown.winfo_exists():
+            self._countdown.destroy()
+            
+        if self.recorder:
+            self.recorder.stop()
         logger.info(f"Stopped  →  saved to  {self.file_var.get()}")
         self._set_status("Idle", T["ok"])
         self.record_btn.configure(state="normal")
