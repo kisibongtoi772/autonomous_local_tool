@@ -16,6 +16,10 @@ class ClickAction(BaseAction):
     x: int
     y: int
     template_image: Optional[str] = None
+    confidence: float = Field(default=0.8, ge=0.1, le=1.0)
+    offset_x: int = 0
+    offset_y: int = 0
+    move_duration: float = Field(default=0.0, ge=0.0, description="Seconds to smoothly move mouse before clicking")
     button: str = "left"
     clicks: int = 1
 
@@ -60,6 +64,7 @@ class ScreenshotAction(BaseAction):
 class AssertTemplateAction(BaseAction):
     type: Literal["assert_template"]
     template: str
+    confidence: float = Field(default=0.8, ge=0.1, le=1.0)
 
 
 class ClipboardAction(BaseAction):
@@ -73,6 +78,7 @@ class IfTemplateAction(BaseAction):
     """Branch execution based on template presence."""
     type: Literal["if_template"]
     template: str
+    confidence: float = Field(default=0.8, ge=0.1, le=1.0)
     then_actions: List['ActionType'] = Field(default_factory=list)
     else_actions: List['ActionType'] = Field(default_factory=list)
 
@@ -85,6 +91,7 @@ class WaitForTemplateAction(BaseAction):
         description="Max seconds to wait before raising an error")
     interval: float = Field(default=0.5, gt=0.0,
         description="Polling interval in seconds")
+    confidence: float = Field(default=0.8, ge=0.1, le=1.0)
     on_timeout: Literal["error", "continue"] = Field(default="error",
         description="'error' stops the workflow; 'continue' logs a warning and moves on")
 
@@ -96,12 +103,20 @@ class RunWorkflowAction(BaseAction):
         description="Filename relative to workspace/ (e.g. setup_app.json)")
 
 
+class PromptUserAction(BaseAction):
+    """Pause workflow and ask user for confirmation or input."""
+    type: Literal["prompt_user"]
+    message: str = "Please confirm to continue."
+    require_input: bool = False
+    save_to_variable: Optional[str] = None
+
+
 ActionType = Annotated[
     Union[
         ClickAction, TypeAction, LoopAction, RunCommandAction,
         HotkeyAction, SleepAction, ScrollAction, ScreenshotAction,
         AssertTemplateAction, ClipboardAction, IfTemplateAction,
-        WaitForTemplateAction, RunWorkflowAction,
+        WaitForTemplateAction, RunWorkflowAction, PromptUserAction,
     ],
     Field(discriminator='type')
 ]

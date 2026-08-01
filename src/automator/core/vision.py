@@ -6,7 +6,7 @@ from ..utils.config import CONFIDENCE_THRESHOLD
 
 logger = get_logger(__name__)
 
-def locate_template(template_path: str) -> Optional[Tuple[int, int]]:
+def locate_template(template_path: str, confidence: float = CONFIDENCE_THRESHOLD) -> Optional[Tuple[int, int]]:
     """
     Tries to find the template image on the screen.
     Returns (x, y) coordinates if found, else None.
@@ -16,7 +16,7 @@ def locate_template(template_path: str) -> Optional[Tuple[int, int]]:
         return None
         
     try:
-        location = pyautogui.locateCenterOnScreen(template_path, confidence=CONFIDENCE_THRESHOLD)
+        location = pyautogui.locateCenterOnScreen(template_path, confidence=confidence)
         if location:
             # Check if location has x and y attributes (PyAutoGUI sometimes returns a Box or Point)
             try:

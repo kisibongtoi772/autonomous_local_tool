@@ -114,6 +114,7 @@ ACTION_LABELS = {
     "if_template":      "Conditional",
     "wait_for_template":"Wait For",
     "run_workflow":      "Sub-Workflow",
+    "prompt_user":       "Prompt",
 }
 
 
@@ -770,6 +771,7 @@ class AutomatorGUI(ctk.CTk):
             "loop": "count  (e.g. 3)",
             "wait_for_template": "template,timeout  (e.g. btn.png,15  or just  btn.png)",
             "run_workflow": "filename in workspace/  (e.g. setup.json)",
+            "prompt_user": "message to display  (e.g. Please log in first)",
         }
         hint = _label(dlg, HINTS.get("sleep", ""), size=10, colour=T["dim"])
         hint.pack(padx=20, pady=(3, 0), anchor="w")
@@ -802,6 +804,7 @@ class AutomatorGUI(ctk.CTk):
                     a["template"] = parts[0] if parts else val
                     a["timeout"]  = float(parts[1]) if len(parts) > 1 else 10.0
                 elif t == "run_workflow": a["workflow_file"] = val
+                elif t == "prompt_user": a["message"] = val
                 self._modify_workflow(lambda d: d.setdefault("actions", []).append(a))
                 logger.info(f"Added action: {t}")
                 dlg.destroy()
@@ -1144,6 +1147,7 @@ class AutomatorGUI(ctk.CTk):
         self.stop_play_btn.configure(state="normal", text_color=T["err"])
 
         step_cb = self._make_step_callback() if step else None
+        prompt_cb = self._make_prompt_callback()
 
         def run():
             try:
@@ -1152,6 +1156,7 @@ class AutomatorGUI(ctk.CTk):
                     speed=speed,
                     step_callback=step_cb,
                     progress_callback=self._on_progress_update,
+                    prompt_callback=prompt_cb,
                 )
                 self._player = p
                 p.play()
@@ -1172,6 +1177,39 @@ class AutomatorGUI(ctk.CTk):
 
     def _on_speed_change(self, val):
         self._speed_label.configure(text=f"{round(val, 2)}x")
+
+    def _make_prompt_callback(self) -> Callable:
+        import queue
+        q: queue.Queue[str] = queue.Queue()
+        def callback(action_dict: dict) -> str:
+            self.after(0, self._show_prompt_dialog, action_dict, q)
+            return q.get()
+        return callback
+
+    def _show_prompt_dialog(self, action_dict: dict, q):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Automation Prompt")
+        dlg.geometry("400x200")
+        dlg.transient(self)
+        dlg.grab_set()
+
+        msg = action_dict.get("message", "Please confirm to continue.")
+        lbl = ctk.CTkLabel(dlg, text=msg, font=ctk.CTkFont(*FONT_BODY), text_color=T["text"], wraplength=360)
+        lbl.pack(pady=30, padx=20)
+        
+        btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_frame.pack(fill="x", side="bottom", pady=20)
+        
+        def on_ok():
+            q.put("OK")
+            dlg.destroy()
+            
+        def on_cancel():
+            q.put("!CANCEL!")
+            dlg.destroy()
+            
+        _btn(btn_frame, "OK", on_ok, primary=True).pack(side="right", padx=20)
+        _btn(btn_frame, "Cancel", on_cancel).pack(side="right")
 
     def _make_step_callback(self) -> Callable:
         """Return a blocking step callback that shows a confirmation dialog."""

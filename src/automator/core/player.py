@@ -23,7 +23,7 @@ from ..models.workflow import (
     ActionType, AssertTemplateAction, ClickAction, ClipboardAction,
     HotkeyAction, IfTemplateAction, LoopAction, RunCommandAction,
     RunWorkflowAction, ScreenshotAction, ScrollAction, SleepAction,
-    TypeAction, WaitForTemplateAction, Workflow,
+    TypeAction, WaitForTemplateAction, Workflow, PromptUserAction,
 )
 from ..utils.config import RUN_HISTORY_FILE, TEMPLATES_DIR, WORKFLOW_FILE, WORKSPACE_DIR
 from ..utils.logger import get_logger
@@ -41,6 +41,7 @@ class Player:
         speed: float = 1.0,
         step_callback: Callable[[dict], str] | None = None,
         progress_callback: Callable[[int, int, dict], None] | None = None,
+        prompt_callback: Callable[[dict], str] | None = None,
         _depth: int = 0,
     ):
         """
@@ -51,6 +52,8 @@ class Player:
                                Must return: "run" | "skip" | "stop"
             progress_callback: Optional callable for real-time progress update.
                                Called as progress_callback(step_index_1_based, total_steps, raw_action_dict)
+            prompt_callback:   Optional callable for interactive PromptUserAction.
+                               Must return user input string, or '!CANCEL!'.
             _depth:            Internal recursion guard for run_workflow (max 10 levels).
         """
         self.workflow_path = workflow_path or WORKFLOW_FILE
@@ -58,6 +61,7 @@ class Player:
         self.speed = max(0.1, speed)
         self.step_callback = step_callback
         self.progress_callback = progress_callback
+        self.prompt_callback = prompt_callback
         self._depth = _depth
         self.var_manager = VariableManager()
         self._stop_requested = False
@@ -192,19 +196,22 @@ class Player:
         elif isinstance(action, IfTemplateAction):    self._do_if_template(action)
         elif isinstance(action, WaitForTemplateAction):self._do_wait_for_template(action)
         elif isinstance(action, RunWorkflowAction):   self._do_run_workflow(action)
+        elif isinstance(action, PromptUserAction):    self._do_prompt_user(action)
 
     # ── Action handlers ───────────────────────────────────────────────────────
 
     def _do_click(self, a: ClickAction):
         x, y = a.x, a.y
         if a.template_image:
-            loc = locate_template(a.template_image)
+            loc = locate_template(a.template_image, confidence=a.confidence)
             if loc:
-                x, y = loc
-                logger.info(f"Template matched at ({x}, {y})")
+                x, y = loc[0] + a.offset_x, loc[1] + a.offset_y
+                logger.info(f"Template matched. Target set to ({x}, {y}) [offset: {a.offset_x}, {a.offset_y}]")
             else:
                 logger.warning(f"Template not found — falling back to ({a.x}, {a.y})")
         logger.info(f"Click ({x}, {y})  button={a.button}  ×{a.clicks}")
+        if a.move_duration > 0:
+            pyautogui.moveTo(x, y, duration=a.move_duration)
         pyautogui.click(x=x, y=y, button=a.button, clicks=a.clicks)
 
     def _do_type(self, a: TypeAction):
@@ -257,7 +264,7 @@ class Player:
 
     def _do_assert_template(self, a: AssertTemplateAction):
         path = os.path.join(TEMPLATES_DIR, a.template)
-        loc  = locate_template(path)
+        loc  = locate_template(path, confidence=a.confidence)
         if loc is None:
             raise RuntimeError(f"Assertion failed: '{a.template}' not found on screen.")
         logger.info(f"Assert OK: '{a.template}' at {loc}")
@@ -278,7 +285,7 @@ class Player:
 
     def _do_if_template(self, a: IfTemplateAction):
         path = os.path.join(TEMPLATES_DIR, a.template)
-        loc  = locate_template(path)
+        loc  = locate_template(path, confidence=a.confidence)
         if loc:
             logger.info(f"Conditional: '{a.template}' FOUND → then ({len(a.then_actions)} actions)")
             self._play_actions(a.then_actions)
@@ -299,7 +306,7 @@ class Player:
         while time.time() < deadline:
             if self._stop_requested:
                 return
-            loc = locate_template(path)
+            loc = locate_template(path, confidence=a.confidence)
             if loc:
                 elapsed = round(time.time() - (deadline - a.timeout), 2)
                 logger.info(f"  Found '{a.template}' at {loc} after {elapsed}s")
@@ -334,6 +341,20 @@ class Player:
         if not ok:
             raise RuntimeError(f"Sub-workflow '{a.workflow_file}' failed or was stopped.")
         logger.info(f"<<< Returned from sub-workflow: {a.workflow_file}")
+
+    def _do_prompt_user(self, a: PromptUserAction):
+        logger.info(f"Prompting user: {a.message}")
+        if self.prompt_callback:
+            result = self.prompt_callback(a.model_dump())
+            if result == "!CANCEL!":
+                self.stop()
+                logger.info("User cancelled at prompt. Workflow stopped.")
+                return
+            if a.save_to_variable:
+                self.var_manager.variables[a.save_to_variable] = result
+                logger.info(f"Saved user input to variable '{a.save_to_variable}'")
+        else:
+            logger.warning("No prompt_callback defined. Skipping prompt.")
 
     # ── Run History ───────────────────────────────────────────────────────────
 
