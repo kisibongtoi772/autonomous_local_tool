@@ -74,7 +74,7 @@ class Player:
         """Request early termination (thread-safe flag)."""
         self._stop_requested = True
 
-    def play(self) -> bool:
+    def play(self, start_idx: int = 0) -> bool:
         if not os.path.exists(self.workflow_path):
             logger.error(f"Workflow not found: {self.workflow_path}")
             return False
@@ -97,9 +97,9 @@ class Player:
             action_count = len(self.workflow.actions)
             logger.info(
                 f"Starting playback: '{self.workflow.workflow_name}' "
-                f"({action_count} actions, speed={self.speed}x)"
+                f"({action_count} actions, start={start_idx+1}, speed={self.speed}x)"
             )
-            self._play_actions(self.workflow.actions)
+            self._play_actions(self.workflow.actions, start_idx=start_idx)
             if self._stop_requested:
                 logger.info("Playback stopped by user.")
             else:
@@ -130,18 +130,21 @@ class Player:
 
     # ── Core execution loop ───────────────────────────────────────────────────
 
-    def _play_actions(self, actions: List[ActionType]):
+    def _play_actions(self, actions: List[ActionType], start_idx: int = 0):
         total_steps = len(actions)
-        for idx, action in enumerate(actions, start=1):
+        for i in range(start_idx, total_steps):
             if self._stop_requested:
                 return
+
+            action = actions[i]
+            idx_1_based = i + 1
 
             if not getattr(action, "enabled", True):
                 continue
 
             if self.progress_callback is not None:
                 try:
-                    self.progress_callback(idx, total_steps, action.model_dump())
+                    self.progress_callback(idx_1_based, total_steps, action.model_dump())
                 except Exception:
                     pass
 

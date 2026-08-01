@@ -686,15 +686,16 @@ class AutomatorGUI(ctk.CTk):
         ctrl = ctk.CTkFrame(row, fg_color="transparent")
         ctrl.grid(row=0, column=3, padx=8, pady=4)
 
-        def _ctrl_btn(parent, txt, cmd):
+        def _ctrl_btn(parent, txt, cmd, text_color=T["dim"]):
             return ctk.CTkButton(
                 parent, text=txt, width=32, height=26,
                 fg_color="transparent", hover_color=T["hover"],
-                text_color=T["dim"], font=ctk.CTkFont("SF Pro Text", 11),
+                text_color=text_color, font=ctk.CTkFont("SF Pro Text", 11),
                 corner_radius=4, border_width=0, command=cmd
             )
 
-        _ctrl_btn(ctrl, "Run",  lambda idx=i: self._test_action(idx)).pack(side="left", padx=1)
+        _ctrl_btn(ctrl, "▶1",  lambda idx=i: self._test_action(idx), text_color=T["accent"]).pack(side="left", padx=1)
+        _ctrl_btn(ctrl, "▶▶",  lambda idx=i: self.playback(start_idx=idx), text_color=T["accent"]).pack(side="left", padx=1)
         tmpl_file = action.get("template") or action.get("template_image")
         if tmpl_file:
             _ctrl_btn(ctrl, "Img", lambda t=tmpl_file: self._show_template_preview_dialog(t)).pack(side="left", padx=1)
@@ -1309,11 +1310,11 @@ class AutomatorGUI(ctk.CTk):
         self.file_dropdown.configure(values=get_workflow_files())
         self._refresh_stats()
 
-    def playback(self):
+    def playback(self, start_idx: int = 0):
         if self.recording: return
         speed = round(self._speed_var.get(), 2)
         step  = self._step_mode.get()
-        logger.info(f"Playback  →  {self.file_var.get()}  speed={speed}x  step={step}")
+        logger.info(f"Playback  →  {self.file_var.get()}  start={start_idx+1}  speed={speed}x  step={step}")
         self._set_status("Playing", T["accent"])
         self.play_btn.configure(state="disabled")
         self.stop_play_btn.configure(state="normal", text_color=T["err"])
@@ -1336,7 +1337,7 @@ class AutomatorGUI(ctk.CTk):
                     ripple_callback=ripple_cb,
                 )
                 self._player = p
-                p.play()
+                p.play(start_idx=start_idx)
             except Exception as e:
                 logger.error(f"Playback error: {e}")
             finally:
