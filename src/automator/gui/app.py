@@ -706,6 +706,7 @@ class AutomatorGUI(ctk.CTk):
             _ctrl_btn(ctrl, "Dn",  lambda idx=i: self._move_down(idx)).pack(side="left", padx=1)
         _ctrl_btn(ctrl, "Edit", lambda idx=i, a=action: self._open_edit_dialog(idx, a)).pack(side="left", padx=1)
         _ctrl_btn(ctrl, "Dupe", lambda idx=i: self._duplicate_action(idx)).pack(side="left", padx=1)
+        _ctrl_btn(ctrl, "Ins",  lambda idx=i: self._open_add_dialog(insert_idx=idx + 1)).pack(side="left", padx=1)
 
         del_btn = ctk.CTkButton(
             ctrl, text="Del", width=32, height=26,
@@ -774,8 +775,8 @@ class AutomatorGUI(ctk.CTk):
                 daemon=True
             ).start()
 
-    def _open_add_dialog(self):
-        dlg = self._dialog("Add Action", "400x420")
+    def _open_add_dialog(self, insert_idx: int = None):
+        dlg = self._dialog("Add Action" if insert_idx is None else "Insert Action", "400x420")
 
         _label(dlg, "Type", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
         type_var = ctk.StringVar(value="sleep")
@@ -899,7 +900,14 @@ class AutomatorGUI(ctk.CTk):
                 if note_val:
                     a["note"] = note_val
                     
-                self._modify_workflow(lambda d: d.setdefault("actions", []).append(a))
+                def m(d):
+                    actions = d.setdefault("actions", [])
+                    if insert_idx is not None:
+                        actions.insert(insert_idx, a)
+                    else:
+                        actions.append(a)
+                self._modify_workflow(m)
+                
                 logger.info(f"Added action: {t}")
                 dlg.destroy()
             except Exception as e:
