@@ -25,7 +25,7 @@ from ..core.scheduler import WorkflowScheduler
 from ..core.variable_manager import VariableManager
 from ..utils.logger import get_logger
 from ..utils.config import (
-    WORKSPACE_DIR, VARIABLES_FILE, RUN_HISTORY_FILE, SCHEDULES_FILE
+    WORKSPACE_DIR, VARIABLES_FILE, RUN_HISTORY_FILE, SCHEDULES_FILE, TEMPLATES_DIR
 )
 
 # macOS: pre-load HIServices on main thread to prevent pynput crash on bg threads
