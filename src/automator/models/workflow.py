@@ -12,6 +12,12 @@ class BaseAction(BaseModel):
         description="Seconds to wait between retries")
 
 
+class CommentAction(BaseAction):
+    """A visual separator or comment in the workflow."""
+    type: Literal["comment"]
+    text: str
+
+
 class ClickAction(BaseAction):
     type: Literal["click"]
     x: int
@@ -118,6 +124,7 @@ ActionType = Annotated[
         HotkeyAction, SleepAction, ScrollAction, ScreenshotAction,
         AssertTemplateAction, ClipboardAction, IfTemplateAction,
         WaitForTemplateAction, RunWorkflowAction, PromptUserAction,
+        CommentAction,
     ],
     Field(discriminator='type')
 ]

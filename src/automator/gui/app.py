@@ -115,6 +115,7 @@ ACTION_LABELS = {
     "wait_for_template":"Wait For",
     "run_workflow":      "Sub-Workflow",
     "prompt_user":       "Prompt",
+    "comment":          "Comment / Group",
 }
 
 
@@ -643,48 +644,56 @@ class AutomatorGUI(ctk.CTk):
         idx_frame = ctk.CTkFrame(row, fg_color="transparent")
         idx_frame.grid(row=0, column=0, padx=(10, 0), pady=8)
         
-        toggle_text = "✔" if enabled else "✕"
-        toggle_color = T["ok"] if enabled else T["err"]
-        
-        def toggle():
-            def m(d):
-                if 0 <= i < len(d.get("actions", [])):
-                    d["actions"][i]["enabled"] = not enabled
-            self._modify_workflow(m)
+        if atype == "comment":
+            row.configure(fg_color="#1F2937") # deep blue-grey for separator
+            _label(idx_frame, "💬", size=14).pack(side="left")
             
-        ctk.CTkButton(
-            idx_frame, text=toggle_text, width=24, height=24,
-            fg_color="transparent", hover_color=T["hover"],
-            text_color=toggle_color, font=ctk.CTkFont("SF Pro Text", 12),
-            corner_radius=4, border_width=0, command=toggle
-        ).pack(side="left")
-        
-        _label(idx_frame, str(i + 1), size=10, colour=T["dim"],
-               anchor="center", width=20).pack(side="left")
-
-        # Type badge
-        badge = ctk.CTkFrame(row, fg_color=T["border"], corner_radius=4, width=80)
-        badge.grid(row=0, column=1, padx=8, pady=8)
-        badge_color = T["label"] if enabled else T["dim"]
-        _label(badge, label, size=10, colour=badge_color).pack(padx=8, pady=3)
-
-        # Summary & Note
-        summary_frame = ctk.CTkFrame(row, fg_color="transparent")
-        summary_frame.grid(row=0, column=2, padx=4, pady=8, sticky="ew")
-        
-        note = action.get("note", "").strip()
-        main_color = "#FFFFFF" if enabled else T["dim"]
-        sub_color = T["text"] if enabled else T["dim"]
-        
-        if note:
-            _label(summary_frame, f"[{note}]", size=11, colour=main_color, weight="bold").pack(side="left", padx=(0, 8))
-            _label(summary_frame, summary, size=11, colour=T["dim"]).pack(side="left")
+            summary_frame = ctk.CTkFrame(row, fg_color="transparent")
+            summary_frame.grid(row=0, column=1, columnspan=2, padx=12, pady=8, sticky="ew")
+            _label(summary_frame, f"--- {action.get('text', '')} ---", size=11, colour=T["accent"], weight="bold").pack(side="left")
         else:
-            _label(summary_frame, summary, size=11, colour=sub_color).pack(side="left")
+            toggle_text = "✔" if enabled else "✕"
+            toggle_color = T["ok"] if enabled else T["err"]
             
-        retry = action.get("retry_count", 0)
-        if retry > 0:
-            _label(summary_frame, f"[↺ {retry}x]", size=11, colour=T["warn"]).pack(side="left", padx=(8, 0))
+            def toggle():
+                def m(d):
+                    if 0 <= i < len(d.get("actions", [])):
+                        d["actions"][i]["enabled"] = not enabled
+                self._modify_workflow(m)
+                
+            ctk.CTkButton(
+                idx_frame, text=toggle_text, width=24, height=24,
+                fg_color="transparent", hover_color=T["hover"],
+                text_color=toggle_color, font=ctk.CTkFont("SF Pro Text", 12),
+                corner_radius=4, border_width=0, command=toggle
+            ).pack(side="left")
+            
+            _label(idx_frame, str(i + 1), size=10, colour=T["dim"],
+                   anchor="center", width=20).pack(side="left")
+
+            # Type badge
+            badge = ctk.CTkFrame(row, fg_color=T["border"], corner_radius=4, width=80)
+            badge.grid(row=0, column=1, padx=8, pady=8)
+            badge_color = T["text"] if enabled else T["dim"]
+            _label(badge, label, size=10, colour=badge_color).pack(padx=8, pady=3)
+
+            # Summary & Note
+            summary_frame = ctk.CTkFrame(row, fg_color="transparent")
+            summary_frame.grid(row=0, column=2, padx=4, pady=8, sticky="ew")
+            
+            note = action.get("note", "").strip()
+            main_color = "#FFFFFF" if enabled else T["dim"]
+            sub_color = T["text"] if enabled else T["dim"]
+            
+            if note:
+                _label(summary_frame, f"[{note}]", size=11, colour=main_color, weight="bold").pack(side="left", padx=(0, 8))
+                _label(summary_frame, summary, size=11, colour=T["dim"]).pack(side="left")
+            else:
+                _label(summary_frame, summary, size=11, colour=sub_color).pack(side="left")
+                
+            retry = action.get("retry_count", 0)
+            if retry > 0:
+                _label(summary_frame, f"[↺ {retry}x]", size=11, colour=T["warn"]).pack(side="left", padx=(8, 0))
 
         # Controls — plain text buttons only
         ctrl = ctk.CTkFrame(row, fg_color="transparent")
@@ -737,6 +746,10 @@ class AutomatorGUI(ctk.CTk):
         if atype == "wait_for_template":
             return f"template={a.get('template','')}  timeout={a.get('timeout',10)}s  on_timeout={a.get('on_timeout','error')}"
         if atype == "run_workflow":     return f"file={a.get('workflow_file','')}"
+        if atype == "prompt_user":      return f"msg={a.get('message','')[:50]}"
+        if atype == "comment":          return a.get("text", "")
+        for k in ["template", "template_image"]:
+            if k in a: return a[k]
         return ""
 
     def _modify_workflow(self, mutator):
@@ -859,6 +872,7 @@ class AutomatorGUI(ctk.CTk):
             "wait_for_template": "template,timeout  (e.g. btn.png,15  or just  btn.png)",
             "run_workflow": "filename in workspace/  (e.g. setup.json)",
             "prompt_user": "message to display  (e.g. Please log in first)",
+            "comment": "text to display (e.g. --- Login Section ---)",
         }
         hint = _label(dlg, HINTS.get("sleep", ""), size=10, colour=T["dim"])
         hint.pack(padx=20, pady=(3, 0), anchor="w")
@@ -1007,6 +1021,8 @@ class AutomatorGUI(ctk.CTk):
             "if_template":      action.get("template", ""),
             "wait_for_template":f"{action.get('template','')},{action.get('timeout',10)}",
             "run_workflow":     action.get("workflow_file", ""),
+            "prompt_user":      action.get("message", ""),
+            "comment":          action.get("text", ""),
         }.get(atype, "")
         entry.insert(0, cur)
         
@@ -1055,6 +1071,7 @@ class AutomatorGUI(ctk.CTk):
                     upd["timeout"]  = float(parts[1]) if len(parts) > 1 else 10.0
                 elif atype == "run_workflow":     upd["workflow_file"] = val
                 elif atype == "prompt_user":      upd["message"] = val
+                elif atype == "comment":          upd["text"] = val
                 
                 note_val = note_entry.get().strip()
                 if note_val:

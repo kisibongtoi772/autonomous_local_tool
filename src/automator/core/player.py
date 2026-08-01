@@ -205,8 +205,12 @@ class Player:
         elif isinstance(action, WaitForTemplateAction):self._do_wait_for_template(action)
         elif isinstance(action, RunWorkflowAction):   self._do_run_workflow(action)
         elif isinstance(action, PromptUserAction):    self._do_prompt_user(action)
+        elif isinstance(action, CommentAction):       self._do_comment(action)
 
     # ── Action handlers ───────────────────────────────────────────────────────
+    
+    def _do_comment(self, a: CommentAction):
+        logger.info(f"--- {a.text} ---")
 
     def _do_click(self, a: ClickAction):
         x, y = a.x, a.y
