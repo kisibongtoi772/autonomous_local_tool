@@ -598,6 +598,7 @@ class AutomatorGUI(ctk.CTk):
         p.grid_rowconfigure(3, weight=1)
 
     def _refresh_workflow(self):
+        self._action_rows = []
         for w in self._wf_list.winfo_children():
             w.destroy()
 
@@ -634,6 +635,8 @@ class AutomatorGUI(ctk.CTk):
         row = ctk.CTkFrame(self._wf_list, fg_color=T["raised"], corner_radius=6)
         row.pack(fill="x", pady=2)
         row.grid_columnconfigure(2, weight=1)
+        if hasattr(self, "_action_rows"):
+            self._action_rows.append(row)
 
         # Index
         _label(row, str(i + 1), size=10, colour=T["dim"],
@@ -1390,6 +1393,24 @@ class AutomatorGUI(ctk.CTk):
         
         if hasattr(self, '_floating_status') and self._floating_status.winfo_exists():
             self._floating_status.update_status(text)
+            
+        # Highlight current row and auto-scroll
+        if hasattr(self, "_action_rows") and len(self._action_rows) >= step > 0:
+            idx = step - 1
+            if hasattr(self, "_current_highlight_idx") and self._current_highlight_idx is not None:
+                old_idx = self._current_highlight_idx
+                if 0 <= old_idx < len(self._action_rows):
+                    self._action_rows[old_idx].configure(fg_color=T["raised"])
+            
+            self._action_rows[idx].configure(fg_color=T["accent"])
+            self._current_highlight_idx = idx
+            
+            # Auto-scroll if total is large enough
+            if total > 5:
+                # yview_moveto takes fraction from 0.0 to 1.0
+                # Subtracting a small offset so the item isn't glued to the very top
+                scroll_fraction = max(0.0, (idx / total) - 0.1)
+                self._wf_list._parent_canvas.yview_moveto(scroll_fraction)
 
     def _test_template_match(self, action: dict):
         tmpl = action.get("template") or action.get("template_image")
@@ -1419,6 +1440,13 @@ class AutomatorGUI(ctk.CTk):
         if hasattr(self, "progress_bar"):
             self.progress_bar.set(0.0)
             self.progress_label.configure(text="Ready", text_color=T["dim"])
+            
+        # Reset highlight
+        if hasattr(self, "_current_highlight_idx") and self._current_highlight_idx is not None:
+            old_idx = self._current_highlight_idx
+            if hasattr(self, "_action_rows") and 0 <= old_idx < len(self._action_rows):
+                self._action_rows[old_idx].configure(fg_color=T["raised"])
+            self._current_highlight_idx = None
             
         if hasattr(self, '_floating_status') and self._floating_status.winfo_exists():
             self._floating_status.destroy()
