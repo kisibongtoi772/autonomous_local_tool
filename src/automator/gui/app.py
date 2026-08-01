@@ -13,6 +13,9 @@ import sys
 import glob
 import threading
 import time
+import zipfile
+import shutil
+import tkinter.filedialog
 from typing import Any, Callable
 
 import customtkinter as ctk
@@ -294,6 +297,19 @@ class AutomatorGUI(ctk.CTk):
              fg_color="transparent", border_width=1, border_color=T["border"],
              text_color=T["err"], hover_color="#2A1515", font=ctk.CTkFont(*FONT_SM)
              ).grid(row=0, column=2, sticky="ew")
+
+        pkg_mgmt_row = ctk.CTkFrame(sel, fg_color="transparent")
+        pkg_mgmt_row.pack(fill="x", pady=(2, 0))
+        pkg_mgmt_row.grid_columnconfigure((0, 1), weight=1)
+
+        _btn(pkg_mgmt_row, "Export", self._export_package, width=10,
+             fg_color="transparent", border_width=1, border_color=T["border"],
+             text_color=T["dim"], hover_color=T["hover"], font=ctk.CTkFont(*FONT_SM)
+             ).grid(row=0, column=0, padx=(0, 4), sticky="ew")
+        _btn(pkg_mgmt_row, "Import", self._import_package, width=10,
+             fg_color="transparent", border_width=1, border_color=T["border"],
+             text_color=T["dim"], hover_color=T["hover"], font=ctk.CTkFont(*FONT_SM)
+             ).grid(row=0, column=1, sticky="ew")
 
         _sep(sb).pack(fill="x", padx=0, pady=4)
 
@@ -1884,6 +1900,96 @@ class AutomatorGUI(ctk.CTk):
 
         _btn(row, "Delete File", confirm_delete, danger=True, width=150).pack(side="left", padx=(0, 10))
         _btn(row, "Cancel", dlg.destroy, width=150).pack(side="left")
+
+    def _export_package(self):
+        cur_filename = self.file_var.get()
+        cur_path = os.path.join(WORKSPACE_DIR, cur_filename)
+        if not os.path.exists(cur_path):
+            logger.error("Workflow file not found.")
+            return
+
+        save_path = tkinter.filedialog.asksaveasfilename(
+            title="Export DAuto Package",
+            defaultextension=".dauto",
+            filetypes=[("DAuto Package", "*.dauto")],
+            initialfile=cur_filename.replace(".json", "")
+        )
+        if not save_path:
+            return
+
+        try:
+            data = load_json(cur_path, {})
+            # Find referenced images
+            images = set()
+            for action in data.get("actions", []):
+                for k in ["template", "template_image", "filename"]:
+                    if k in action and action[k].endswith(".png"):
+                        images.add(action[k])
+
+            with zipfile.ZipFile(save_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                # Add workflow json
+                zf.write(cur_path, "workflow.json")
+                # Add images
+                for img in images:
+                    img_path = os.path.join(TEMPLATES_DIR, img)
+                    if os.path.exists(img_path):
+                        zf.write(img_path, f"templates/{img}")
+
+            logger.info(f"Exported package to {save_path} with {len(images)} images.")
+        except Exception as e:
+            logger.error(f"Failed to export package: {e}")
+
+    def _import_package(self):
+        open_path = tkinter.filedialog.askopenfilename(
+            title="Import DAuto Package",
+            filetypes=[("DAuto Package", "*.dauto")]
+        )
+        if not open_path:
+            return
+
+        try:
+            pkg_name = os.path.basename(open_path).replace(".dauto", "")
+            with zipfile.ZipFile(open_path, 'r') as zf:
+                file_list = zf.namelist()
+                if "workflow.json" not in file_list:
+                    logger.error("Invalid package: workflow.json missing.")
+                    return
+
+                # Read workflow to get name or use pkg_name
+                wf_data = json.loads(zf.read("workflow.json"))
+                target_json = f"{pkg_name}.json"
+                
+                # Prevent overwrite
+                base = pkg_name
+                counter = 1
+                while os.path.exists(os.path.join(WORKSPACE_DIR, target_json)):
+                    target_json = f"{base}_{counter}.json"
+                    counter += 1
+
+                # Save JSON
+                wf_data["workflow_name"] = target_json.replace(".json", "")
+                save_json(os.path.join(WORKSPACE_DIR, target_json), wf_data)
+
+                # Extract images
+                for f in file_list:
+                    if f.startswith("templates/") and f.endswith(".png"):
+                        img_name = os.path.basename(f)
+                        img_data = zf.read(f)
+                        with open(os.path.join(TEMPLATES_DIR, img_name), 'wb') as img_f:
+                            img_f.write(img_data)
+
+            logger.info(f"Imported package as {target_json}.")
+            
+            # Refresh UI
+            new_files = get_workflow_files()
+            self.file_var.set(target_json)
+            self.file_dropdown.configure(values=new_files)
+            if self._active_nav == "workflow":
+                self._refresh_workflow()
+            self._refresh_stats()
+
+        except Exception as e:
+            logger.error(f"Failed to import package: {e}")
 
     def _show_template_preview_dialog(self, tmpl_filename: str):
         path = os.path.join(TEMPLATES_DIR, tmpl_filename)
