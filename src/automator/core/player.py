@@ -283,6 +283,11 @@ class Player:
         for i in range(a.count):
             if self._stop_requested:
                 return
+            
+            # Expose loop index
+            self.var_manager.variables["loop_index"] = str(i + 1)
+            self.var_manager.variables[f"loop_index_{self._depth}"] = str(i + 1)
+            
             logger.info(f"  Iteration {i+1}/{a.count}")
             self._play_actions(a.actions)
         logger.info("Loop done.")

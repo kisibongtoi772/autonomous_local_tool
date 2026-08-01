@@ -49,6 +49,21 @@ class VariableManager:
         """Replace all {{key}} placeholders in text with their variable values."""
         def replacer(match):
             key = match.group(1).strip()
+            
+            # Built-in Dynamic Variables
+            if key == "CLIPBOARD":
+                import pyperclip
+                return str(pyperclip.paste() or "")
+            elif key == "TIME":
+                import datetime
+                return datetime.datetime.now().strftime("%H:%M:%S")
+            elif key == "DATE":
+                import datetime
+                return datetime.datetime.now().strftime("%Y-%m-%d")
+            elif key == "DATETIME":
+                import datetime
+                return datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                
             if key in self.variables:
                 return str(self.variables[key])
             logger.warning(f"Variable '{{{{ {key} }}}}' not found, leaving as-is.")

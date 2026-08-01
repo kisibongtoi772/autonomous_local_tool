@@ -1334,7 +1334,8 @@ class AutomatorGUI(ctk.CTk):
 
         _btn(form, "Set Variable", self._set_variable, primary=True).grid(
             row=2, column=0, columnspan=2, padx=12, pady=(0, 6), sticky="ew")
-        _label(form, "Use  {{variable_name}}  inside TypeAction to inject the value at runtime.",
+        _label(form, "Use  {{variable_name}}  inside TypeAction to inject the value at runtime.\n"
+                     "Built-in:  {{TIME}}, {{DATE}}, {{DATETIME}}, {{CLIPBOARD}}, {{loop_index}}",
                size=10, colour=T["dim"]).grid(
             row=3, column=0, columnspan=2, padx=12, pady=(0, 10), sticky="w")
 
