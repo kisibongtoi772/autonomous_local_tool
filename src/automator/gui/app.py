@@ -1194,6 +1194,7 @@ class AutomatorGUI(ctk.CTk):
 
         step_cb = self._make_step_callback() if step else None
         prompt_cb = self._make_prompt_callback()
+        ripple_cb = self._make_ripple_callback()
 
         from .floating_status import FloatingStatus
         self._floating_status = FloatingStatus(self, on_stop=self._stop_playback)
@@ -1206,6 +1207,7 @@ class AutomatorGUI(ctk.CTk):
                     step_callback=step_cb,
                     progress_callback=self._on_progress_update,
                     prompt_callback=prompt_cb,
+                    ripple_callback=ripple_cb,
                 )
                 self._player = p
                 p.play()
@@ -1232,6 +1234,17 @@ class AutomatorGUI(ctk.CTk):
         q: queue.Queue[str] = queue.Queue()
         def callback(action_dict: dict) -> str:
             self.after(0, self._show_prompt_dialog, action_dict, q)
+            return q.get()
+        return callback
+        
+    def _make_ripple_callback(self) -> Callable:
+        import queue
+        q: queue.Queue[str] = queue.Queue()
+        def callback(x: int, y: int):
+            def _show():
+                from .click_ripple import ClickRipple
+                ClickRipple(self, x, y, on_complete=lambda: q.put("done"))
+            self.after(0, _show)
             return q.get()
         return callback
 

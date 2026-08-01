@@ -42,6 +42,7 @@ class Player:
         step_callback: Callable[[dict], str] | None = None,
         progress_callback: Callable[[int, int, dict], None] | None = None,
         prompt_callback: Callable[[dict], str] | None = None,
+        ripple_callback: Callable[[int, int], None] | None = None,
         _depth: int = 0,
     ):
         """
@@ -62,6 +63,7 @@ class Player:
         self.step_callback = step_callback
         self.progress_callback = progress_callback
         self.prompt_callback = prompt_callback
+        self.ripple_callback = ripple_callback
         self._depth = _depth
         self.var_manager = VariableManager()
         self._stop_requested = False
@@ -212,6 +214,8 @@ class Player:
         logger.info(f"Click ({x}, {y})  button={a.button}  ×{a.clicks}")
         if a.move_duration > 0:
             pyautogui.moveTo(x, y, duration=a.move_duration)
+        if self.ripple_callback:
+            self.ripple_callback(x, y)
         pyautogui.click(x=x, y=y, button=a.button, clicks=a.clicks)
 
     def _do_type(self, a: TypeAction):
