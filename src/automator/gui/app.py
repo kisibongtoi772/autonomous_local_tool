@@ -899,44 +899,48 @@ class AutomatorGUI(ctk.CTk):
         retry_delay.pack(side="left", padx=(8, 0))
         retry_delay.insert(0, "0.5")
 
-        def save():
+        def _build_new_action() -> dict:
             t   = type_var.get()
             val = entry.get().strip()
             a:  dict = {"type": t, "time_offset": 0.5}
-            try:
-                if   t == "sleep":     a["duration"] = float(val or 1)
-                elif t == "type":      a["key"] = val
-                elif t == "run_command": a["command"] = val; a["wait"] = True
-                elif t == "hotkey":    a["keys"] = [k.strip() for k in val.split(",")]
-                elif t == "scroll":    a["amount"] = int(val or -3)
-                elif t == "screenshot": a["filename"] = val or "screenshot.png"
-                elif t == "assert_template": a["template"] = val
-                elif t == "clipboard":
-                    parts = val.split(None, 1)
-                    a["action"] = parts[0] if parts else "set"
-                    a["text"]   = parts[1] if len(parts) > 1 else ""
-                elif t == "click":
-                    x, y = [v.strip() for v in val.split(",")]
-                    a["x"] = int(x); a["y"] = int(y)
-                elif t == "loop": a["count"] = int(val or 1); a["actions"] = []
-                elif t == "if_template": a["template"] = val; a["then_actions"] = []; a["else_actions"] = []
-                elif t == "wait_for_template":
-                    parts = [v.strip() for v in val.split(",")]
-                    a["template"] = parts[0] if parts else val
-                    a["timeout"]  = float(parts[1]) if len(parts) > 1 else 10.0
-                elif t == "run_workflow": a["workflow_file"] = val
-                elif t == "prompt_user": a["message"] = val
+            if   t == "sleep":     a["duration"] = float(val or 1)
+            elif t == "type":      a["key"] = val
+            elif t == "run_command": a["command"] = val; a["wait"] = True
+            elif t == "hotkey":    a["keys"] = [k.strip() for k in val.split(",")]
+            elif t == "scroll":    a["amount"] = int(val or -3)
+            elif t == "screenshot": a["filename"] = val or "screenshot.png"
+            elif t == "assert_template": a["template"] = val
+            elif t == "clipboard":
+                parts = val.split(None, 1)
+                a["action"] = parts[0] if parts else "set"
+                a["text"]   = parts[1] if len(parts) > 1 else ""
+            elif t == "click":
+                x, y = [v.strip() for v in val.split(",")]
+                a["x"] = int(x); a["y"] = int(y)
+            elif t == "loop": a["count"] = int(val or 1); a["actions"] = []
+            elif t == "if_template": a["template"] = val; a["then_actions"] = []; a["else_actions"] = []
+            elif t == "wait_for_template":
+                parts = [v.strip() for v in val.split(",")]
+                a["template"] = parts[0] if parts else val
+                a["timeout"]  = float(parts[1]) if len(parts) > 1 else 10.0
+            elif t == "run_workflow": a["workflow_file"] = val
+            elif t == "prompt_user": a["message"] = val
+            elif t == "comment": a["text"] = val
+            
+            note_val = note_entry.get().strip()
+            if note_val:
+                a["note"] = note_val
                 
-                note_val = note_entry.get().strip()
-                if note_val:
-                    a["note"] = note_val
-                    
-                rc = int(retry_count.get() or 0)
-                rd = float(retry_delay.get() or 0.5)
-                if rc > 0:
-                    a["retry_count"] = rc
-                    a["retry_delay"] = rd
-                    
+            rc = int(retry_count.get() or 0)
+            rd = float(retry_delay.get() or 0.5)
+            if rc > 0:
+                a["retry_count"] = rc
+                a["retry_delay"] = rd
+            return a
+
+        def save():
+            try:
+                a = _build_new_action()
                 def m(d):
                     actions = d.setdefault("actions", [])
                     if insert_idx is not None:
@@ -945,12 +949,26 @@ class AutomatorGUI(ctk.CTk):
                         actions.append(a)
                 self._modify_workflow(m)
                 
-                logger.info(f"Added action: {t}")
+                logger.info(f"Added action: {a['type']}")
                 dlg.destroy()
             except Exception as e:
                 logger.error(f"Add action error: {e}")
 
-        _btn(dlg, "Add to Workflow", save, primary=True, width=360).pack(pady=16, padx=20)
+        def test():
+            try:
+                a = _build_new_action()
+                threading.Thread(
+                    target=lambda: Player(speed=self._speed_var.get()).play_single_action(a),
+                    daemon=True
+                ).start()
+            except Exception as e:
+                logger.error(f"Test action error: {e}")
+
+        btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_frame.pack(pady=16, padx=20, fill="x")
+        
+        _btn(btn_frame, "Add to Workflow", save, primary=True, width=250).pack(side="left")
+        _btn(btn_frame, "▶ Test", test, width=100, fg_color=T["accent"], text_color=T["text"]).pack(side="right")
 
     def _open_edit_dialog(self, idx: int, action: dict):
         atype = action.get("type", "unknown")
@@ -1047,47 +1065,50 @@ class AutomatorGUI(ctk.CTk):
         retry_delay.pack(side="left", padx=(8, 0))
         retry_delay.insert(0, str(action.get("retry_delay", 0.5)))
 
-        def save():
+        def _build_updated_action() -> dict:
             val = entry.get().strip()
             upd = copy.deepcopy(action)
+            if   atype == "sleep":            upd["duration"] = float(val)
+            elif atype == "type":             upd["key"] = val
+            elif atype == "run_command":      upd["command"] = val
+            elif atype == "hotkey":           upd["keys"] = [k.strip() for k in val.split(",")]
+            elif atype == "click":
+                x, y = [v.strip() for v in val.split(",")]
+                upd["x"] = int(x); upd["y"] = int(y)
+            elif atype == "scroll":           upd["amount"] = int(val)
+            elif atype == "clipboard":
+                parts = val.split(None, 1)
+                upd["action"] = parts[0] if parts else "set"
+                upd["text"]   = parts[1] if len(parts) > 1 else ""
+            elif atype == "screenshot":       upd["filename"] = val
+            elif atype in ("assert_template","if_template"): upd["template"] = val
+            elif atype == "wait_for_template":
+                parts = [v.strip() for v in val.split(",")]
+                upd["template"] = parts[0] if parts else val
+                upd["timeout"]  = float(parts[1]) if len(parts) > 1 else 10.0
+            elif atype == "run_workflow":     upd["workflow_file"] = val
+            elif atype == "prompt_user":      upd["message"] = val
+            elif atype == "comment":          upd["text"] = val
+            
+            note_val = note_entry.get().strip()
+            if note_val:
+                upd["note"] = note_val
+            elif "note" in upd:
+                del upd["note"]
+
+            rc = int(retry_count.get() or 0)
+            rd = float(retry_delay.get() or 0.5)
+            if rc > 0:
+                upd["retry_count"] = rc
+                upd["retry_delay"] = rd
+            else:
+                upd.pop("retry_count", None)
+                upd.pop("retry_delay", None)
+            return upd
+
+        def save():
             try:
-                if   atype == "sleep":            upd["duration"] = float(val)
-                elif atype == "type":             upd["key"] = val
-                elif atype == "run_command":      upd["command"] = val
-                elif atype == "hotkey":           upd["keys"] = [k.strip() for k in val.split(",")]
-                elif atype == "click":
-                    x, y = [v.strip() for v in val.split(",")]
-                    upd["x"] = int(x); upd["y"] = int(y)
-                elif atype == "scroll":           upd["amount"] = int(val)
-                elif atype == "clipboard":
-                    parts = val.split(None, 1)
-                    upd["action"] = parts[0] if parts else "set"
-                    upd["text"]   = parts[1] if len(parts) > 1 else ""
-                elif atype == "screenshot":       upd["filename"] = val
-                elif atype in ("assert_template","if_template"): upd["template"] = val
-                elif atype == "wait_for_template":
-                    parts = [v.strip() for v in val.split(",")]
-                    upd["template"] = parts[0] if parts else val
-                    upd["timeout"]  = float(parts[1]) if len(parts) > 1 else 10.0
-                elif atype == "run_workflow":     upd["workflow_file"] = val
-                elif atype == "prompt_user":      upd["message"] = val
-                elif atype == "comment":          upd["text"] = val
-                
-                note_val = note_entry.get().strip()
-                if note_val:
-                    upd["note"] = note_val
-                elif "note" in upd:
-                    del upd["note"]
-
-                rc = int(retry_count.get() or 0)
-                rd = float(retry_delay.get() or 0.5)
-                if rc > 0:
-                    upd["retry_count"] = rc
-                    upd["retry_delay"] = rd
-                else:
-                    upd.pop("retry_count", None)
-                    upd.pop("retry_delay", None)
-
+                upd = _build_updated_action()
                 def m(d):
                     if 0 <= idx < len(d.get("actions", [])):
                         d["actions"][idx] = upd
@@ -1097,7 +1118,21 @@ class AutomatorGUI(ctk.CTk):
             except Exception as e:
                 logger.error(f"Edit error: {e}")
 
-        _btn(dlg, "Save Changes", save, primary=True, width=360).pack(pady=16, padx=20)
+        def test():
+            try:
+                upd = _build_updated_action()
+                threading.Thread(
+                    target=lambda: Player(speed=self._speed_var.get()).play_single_action(upd),
+                    daemon=True
+                ).start()
+            except Exception as e:
+                logger.error(f"Test error: {e}")
+
+        btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_frame.pack(pady=16, padx=20, fill="x")
+        
+        _btn(btn_frame, "Save Changes", save, primary=True, width=250).pack(side="left")
+        _btn(btn_frame, "▶ Test", test, width=100, fg_color=T["accent"], text_color=T["text"]).pack(side="right")
 
     # ── PANEL: Scheduler ──────────────────────────────────────────────────────
 
