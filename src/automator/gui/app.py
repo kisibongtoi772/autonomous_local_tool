@@ -681,6 +681,10 @@ class AutomatorGUI(ctk.CTk):
             _label(summary_frame, summary, size=11, colour=T["dim"]).pack(side="left")
         else:
             _label(summary_frame, summary, size=11, colour=sub_color).pack(side="left")
+            
+        retry = action.get("retry_count", 0)
+        if retry > 0:
+            _label(summary_frame, f"[↺ {retry}x]", size=11, colour=T["warn"]).pack(side="left", padx=(8, 0))
 
         # Controls — plain text buttons only
         ctrl = ctk.CTkFrame(row, fg_color="transparent")
@@ -776,7 +780,7 @@ class AutomatorGUI(ctk.CTk):
             ).start()
 
     def _open_add_dialog(self, insert_idx: int = None):
-        dlg = self._dialog("Add Action" if insert_idx is None else "Insert Action", "400x420")
+        dlg = self._dialog("Add Action" if insert_idx is None else "Insert Action", "400x470")
 
         _label(dlg, "Type", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
         type_var = ctk.StringVar(value="sleep")
@@ -867,6 +871,19 @@ class AutomatorGUI(ctk.CTk):
             text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6
         )
         note_entry.pack(padx=20)
+        
+        adv_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        adv_frame.pack(padx=20, pady=(16, 2), fill="x")
+        
+        _label(adv_frame, "Retry Count", size=10, colour=T["dim"]).pack(side="left")
+        retry_count = ctk.CTkEntry(adv_frame, width=60, fg_color=T["raised"], border_color=T["border"], text_color=T["text"])
+        retry_count.pack(side="left", padx=(8, 20))
+        retry_count.insert(0, "0")
+        
+        _label(adv_frame, "Delay (s)", size=10, colour=T["dim"]).pack(side="left")
+        retry_delay = ctk.CTkEntry(adv_frame, width=60, fg_color=T["raised"], border_color=T["border"], text_color=T["text"])
+        retry_delay.pack(side="left", padx=(8, 0))
+        retry_delay.insert(0, "0.5")
 
         def save():
             t   = type_var.get()
@@ -900,6 +917,12 @@ class AutomatorGUI(ctk.CTk):
                 if note_val:
                     a["note"] = note_val
                     
+                rc = int(retry_count.get() or 0)
+                rd = float(retry_delay.get() or 0.5)
+                if rc > 0:
+                    a["retry_count"] = rc
+                    a["retry_delay"] = rd
+                    
                 def m(d):
                     actions = d.setdefault("actions", [])
                     if insert_idx is not None:
@@ -917,7 +940,7 @@ class AutomatorGUI(ctk.CTk):
 
     def _open_edit_dialog(self, idx: int, action: dict):
         atype = action.get("type", "unknown")
-        dlg   = self._dialog(f"Edit  #{idx+1}  —  {ACTION_LABELS.get(atype, atype)}", "400x320")
+        dlg = self._dialog(f"Edit {atype.title()}", "400x370")
 
         _label(dlg, "Value", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
         val_frame = ctk.CTkFrame(dlg, fg_color="transparent")
@@ -995,6 +1018,19 @@ class AutomatorGUI(ctk.CTk):
         note_entry.pack(padx=20)
         note_entry.insert(0, action.get("note", ""))
 
+        adv_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        adv_frame.pack(padx=20, pady=(16, 2), fill="x")
+        
+        _label(adv_frame, "Retry Count", size=10, colour=T["dim"]).pack(side="left")
+        retry_count = ctk.CTkEntry(adv_frame, width=60, fg_color=T["raised"], border_color=T["border"], text_color=T["text"])
+        retry_count.pack(side="left", padx=(8, 20))
+        retry_count.insert(0, str(action.get("retry_count", 0)))
+        
+        _label(adv_frame, "Delay (s)", size=10, colour=T["dim"]).pack(side="left")
+        retry_delay = ctk.CTkEntry(adv_frame, width=60, fg_color=T["raised"], border_color=T["border"], text_color=T["text"])
+        retry_delay.pack(side="left", padx=(8, 0))
+        retry_delay.insert(0, str(action.get("retry_delay", 0.5)))
+
         def save():
             val = entry.get().strip()
             upd = copy.deepcopy(action)
@@ -1025,6 +1061,15 @@ class AutomatorGUI(ctk.CTk):
                     upd["note"] = note_val
                 elif "note" in upd:
                     del upd["note"]
+
+                rc = int(retry_count.get() or 0)
+                rd = float(retry_delay.get() or 0.5)
+                if rc > 0:
+                    upd["retry_count"] = rc
+                    upd["retry_delay"] = rd
+                else:
+                    upd.pop("retry_count", None)
+                    upd.pop("retry_delay", None)
 
                 def m(d):
                     if 0 <= idx < len(d.get("actions", [])):
