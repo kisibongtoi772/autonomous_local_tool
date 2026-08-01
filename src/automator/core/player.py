@@ -136,6 +136,9 @@ class Player:
             if self._stop_requested:
                 return
 
+            if not getattr(action, "enabled", True):
+                continue
+
             if self.progress_callback is not None:
                 try:
                     self.progress_callback(idx, total_steps, action.model_dump())

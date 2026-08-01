@@ -631,33 +631,56 @@ class AutomatorGUI(ctk.CTk):
         atype   = action.get("type", "unknown")
         label   = ACTION_LABELS.get(atype, atype.upper())
         summary = self._action_summary(atype, action)
-
+        enabled = action.get("enabled", True)
+        
         row = ctk.CTkFrame(self._wf_list, fg_color=T["raised"], corner_radius=6)
         row.pack(fill="x", pady=2)
         row.grid_columnconfigure(2, weight=1)
         if hasattr(self, "_action_rows"):
             self._action_rows.append(row)
 
-        # Index
-        _label(row, str(i + 1), size=10, colour=T["dim"],
-               anchor="center", width=40).grid(row=0, column=0, padx=(10, 0), pady=8)
+        # Index & Toggle
+        idx_frame = ctk.CTkFrame(row, fg_color="transparent")
+        idx_frame.grid(row=0, column=0, padx=(10, 0), pady=8)
+        
+        toggle_text = "✔" if enabled else "✕"
+        toggle_color = T["ok"] if enabled else T["err"]
+        
+        def toggle():
+            def m(d):
+                if 0 <= i < len(d.get("actions", [])):
+                    d["actions"][i]["enabled"] = not enabled
+            self._modify_workflow(m)
+            
+        ctk.CTkButton(
+            idx_frame, text=toggle_text, width=24, height=24,
+            fg_color="transparent", hover_color=T["hover"],
+            text_color=toggle_color, font=ctk.CTkFont("SF Pro Text", 12),
+            corner_radius=4, border_width=0, command=toggle
+        ).pack(side="left")
+        
+        _label(idx_frame, str(i + 1), size=10, colour=T["dim"],
+               anchor="center", width=20).pack(side="left")
 
         # Type badge
         badge = ctk.CTkFrame(row, fg_color=T["border"], corner_radius=4, width=80)
         badge.grid(row=0, column=1, padx=8, pady=8)
-        _label(badge, label, size=10, colour=T["label"]).pack(padx=8, pady=3)
+        badge_color = T["label"] if enabled else T["dim"]
+        _label(badge, label, size=10, colour=badge_color).pack(padx=8, pady=3)
 
         # Summary & Note
         summary_frame = ctk.CTkFrame(row, fg_color="transparent")
         summary_frame.grid(row=0, column=2, padx=4, pady=8, sticky="ew")
         
         note = action.get("note", "").strip()
+        main_color = "#FFFFFF" if enabled else T["dim"]
+        sub_color = T["text"] if enabled else T["dim"]
+        
         if note:
-            # We use text_color=T["accent"] or bright white for note
-            _label(summary_frame, f"[{note}]", size=11, colour="#FFFFFF", weight="bold").pack(side="left", padx=(0, 8))
+            _label(summary_frame, f"[{note}]", size=11, colour=main_color, weight="bold").pack(side="left", padx=(0, 8))
             _label(summary_frame, summary, size=11, colour=T["dim"]).pack(side="left")
         else:
-            _label(summary_frame, summary, size=11, colour=T["text"]).pack(side="left")
+            _label(summary_frame, summary, size=11, colour=sub_color).pack(side="left")
 
         # Controls — plain text buttons only
         ctrl = ctk.CTkFrame(row, fg_color="transparent")
