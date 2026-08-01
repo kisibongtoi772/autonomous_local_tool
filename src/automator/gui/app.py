@@ -664,6 +664,7 @@ class AutomatorGUI(ctk.CTk):
         tmpl_file = action.get("template") or action.get("template_image")
         if tmpl_file:
             _ctrl_btn(ctrl, "Img", lambda t=tmpl_file: self._show_template_preview_dialog(t)).pack(side="left", padx=1)
+            _ctrl_btn(ctrl, "Find", lambda a=action: self._test_template_match(a)).pack(side="left", padx=1)
         if i > 0:
             _ctrl_btn(ctrl, "Up",  lambda idx=i: self._move_up(idx)).pack(side="left", padx=1)
         if i < total - 1:
@@ -1330,6 +1331,27 @@ class AutomatorGUI(ctk.CTk):
         
         if hasattr(self, '_floating_status') and self._floating_status.winfo_exists():
             self._floating_status.update_status(text)
+
+    def _test_template_match(self, action: dict):
+        tmpl = action.get("template") or action.get("template_image")
+        conf = action.get("confidence", 0.8)
+        
+        from ..core.vision import locate_template
+        loc = locate_template(tmpl, confidence=conf)
+        
+        if loc:
+            x, y = loc
+            if action.get("type") == "click":
+                x += action.get("offset_x", 0)
+                y += action.get("offset_y", 0)
+            
+            # Show ripple
+            from .click_ripple import ClickRipple
+            ClickRipple(self, x, y)
+            
+            self._set_status(f"Template found at ({x}, {y})", T["ok"])
+        else:
+            self._set_status("Template not found on screen!", T["err"])
 
     def _on_done(self):
         self._set_status("Idle", T["ok"])
