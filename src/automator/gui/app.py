@@ -1518,7 +1518,17 @@ class AutomatorGUI(ctk.CTk):
         ripple_cb = self._make_ripple_callback()
 
         from .floating_status import FloatingStatus
-        self._floating_status = FloatingStatus(self, on_stop=self._stop_playback)
+        def _on_pause():
+            if hasattr(self, "_player") and self._player:
+                self._player.pause()
+                
+        def _on_resume():
+            if hasattr(self, "_player") and self._player:
+                self._player.resume()
+                
+        self._floating_status = FloatingStatus(
+            self, on_stop=self._stop_playback, on_pause=_on_pause, on_resume=_on_resume
+        )
 
         def run():
             try:

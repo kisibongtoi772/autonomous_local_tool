@@ -67,12 +67,22 @@ class Player:
         self._depth = _depth
         self.var_manager = VariableManager()
         self._stop_requested = False
+        self._paused = False
 
     # ── Public API ────────────────────────────────────────────────────────────
 
     def stop(self):
-        """Request early termination (thread-safe flag)."""
         self._stop_requested = True
+        self._paused = False
+        logger.info("Player: Stop requested.")
+
+    def pause(self):
+        self._paused = True
+        logger.info("Player: Playback paused.")
+
+    def resume(self):
+        self._paused = False
+        logger.info("Player: Playback resumed.")
 
     def play(self, start_idx: int = 0) -> bool:
         if not os.path.exists(self.workflow_path):
@@ -133,6 +143,12 @@ class Player:
     def _play_actions(self, actions: List[ActionType], start_idx: int = 0):
         total_steps = len(actions)
         for i in range(start_idx, total_steps):
+            if self._stop_requested:
+                return
+
+            while self._paused and not self._stop_requested:
+                time.sleep(0.1)
+
             if self._stop_requested:
                 return
 
@@ -242,13 +258,19 @@ class Player:
         else:
             pyautogui.write(key) if len(key) == 1 else pyautogui.press(key)
 
-    def _chunked_sleep(self, duration: float) -> bool:
-        """Sleep in chunks to remain responsive to stop signals. Returns False if aborted."""
-        end_time = time.time() + duration
+    def _chunked_sleep(self, seconds: float) -> bool:
+        """Sleeps in small chunks to allow immediate cancellation or pausing."""
+        end_time = time.time() + seconds
         while time.time() < end_time:
             if self._stop_requested:
                 return False
-            time.sleep(0.05)
+            while self._paused and not self._stop_requested:
+                time.sleep(0.1)
+                end_time += 0.1  # Extend end_time while paused
+            
+            if self._stop_requested:
+                return False
+            time.sleep(min(0.1, end_time - time.time()))
         return True
 
     def _do_sleep(self, a: SleepAction):
