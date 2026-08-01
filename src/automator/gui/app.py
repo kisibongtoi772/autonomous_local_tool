@@ -647,9 +647,17 @@ class AutomatorGUI(ctk.CTk):
         badge.grid(row=0, column=1, padx=8, pady=8)
         _label(badge, label, size=10, colour=T["label"]).pack(padx=8, pady=3)
 
-        # Summary
-        _label(row, summary, size=11, colour=T["text"],
-               anchor="w").grid(row=0, column=2, padx=4, pady=8, sticky="ew")
+        # Summary & Note
+        summary_frame = ctk.CTkFrame(row, fg_color="transparent")
+        summary_frame.grid(row=0, column=2, padx=4, pady=8, sticky="ew")
+        
+        note = action.get("note", "").strip()
+        if note:
+            # We use text_color=T["accent"] or bright white for note
+            _label(summary_frame, f"[{note}]", size=11, colour="#FFFFFF", weight="bold").pack(side="left", padx=(0, 8))
+            _label(summary_frame, summary, size=11, colour=T["dim"]).pack(side="left")
+        else:
+            _label(summary_frame, summary, size=11, colour=T["text"]).pack(side="left")
 
         # Controls — plain text buttons only
         ctrl = ctk.CTkFrame(row, fg_color="transparent")
@@ -743,7 +751,7 @@ class AutomatorGUI(ctk.CTk):
             ).start()
 
     def _open_add_dialog(self):
-        dlg = self._dialog("Add Action", "400x340")
+        dlg = self._dialog("Add Action", "400x420")
 
         _label(dlg, "Type", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
         type_var = ctk.StringVar(value="sleep")
@@ -828,6 +836,13 @@ class AutomatorGUI(ctk.CTk):
 
         type_var.trace_add("write", lambda *_: hint.configure(text=HINTS.get(type_var.get(), "")))
 
+        _label(dlg, "Note (Optional)", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
+        note_entry = ctk.CTkEntry(
+            dlg, width=360, fg_color=T["raised"], border_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6
+        )
+        note_entry.pack(padx=20)
+
         def save():
             t   = type_var.get()
             val = entry.get().strip()
@@ -855,6 +870,11 @@ class AutomatorGUI(ctk.CTk):
                     a["timeout"]  = float(parts[1]) if len(parts) > 1 else 10.0
                 elif t == "run_workflow": a["workflow_file"] = val
                 elif t == "prompt_user": a["message"] = val
+                
+                note_val = note_entry.get().strip()
+                if note_val:
+                    a["note"] = note_val
+                    
                 self._modify_workflow(lambda d: d.setdefault("actions", []).append(a))
                 logger.info(f"Added action: {t}")
                 dlg.destroy()
@@ -865,7 +885,7 @@ class AutomatorGUI(ctk.CTk):
 
     def _open_edit_dialog(self, idx: int, action: dict):
         atype = action.get("type", "unknown")
-        dlg   = self._dialog(f"Edit  #{idx+1}  —  {ACTION_LABELS.get(atype, atype)}", "400x240")
+        dlg   = self._dialog(f"Edit  #{idx+1}  —  {ACTION_LABELS.get(atype, atype)}", "400x320")
 
         _label(dlg, "Value", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
         val_frame = ctk.CTkFrame(dlg, fg_color="transparent")
@@ -934,6 +954,14 @@ class AutomatorGUI(ctk.CTk):
             "run_workflow":     action.get("workflow_file", ""),
         }.get(atype, "")
         entry.insert(0, cur)
+        
+        _label(dlg, "Note (Optional)", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
+        note_entry = ctk.CTkEntry(
+            dlg, width=360, fg_color=T["raised"], border_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6
+        )
+        note_entry.pack(padx=20)
+        note_entry.insert(0, action.get("note", ""))
 
         def save():
             val = entry.get().strip()
@@ -953,6 +981,18 @@ class AutomatorGUI(ctk.CTk):
                     upd["text"]   = parts[1] if len(parts) > 1 else ""
                 elif atype == "screenshot":       upd["filename"] = val
                 elif atype in ("assert_template","if_template"): upd["template"] = val
+                elif atype == "wait_for_template":
+                    parts = [v.strip() for v in val.split(",")]
+                    upd["template"] = parts[0] if parts else val
+                    upd["timeout"]  = float(parts[1]) if len(parts) > 1 else 10.0
+                elif atype == "run_workflow":     upd["workflow_file"] = val
+                elif atype == "prompt_user":      upd["message"] = val
+                
+                note_val = note_entry.get().strip()
+                if note_val:
+                    upd["note"] = note_val
+                elif "note" in upd:
+                    del upd["note"]
 
                 def m(d):
                     if 0 <= idx < len(d.get("actions", [])):
