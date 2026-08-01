@@ -213,6 +213,10 @@ class AutomatorGUI(ctk.CTk):
         self.scheduler   = WorkflowScheduler()
         self.var_manager = VariableManager()
 
+        # Undo/Redo Stacks
+        self._undo_stack = []
+        self._redo_stack = []
+
         os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
         self._build()
@@ -556,6 +560,13 @@ class AutomatorGUI(ctk.CTk):
         tb.grid(row=0, column=0, sticky="ew", padx=24, pady=(56, 8))
 
         _btn(tb, "Refresh",    self._refresh_workflow, False).pack(side="left", padx=(8, 0), pady=8)
+        
+        self._undo_btn = _btn(tb, "↶ Undo", self._undo, False)
+        self._undo_btn.pack(side="left", padx=(8, 0), pady=8)
+        
+        self._redo_btn = _btn(tb, "↷ Redo", self._redo, False)
+        self._redo_btn.pack(side="left", padx=(8, 0), pady=8)
+        
         _btn(tb, "Add Action", self._open_add_dialog,  True).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
@@ -752,12 +763,60 @@ class AutomatorGUI(ctk.CTk):
             if k in a: return a[k]
         return ""
 
+    def _update_undo_redo_buttons(self):
+        if hasattr(self, "_undo_btn"):
+            if self._undo_stack:
+                self._undo_btn.configure(state="normal", text_color=T["text"])
+            else:
+                self._undo_btn.configure(state="disabled", text_color=T["dim"])
+                
+        if hasattr(self, "_redo_btn"):
+            if self._redo_stack:
+                self._redo_btn.configure(state="normal", text_color=T["text"])
+            else:
+                self._redo_btn.configure(state="disabled", text_color=T["dim"])
+
     def _modify_workflow(self, mutator):
         path = os.path.join(WORKSPACE_DIR, self.file_var.get())
         data = load_json(path, {"workflow_name": "workflow", "created_at": "", "actions": []})
+        
+        prev_actions = copy.deepcopy(data.get("actions", []))
+        
         mutator(data)
+        
+        if data.get("actions", []) != prev_actions:
+            self._undo_stack.append(prev_actions)
+            self._redo_stack.clear()
+            self._update_undo_redo_buttons()
+            
         save_json(path, data)
         self._refresh_workflow()
+
+    def _undo(self):
+        if not self._undo_stack: return
+        path = os.path.join(WORKSPACE_DIR, self.file_var.get())
+        data = load_json(path, {"workflow_name": "workflow", "created_at": "", "actions": []})
+        
+        self._redo_stack.append(copy.deepcopy(data.get("actions", [])))
+        data["actions"] = self._undo_stack.pop()
+        
+        save_json(path, data)
+        self._refresh_workflow()
+        self._update_undo_redo_buttons()
+        logger.info("Undo successful.")
+
+    def _redo(self):
+        if not self._redo_stack: return
+        path = os.path.join(WORKSPACE_DIR, self.file_var.get())
+        data = load_json(path, {"workflow_name": "workflow", "created_at": "", "actions": []})
+        
+        self._undo_stack.append(copy.deepcopy(data.get("actions", [])))
+        data["actions"] = self._redo_stack.pop()
+        
+        save_json(path, data)
+        self._refresh_workflow()
+        self._update_undo_redo_buttons()
+        logger.info("Redo successful.")
         self._refresh_stats()
 
     def _delete_action(self, idx: int):
@@ -1657,6 +1716,12 @@ class AutomatorGUI(ctk.CTk):
     def _on_file_select(self, choice: str):
         self.file_var.set(choice)
         logger.info(f"Workflow: {choice}")
+        
+        # Reset undo/redo when switching files
+        self._undo_stack.clear()
+        self._redo_stack.clear()
+        self._update_undo_redo_buttons()
+        
         if self._active_nav == "workflow":
             self._refresh_workflow()
         self._refresh_stats()
