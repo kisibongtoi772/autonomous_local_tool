@@ -772,8 +772,22 @@ class AutomatorGUI(ctk.CTk):
                 dlg.deiconify()
             SnippingTool(self, on_capture, on_cancel)
 
+        def open_coord_picker():
+            from .coord_picker import CoordinatePicker
+            dlg.withdraw()
+            def on_pick(x, y):
+                dlg.deiconify()
+                entry.delete(0, "end")
+                entry.insert(0, f"{x},{y}")
+            def on_cancel():
+                dlg.deiconify()
+            CoordinatePicker(self, on_pick, on_cancel)
+
         capture_btn = _btn(val_frame, "✂", open_snipping, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         capture_btn.pack(side="right", padx=(8, 0))
+        
+        coord_btn = _btn(val_frame, "🎯", open_coord_picker, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        coord_btn.pack(side="right", padx=(8, 0))
 
         HINTS = {
             "sleep": "seconds  (e.g. 1.5)",
