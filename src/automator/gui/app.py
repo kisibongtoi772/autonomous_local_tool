@@ -871,7 +871,7 @@ class AutomatorGUI(ctk.CTk):
             "loop": "count  (e.g. 3)",
             "wait_for_template": "template,timeout  (e.g. btn.png,15  or just  btn.png)",
             "run_workflow": "filename in workspace/  (e.g. setup.json)",
-            "prompt_user": "message to display  (e.g. Please log in first)",
+            "prompt_user": "message to display  (e.g. Enter name:|username)",
             "comment": "text to display (e.g. --- Login Section ---)",
         }
         hint = _label(dlg, HINTS.get("sleep", ""), size=10, colour=T["dim"])
@@ -924,7 +924,12 @@ class AutomatorGUI(ctk.CTk):
                 a["template"] = parts[0] if parts else val
                 a["timeout"]  = float(parts[1]) if len(parts) > 1 else 10.0
             elif t == "run_workflow": a["workflow_file"] = val
-            elif t == "prompt_user": a["message"] = val
+            elif t == "prompt_user":
+                parts = val.split("|", 1)
+                a["message"] = parts[0].strip()
+                if len(parts) > 1:
+                    a["require_input"] = True
+                    a["save_to_variable"] = parts[1].strip()
             elif t == "comment": a["text"] = val
             
             note_val = note_entry.get().strip()
@@ -1039,7 +1044,7 @@ class AutomatorGUI(ctk.CTk):
             "if_template":      action.get("template", ""),
             "wait_for_template":f"{action.get('template','')},{action.get('timeout',10)}",
             "run_workflow":     action.get("workflow_file", ""),
-            "prompt_user":      action.get("message", ""),
+            "prompt_user":      action.get("message", "") + (f"|{action.get('save_to_variable')}" if action.get("require_input") else ""),
             "comment":          action.get("text", ""),
         }.get(atype, "")
         entry.insert(0, cur)
@@ -1087,7 +1092,15 @@ class AutomatorGUI(ctk.CTk):
                 upd["template"] = parts[0] if parts else val
                 upd["timeout"]  = float(parts[1]) if len(parts) > 1 else 10.0
             elif atype == "run_workflow":     upd["workflow_file"] = val
-            elif atype == "prompt_user":      upd["message"] = val
+            elif atype == "prompt_user":
+                parts = val.split("|", 1)
+                upd["message"] = parts[0].strip()
+                if len(parts) > 1:
+                    upd["require_input"] = True
+                    upd["save_to_variable"] = parts[1].strip()
+                else:
+                    upd["require_input"] = False
+                    upd.pop("save_to_variable", None)
             elif atype == "comment":          upd["text"] = val
             
             note_val = note_entry.get().strip()
@@ -1483,19 +1496,30 @@ class AutomatorGUI(ctk.CTk):
     def _show_prompt_dialog(self, action_dict: dict, q):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Automation Prompt")
-        dlg.geometry("400x200")
+        dlg.geometry("400x240")
         dlg.transient(self)
         dlg.grab_set()
 
         msg = action_dict.get("message", "Please confirm to continue.")
         lbl = ctk.CTkLabel(dlg, text=msg, font=ctk.CTkFont(*FONT_BODY), text_color=T["text"], wraplength=360)
-        lbl.pack(pady=30, padx=20)
+        lbl.pack(pady=(30, 10), padx=20)
+        
+        req_input = action_dict.get("require_input", False)
+        inp_entry = None
+        if req_input:
+            inp_entry = ctk.CTkEntry(
+                dlg, width=320, fg_color=T["raised"], border_color=T["border"],
+                text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6
+            )
+            inp_entry.pack(pady=(0, 10), padx=20)
+            inp_entry.focus_set()
         
         btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
         btn_frame.pack(fill="x", side="bottom", pady=20)
         
         def on_ok():
-            q.put("OK")
+            val = inp_entry.get() if inp_entry else "OK"
+            q.put(val)
             dlg.destroy()
             
         def on_cancel():
