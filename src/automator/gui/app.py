@@ -1195,6 +1195,9 @@ class AutomatorGUI(ctk.CTk):
         step_cb = self._make_step_callback() if step else None
         prompt_cb = self._make_prompt_callback()
 
+        from .floating_status import FloatingStatus
+        self._floating_status = FloatingStatus(self, on_stop=self._stop_playback)
+
         def run():
             try:
                 p = Player(
@@ -1309,7 +1312,11 @@ class AutomatorGUI(ctk.CTk):
         self.progress_bar.set(pct)
         atype = action_dict.get("type", "?")
         label = ACTION_LABELS.get(atype, atype)
-        self.progress_label.configure(text=f"Step {step}/{total}: {label}", text_color=T["text"])
+        text = f"Step {step}/{total}: {label}"
+        self.progress_label.configure(text=text, text_color=T["text"])
+        
+        if hasattr(self, '_floating_status') and self._floating_status.winfo_exists():
+            self._floating_status.update_status(text)
 
     def _on_done(self):
         self._set_status("Idle", T["ok"])
@@ -1318,6 +1325,10 @@ class AutomatorGUI(ctk.CTk):
         if hasattr(self, "progress_bar"):
             self.progress_bar.set(0.0)
             self.progress_label.configure(text="Ready", text_color=T["dim"])
+            
+        if hasattr(self, '_floating_status') and self._floating_status.winfo_exists():
+            self._floating_status.destroy()
+            
         self._refresh_stats()
         if self._active_nav == "history":
             self._refresh_history()
