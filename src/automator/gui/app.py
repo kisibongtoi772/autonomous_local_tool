@@ -783,6 +783,17 @@ class AutomatorGUI(ctk.CTk):
             def on_cancel():
                 dlg.deiconify()
             CoordinatePicker(self, on_pick, on_cancel)
+            
+        def open_hotkey_picker():
+            from .hotkey_picker import HotkeyPicker
+            dlg.withdraw()
+            def on_capture(combo):
+                dlg.deiconify()
+                entry.delete(0, "end")
+                entry.insert(0, combo)
+            def on_cancel():
+                dlg.deiconify()
+            HotkeyPicker(self, on_capture, on_cancel)
 
         capture_btn = _btn(val_frame, "✂", open_snipping, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         capture_btn.pack(side="right", padx=(8, 0))
@@ -790,11 +801,14 @@ class AutomatorGUI(ctk.CTk):
         coord_btn = _btn(val_frame, "🎯", open_coord_picker, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         coord_btn.pack(side="right", padx=(8, 0))
 
+        hotkey_btn = _btn(val_frame, "⌨️", open_hotkey_picker, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        hotkey_btn.pack(side="right", padx=(8, 0))
+
         HINTS = {
             "sleep": "seconds  (e.g. 1.5)",
             "type": "text or key  (e.g. hello  or  Key.enter)",
             "run_command": "shell command  (e.g. open /Applications/Safari.app)",
-            "hotkey": "keys comma-separated  (e.g. cmd,c)",
+            "hotkey": "keys comma-separated (e.g. cmd,c). Use ⌨️ to record",
             "scroll": "amount  (positive=up  negative=down)",
             "screenshot": "filename  (e.g. state.png)",
             "assert_template": "template filename in workspace/templates/",
@@ -851,11 +865,56 @@ class AutomatorGUI(ctk.CTk):
         dlg   = self._dialog(f"Edit  #{idx+1}  —  {ACTION_LABELS.get(atype, atype)}", "400x240")
 
         _label(dlg, "Value", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
+        val_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        val_frame.pack(padx=20, fill="x")
+        
         entry = ctk.CTkEntry(
-            dlg, width=360, fg_color=T["raised"], border_color=T["border"],
+            val_frame, fg_color=T["raised"], border_color=T["border"],
             text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6
         )
-        entry.pack(padx=20)
+        entry.pack(side="left", fill="x", expand=True)
+
+        def open_snipping():
+            from .snipping_tool import SnippingTool
+            dlg.withdraw()
+            def on_capture(filename):
+                dlg.deiconify()
+                entry.delete(0, "end")
+                entry.insert(0, filename)
+            def on_cancel():
+                dlg.deiconify()
+            SnippingTool(self, on_capture, on_cancel)
+
+        def open_coord_picker():
+            from .coord_picker import CoordinatePicker
+            dlg.withdraw()
+            def on_pick(x, y):
+                dlg.deiconify()
+                entry.delete(0, "end")
+                entry.insert(0, f"{x},{y}")
+            def on_cancel():
+                dlg.deiconify()
+            CoordinatePicker(self, on_pick, on_cancel)
+            
+        def open_hotkey_picker():
+            from .hotkey_picker import HotkeyPicker
+            dlg.withdraw()
+            def on_capture(combo):
+                dlg.deiconify()
+                entry.delete(0, "end")
+                entry.insert(0, combo)
+            def on_cancel():
+                dlg.deiconify()
+            HotkeyPicker(self, on_capture, on_cancel)
+
+        capture_btn = _btn(val_frame, "✂", open_snipping, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        capture_btn.pack(side="right", padx=(8, 0))
+        
+        coord_btn = _btn(val_frame, "🎯", open_coord_picker, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        coord_btn.pack(side="right", padx=(8, 0))
+
+        hotkey_btn = _btn(val_frame, "⌨️", open_hotkey_picker, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        hotkey_btn.pack(side="right", padx=(8, 0))
 
         cur = {
             "sleep":            str(action.get("duration", 1.0)),
