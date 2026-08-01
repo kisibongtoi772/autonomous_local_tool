@@ -163,7 +163,8 @@ class Player:
             # ── Time offset (scaled by speed) ────────────────────────────────
             scaled_offset = action.time_offset / self.speed
             if scaled_offset > 0:
-                time.sleep(scaled_offset)
+                if not self._chunked_sleep(scaled_offset):
+                    return
 
             # ── Execute with optional retry ──────────────────────────────────
             self._execute_with_retry(action)
@@ -185,7 +186,8 @@ class Player:
                         f"[Retry {attempt+1}/{action.retry_count}] {action.type} failed: {e} "
                         f"— retrying in {delay}s"
                     )
-                    time.sleep(delay)
+                    if not self._chunked_sleep(delay):
+                        return
                 else:
                     # Final attempt failed
                     raise
@@ -240,10 +242,19 @@ class Player:
         else:
             pyautogui.write(key) if len(key) == 1 else pyautogui.press(key)
 
+    def _chunked_sleep(self, duration: float) -> bool:
+        """Sleep in chunks to remain responsive to stop signals. Returns False if aborted."""
+        end_time = time.time() + duration
+        while time.time() < end_time:
+            if self._stop_requested:
+                return False
+            time.sleep(0.05)
+        return True
+
     def _do_sleep(self, a: SleepAction):
         duration = a.duration / self.speed
         logger.info(f"Sleep {duration:.2f}s  (original={a.duration}s, speed={self.speed}x)")
-        time.sleep(duration)
+        self._chunked_sleep(duration)
 
     def _do_hotkey(self, a: HotkeyAction):
         keys = [self.var_manager.resolve(k) for k in a.keys]

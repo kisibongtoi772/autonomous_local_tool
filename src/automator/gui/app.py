@@ -1816,7 +1816,9 @@ class AutomatorGUI(ctk.CTk):
         def on_press(key):
             try:
                 if   key == keyboard.Key.f9:  self.after(0, self.start_recording)
-                elif key == keyboard.Key.f10: self.after(0, self.stop_recording)
+                elif key == keyboard.Key.f10:
+                    self.after(0, self.stop_recording)
+                    self.after(0, self._stop_playback)
                 elif key == keyboard.Key.f11: self.after(0, self.playback)
                 elif self.recording and self.recorder:
                     self.recorder.on_press(key)
