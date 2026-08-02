@@ -24,6 +24,7 @@ from ..models.workflow import (
     HotkeyAction, IfTemplateAction, LoopAction, RunCommandAction,
     RunWorkflowAction, ScreenshotAction, ScrollAction, SleepAction,
     TypeAction, WaitForTemplateAction, Workflow, PromptUserAction,
+    AppFocusAction, NotificationAction
 )
 from ..utils.config import RUN_HISTORY_FILE, TEMPLATES_DIR, WORKFLOW_FILE, WORKSPACE_DIR
 from ..utils.logger import get_logger
@@ -223,12 +224,37 @@ class Player:
         elif isinstance(action, WaitForTemplateAction):self._do_wait_for_template(action)
         elif isinstance(action, RunWorkflowAction):   self._do_run_workflow(action)
         elif isinstance(action, PromptUserAction):    self._do_prompt_user(action)
+        elif isinstance(action, AppFocusAction):      self._do_app_focus(action)
+        elif isinstance(action, NotificationAction):  self._do_notification(action)
         elif isinstance(action, CommentAction):       self._do_comment(action)
 
     # ── Action handlers ───────────────────────────────────────────────────────
     
     def _do_comment(self, a: CommentAction):
         logger.info(f"--- {a.text} ---")
+
+    def _do_app_focus(self, a: AppFocusAction):
+        logger.info(f"App Focus: {a.app_name}")
+        app_name = self.var_manager.resolve(a.app_name)
+        if a.launch_if_closed:
+            # Tell application to activate (will launch if not running)
+            subprocess.run(["osascript", "-e", f'tell application "{app_name}" to activate'])
+        else:
+            # Check if running first
+            res = subprocess.run(["osascript", "-e", f'application "{app_name}" is running'], capture_output=True, text=True)
+            if "true" in res.stdout.lower():
+                subprocess.run(["osascript", "-e", f'tell application "{app_name}" to activate'])
+            else:
+                logger.warning(f"AppFocus: {app_name} is not running and launch_if_closed is False.")
+
+    def _do_notification(self, a: NotificationAction):
+        title = self.var_manager.resolve(a.title)
+        msg = self.var_manager.resolve(a.message)
+        logger.info(f"Notification: {title} - {msg}")
+        # Escape quotes for applescript
+        title = title.replace('"', '\\"')
+        msg = msg.replace('"', '\\"')
+        subprocess.run(["osascript", "-e", f'display notification "{msg}" with title "{title}"'])
 
     def _do_click(self, a: ClickAction):
         x, y = a.x, a.y

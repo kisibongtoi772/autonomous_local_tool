@@ -118,6 +118,8 @@ ACTION_LABELS = {
     "wait_for_template":"Wait For",
     "run_workflow":      "Sub-Workflow",
     "prompt_user":       "Prompt",
+    "app_focus":         "App Focus",
+    "notification":      "Notification",
     "comment":          "Comment / Group",
 }
 
@@ -799,6 +801,8 @@ class AutomatorGUI(ctk.CTk):
             return f"template={a.get('template','')}  timeout={a.get('timeout',10)}s  on_timeout={a.get('on_timeout','error')}"
         if atype == "run_workflow":     return f"file={a.get('workflow_file','')}"
         if atype == "prompt_user":      return f"msg={a.get('message','')[:50]}"
+        if atype == "app_focus":        return f"app={a.get('app_name','')}"
+        if atype == "notification":     return f"title={a.get('title','')}  msg={a.get('message','')[:30]}"
         if atype == "comment":          return a.get("text", "")
         for k in ["template", "template_image"]:
             if k in a: return a[k]
@@ -972,6 +976,8 @@ class AutomatorGUI(ctk.CTk):
             "wait_for_template": "template,timeout  (e.g. btn.png,15  or just  btn.png)",
             "run_workflow": "filename in workspace/  (e.g. setup.json)",
             "prompt_user": "message to display  (e.g. Enter name:|username)",
+            "app_focus": "app name to focus  (e.g. Safari)",
+            "notification": "message to send  (e.g. Done!|Success)",
             "comment": "text to display (e.g. --- Login Section ---)",
         }
         hint = _label(dlg, HINTS.get("sleep", ""), size=10, colour=T["dim"])
@@ -1030,6 +1036,15 @@ class AutomatorGUI(ctk.CTk):
                 if len(parts) > 1:
                     a["require_input"] = True
                     a["save_to_variable"] = parts[1].strip()
+            elif t == "app_focus": a["app_name"] = val; a["launch_if_closed"] = True
+            elif t == "notification":
+                parts = val.split("|", 1)
+                if len(parts) > 1:
+                    a["title"] = parts[1].strip()
+                    a["message"] = parts[0].strip()
+                else:
+                    a["message"] = val
+                    a["title"] = "Automator"
             elif t == "comment": a["text"] = val
             
             note_val = note_entry.get().strip()
@@ -1145,6 +1160,8 @@ class AutomatorGUI(ctk.CTk):
             "wait_for_template":f"{action.get('template','')},{action.get('timeout',10)}",
             "run_workflow":     action.get("workflow_file", ""),
             "prompt_user":      action.get("message", "") + (f"|{action.get('save_to_variable')}" if action.get("require_input") else ""),
+            "app_focus":        action.get("app_name", ""),
+            "notification":     action.get("message", "") + (f"|{action.get('title')}" if action.get("title") != "Automator" else ""),
             "comment":          action.get("text", ""),
         }.get(atype, "")
         entry.insert(0, cur)
@@ -1201,6 +1218,14 @@ class AutomatorGUI(ctk.CTk):
                 else:
                     upd["require_input"] = False
                     upd.pop("save_to_variable", None)
+            elif atype == "app_focus":        upd["app_name"] = val
+            elif atype == "notification":
+                parts = val.split("|", 1)
+                if len(parts) > 1:
+                    upd["title"] = parts[1].strip()
+                    upd["message"] = parts[0].strip()
+                else:
+                    upd["message"] = val
             elif atype == "comment":          upd["text"] = val
             
             note_val = note_entry.get().strip()

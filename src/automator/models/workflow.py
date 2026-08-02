@@ -118,13 +118,27 @@ class PromptUserAction(BaseAction):
     save_to_variable: Optional[str] = None
 
 
+class AppFocusAction(BaseAction):
+    """Bring an application to the foreground."""
+    type: Literal["app_focus"]
+    app_name: str
+    launch_if_closed: bool = True
+
+
+class NotificationAction(BaseAction):
+    """Show an OS-level notification."""
+    type: Literal["notification"]
+    title: str = "Automator"
+    message: str
+
+
 ActionType = Annotated[
     Union[
         ClickAction, TypeAction, LoopAction, RunCommandAction,
         HotkeyAction, SleepAction, ScrollAction, ScreenshotAction,
         AssertTemplateAction, ClipboardAction, IfTemplateAction,
         WaitForTemplateAction, RunWorkflowAction, PromptUserAction,
-        CommentAction,
+        AppFocusAction, NotificationAction, CommentAction,
     ],
     Field(discriminator='type')
 ]
