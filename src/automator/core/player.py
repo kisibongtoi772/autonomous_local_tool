@@ -24,7 +24,7 @@ from ..models.workflow import (
     HotkeyAction, IfTemplateAction, LoopAction, RunCommandAction,
     RunWorkflowAction, ScreenshotAction, ScrollAction, SleepAction,
     TypeAction, WaitForTemplateAction, Workflow, PromptUserAction,
-    AppFocusAction, NotificationAction, CommentAction
+    AppFocusAction, NotificationAction, CommentAction, GroupAction
 )
 from ..utils.config import RUN_HISTORY_FILE, TEMPLATES_DIR, WORKFLOW_FILE, WORKSPACE_DIR, SNAPSHOTS_DIR
 from ..utils.logger import get_logger
@@ -359,6 +359,10 @@ class Player:
             logger.info(f"  Iteration {i+1}/{a.count}")
             self._play_actions(a.actions)
         logger.info("Loop done.")
+
+    def _do_group(self, a: GroupAction):
+        logger.info(f"Group: {a.name} ({len(a.actions)} actions)")
+        self._play_actions(a.actions)
 
     def _do_assert_template(self, a: AssertTemplateAction):
         path = os.path.join(TEMPLATES_DIR, a.template)

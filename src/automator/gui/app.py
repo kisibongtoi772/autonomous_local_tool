@@ -103,6 +103,12 @@ def get_workflow_files():
     return files or ["workflow.json"]
 
 
+ACTION_TYPES = [
+    "click", "type", "sleep", "hotkey", "scroll", "run_command", "screenshot", 
+    "assert_template", "if_template", "wait_for_template", "clipboard",
+    "run_workflow", "prompt_user", "app_focus", "notification", "comment", "group"
+]
+
 ACTION_LABELS = {
     "click":            "Click",
     "type":             "Type",
@@ -120,7 +126,8 @@ ACTION_LABELS = {
     "prompt_user":       "Prompt",
     "app_focus":         "App Focus",
     "notification":      "Notification",
-    "comment":          "Comment / Group",
+    "comment":          "Comment",
+    "group":            "Group",
 }
 
 
@@ -835,6 +842,8 @@ class AutomatorGUI(ctk.CTk):
         
         if atype == "loop":
             _ctrl_btn(ctrl, "📂 Mở", lambda idx=i: [self._nav_stack.append((idx, "actions", f"Loop {idx+1}")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=2)
+        elif atype == "group":
+            _ctrl_btn(ctrl, "📂 Mở", lambda idx=i: [self._nav_stack.append((idx, "actions", f"Group: {action.get('name', 'Group')}")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=2)
         elif atype == "if_template":
             _ctrl_btn(ctrl, "📂 Then", lambda idx=i: [self._nav_stack.append((idx, "then_actions", f"If {idx+1} (Then)")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=1)
             _ctrl_btn(ctrl, "📂 Else", lambda idx=i: [self._nav_stack.append((idx, "else_actions", f"If {idx+1} (Else)")), self._refresh_workflow()], text_color=T["warn"]).pack(side="left", padx=1)
@@ -880,6 +889,7 @@ class AutomatorGUI(ctk.CTk):
         if atype == "app_focus":        return f"app={a.get('app_name','')}"
         if atype == "notification":     return f"title={a.get('title','')}  msg={a.get('message','')[:30]}"
         if atype == "comment":          return a.get("text", "")
+        if atype == "group":            return f"Group: {a.get('name', '')} ({len(a.get('actions',[]))} actions)"
         for k in ["template", "template_image"]:
             if k in a: return a[k]
         return ""
@@ -1099,6 +1109,7 @@ class AutomatorGUI(ctk.CTk):
             "if_template": "template filename  (add branches via Edit)",
             "click": "x,y  (e.g. 500,300)",
             "loop": "count  (e.g. 3)",
+            "group": "group name",
             "wait_for_template": "template,timeout  (e.g. btn.png,15  or just  btn.png)",
             "run_workflow": "filename in workspace/  (e.g. setup.json)",
             "prompt_user": "message to display  (e.g. Enter name:|username)",
@@ -1150,6 +1161,7 @@ class AutomatorGUI(ctk.CTk):
                 x, y = [v.strip() for v in val.split(",")]
                 a["x"] = int(x); a["y"] = int(y)
             elif t == "loop": a["count"] = int(val or 1); a["actions"] = []
+            elif t == "group": a["name"] = val or "New Group"; a["actions"] = []
             elif t == "if_template": a["template"] = val; a["then_actions"] = []; a["else_actions"] = []
             elif t == "wait_for_template":
                 parts = [v.strip() for v in val.split(",")]
@@ -1316,6 +1328,7 @@ class AutomatorGUI(ctk.CTk):
             "app_focus":        action.get("app_name", ""),
             "notification":     action.get("message", "") + (f"|{action.get('title')}" if action.get("title") != "Automator" else ""),
             "comment":          action.get("text", ""),
+            "group":            action.get("name", ""),
         }.get(atype, "")
         entry.insert(0, cur)
         
@@ -1380,6 +1393,7 @@ class AutomatorGUI(ctk.CTk):
                 else:
                     upd["message"] = val
             elif atype == "comment":          upd["text"] = val
+            elif atype == "group":            upd["name"] = val
             
             note_val = note_entry.get().strip()
             if note_val:

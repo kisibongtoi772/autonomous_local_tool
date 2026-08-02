@@ -132,13 +132,20 @@ class NotificationAction(BaseAction):
     message: str
 
 
+class GroupAction(BaseAction):
+    """A logical folder to group multiple actions together."""
+    type: Literal["group"]
+    name: str = "New Group"
+    actions: List['ActionType'] = Field(default_factory=list)
+
+
 ActionType = Annotated[
     Union[
         ClickAction, TypeAction, LoopAction, RunCommandAction,
         HotkeyAction, SleepAction, ScrollAction, ScreenshotAction,
         AssertTemplateAction, ClipboardAction, IfTemplateAction,
         WaitForTemplateAction, RunWorkflowAction, PromptUserAction,
-        AppFocusAction, NotificationAction, CommentAction,
+        AppFocusAction, NotificationAction, CommentAction, GroupAction,
     ],
     Field(discriminator='type')
 ]
