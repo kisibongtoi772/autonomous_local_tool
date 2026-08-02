@@ -1061,6 +1061,22 @@ class AutomatorGUI(ctk.CTk):
         del_btn.pack(side="left", padx=1)
 
     def _action_summary(self, atype: str, a: dict) -> str:
+        def preview(actions):
+            if not actions: return " (empty)"
+            previews = []
+            for child in actions[:3]:
+                t = child.get("type", "")
+                if t == "click": previews.append("Click")
+                elif t == "sleep": previews.append(f"Sleep({child.get('duration',0)})")
+                elif t == "type": previews.append("Type")
+                elif t == "group": previews.append("Group")
+                elif t == "assert_template": previews.append("Image")
+                else: previews.append(t.title() if len(t) < 10 else t[:6].title() + ".")
+            res = " [" + ", ".join(previews)
+            if len(actions) > 3: res += ", ..."
+            res += "]"
+            return res
+            
         if atype == "click":
             return f"({a.get('x')}, {a.get('y')})  button={a.get('button','left')}  clicks={a.get('clicks',1)}"
         if atype == "type":      return repr(a.get("key", ""))
@@ -1073,7 +1089,7 @@ class AutomatorGUI(ctk.CTk):
         if atype == "if_template":
             return (f"template={a.get('template','')}  "
                     f"then×{len(a.get('then_actions',[]))}  else×{len(a.get('else_actions',[]))}")
-        if atype == "loop":      return f"repeat={a.get('count',1)}  steps={len(a.get('actions',[]))}"
+        if atype == "loop":      return f"repeat={a.get('count',1)}  steps={len(a.get('actions',[]))}" + preview(a.get('actions', []))
         if atype == "wait_for_template":
             return f"template={a.get('template','')}  timeout={a.get('timeout',10)}s  on_timeout={a.get('on_timeout','error')}"
         if atype == "run_workflow":     return f"file={a.get('workflow_file','')}"
@@ -1081,7 +1097,7 @@ class AutomatorGUI(ctk.CTk):
         if atype == "app_focus":        return f"app={a.get('app_name','')}"
         if atype == "notification":     return f"title={a.get('title','')}  msg={a.get('message','')[:30]}"
         if atype == "comment":          return a.get("text", "")
-        if atype == "group":            return f"Group: {a.get('name', '')} ({len(a.get('actions',[]))} actions)"
+        if atype == "group":            return f"Group: {a.get('name', '')} ({len(a.get('actions',[]))} actions)" + preview(a.get('actions', []))
         if atype in ("assert_color", "if_color"): return f"({a.get('x')}, {a.get('y')}) == {a.get('color')} (±{a.get('tolerance')})"
         for k in ["template", "template_image"]:
             if k in a: return a[k]
@@ -1906,10 +1922,21 @@ class AutomatorGUI(ctk.CTk):
         
         _btn(self._bulk_toolbar, "Cancel", self._toggle_bulk_mode).pack(side="right", padx=12, pady=6)
         _btn(self._bulk_toolbar, "🗑 Delete", self._bulk_delete, danger=True).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "Toggle 🟢", self._bulk_toggle).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "✂️ Extract", self._bulk_extract).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "📦 Group", self._bulk_group).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "📋 Copy", self._bulk_copy).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "⧉ Duplicate", self._bulk_duplicate).pack(side="right", padx=6, pady=6)
+
+    def _bulk_toggle(self):
+        if not self._selected_indices: return
+        def m(lst):
+            for i in self._selected_indices:
+                if 0 <= i < len(lst):
+                    lst[i]["enabled"] = not lst[i].get("enabled", True)
+        self._modify_workflow(m)
+        self._selected_indices.clear()
+        self._toggle_bulk_mode()
 
     def _bulk_copy(self):
         if not self._selected_indices: return
