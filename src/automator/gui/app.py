@@ -225,6 +225,10 @@ class AutomatorGUI(ctk.CTk):
         # Bulk Edit Mode
         self._bulk_mode = False
         self._selected_indices = set()
+        
+        # Navigation Stack for Nested Editing
+        # Format: [(index, key, label), ...] e.g. [(3, "actions", "Loop")]
+        self._nav_stack: list[tuple[int, str, str]] = []
 
         os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
@@ -637,6 +641,9 @@ class AutomatorGUI(ctk.CTk):
         for w in self._wf_list.winfo_children():
             w.destroy()
             
+        if hasattr(self, "_breadcrumb_bar") and self._breadcrumb_bar.winfo_exists():
+            self._breadcrumb_bar.destroy()
+            
         if hasattr(self, "_bulk_toolbar") and self._bulk_toolbar.winfo_exists():
             self._bulk_toolbar.destroy()
 
@@ -647,10 +654,46 @@ class AutomatorGUI(ctk.CTk):
 
         data    = load_json(path, {})
         actions = data.get("actions", [])
-        query   = self._wf_search_var.get().strip().lower() if hasattr(self, "_wf_search_var") else ""
+        
+        # Build breadcrumb bar
+        self._breadcrumb_bar = ctk.CTkFrame(self._wf_list, fg_color="transparent")
+        self._breadcrumb_bar.pack(fill="x", pady=(0, 10))
+        
+        def _nav_root():
+            self._nav_stack.clear()
+            self._refresh_workflow()
+            
+        def _nav_pop(depth):
+            self._nav_stack = self._nav_stack[:depth]
+            self._refresh_workflow()
+            
+        _btn(self._breadcrumb_bar, "🏠 Root", _nav_root, width=50, fg_color="transparent", text_color=T["accent"]).pack(side="left")
+        
+        # Traverse nav_stack
+        for d_idx, (idx, sub_key, label) in enumerate(self._nav_stack):
+            _label(self._breadcrumb_bar, " / ", colour=T["dim"]).pack(side="left", padx=4)
+            _btn(self._breadcrumb_bar, label, lambda d=d_idx+1: _nav_pop(d), 
+                 width=40, fg_color="transparent", text_color=T["accent"]).pack(side="left")
+            
+            if idx < len(actions):
+                if sub_key not in actions[idx]:
+                    actions[idx][sub_key] = []
+                actions = actions[idx][sub_key]
+            else:
+                actions = []
+                
+        # Up one level button if not at root
+        if self._nav_stack:
+            _btn(self._breadcrumb_bar, "⬅ Back", lambda: _nav_pop(len(self._nav_stack)-1), 
+                 width=60, border_width=1, border_color=T["border"]).pack(side="right")
+                 
+        query = self._wf_search_var.get().strip().lower() if hasattr(self, "_wf_search_var") else ""
 
-        if not actions:
+        if not actions and not self._nav_stack:
             _label(self._wf_list, "Workflow is empty. Record or add actions.", colour=T["dim"]).pack(pady=30)
+            return
+        elif not actions:
+            _label(self._wf_list, "This block is empty. Add actions here.", colour=T["dim"]).pack(pady=30)
             return
 
         if self._bulk_mode:
@@ -709,10 +752,12 @@ class AutomatorGUI(ctk.CTk):
                 toggle_text = "●" if enabled else "○"
                 toggle_color = T["ok"] if enabled else T["dim"]
                 
+                toggle_color = T["ok"] if enabled else T["dim"]
+                
                 def toggle():
-                    def m(d):
-                        if 0 <= i < len(d.get("actions", [])):
-                            d["actions"][i]["enabled"] = not enabled
+                    def m(lst):
+                        if 0 <= i < len(lst):
+                            lst[i]["enabled"] = not enabled
                     self._modify_workflow(m)
                 
                 ctk.CTkButton(
@@ -762,7 +807,15 @@ class AutomatorGUI(ctk.CTk):
             )
 
         _ctrl_btn(ctrl, "▶1",  lambda idx=i: self._test_action(idx), text_color=T["accent"]).pack(side="left", padx=1)
-        _ctrl_btn(ctrl, "▶▶",  lambda idx=i: self.playback(start_idx=idx), text_color=T["accent"]).pack(side="left", padx=1)
+        if not self._nav_stack:
+            _ctrl_btn(ctrl, "▶▶",  lambda idx=i: self.playback(start_idx=idx), text_color=T["accent"]).pack(side="left", padx=1)
+        
+        if atype == "loop":
+            _ctrl_btn(ctrl, "📂 Mở", lambda idx=i: [self._nav_stack.append((idx, "actions", f"Loop {idx+1}")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=2)
+        elif atype == "if_template":
+            _ctrl_btn(ctrl, "📂 Then", lambda idx=i: [self._nav_stack.append((idx, "then_actions", f"If {idx+1} (Then)")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=1)
+            _ctrl_btn(ctrl, "📂 Else", lambda idx=i: [self._nav_stack.append((idx, "else_actions", f"If {idx+1} (Else)")), self._refresh_workflow()], text_color=T["warn"]).pack(side="left", padx=1)
+            
         tmpl_file = action.get("template") or action.get("template_image")
         if tmpl_file:
             _ctrl_btn(ctrl, "Img", lambda t=tmpl_file: self._show_template_preview_dialog(t)).pack(side="left", padx=1)
@@ -827,7 +880,21 @@ class AutomatorGUI(ctk.CTk):
         
         prev_actions = copy.deepcopy(data.get("actions", []))
         
-        mutator(data)
+        # Navigate to target list
+        target_container = data
+        key = "actions"
+        for idx, sub_key, label in self._nav_stack:
+            if key not in target_container: target_container[key] = []
+            if idx >= len(target_container[key]):
+                logger.error("Navigation stack invalid: index out of bounds")
+                return
+            target_container = target_container[key][idx]
+            key = sub_key
+            
+        if key not in target_container:
+            target_container[key] = []
+            
+        mutator(target_container[key])
         
         if data.get("actions", []) != prev_actions:
             self._undo_stack.append(prev_actions)
@@ -865,31 +932,39 @@ class AutomatorGUI(ctk.CTk):
         self._refresh_stats()
 
     def _delete_action(self, idx: int):
-        self._modify_workflow(lambda d: d["actions"].pop(idx))
+        self._modify_workflow(lambda lst: lst.pop(idx))
         logger.info(f"Deleted action #{idx+1}")
 
     def _duplicate_action(self, idx: int):
-        def m(d): d["actions"].insert(idx + 1, copy.deepcopy(d["actions"][idx]))
+        def m(lst): lst.insert(idx + 1, copy.deepcopy(lst[idx]))
         self._modify_workflow(m)
 
     def _move_up(self, idx: int):
         if idx <= 0: return
-        def m(d): d["actions"][idx], d["actions"][idx-1] = d["actions"][idx-1], d["actions"][idx]
+        def m(lst): lst[idx], lst[idx-1] = lst[idx-1], lst[idx]
         self._modify_workflow(m)
 
     def _move_down(self, idx: int):
-        def m(d):
-            if idx < len(d["actions"]) - 1:
-                d["actions"][idx], d["actions"][idx+1] = d["actions"][idx+1], d["actions"][idx]
+        def m(lst):
+            if idx < len(lst) - 1:
+                lst[idx], lst[idx+1] = lst[idx+1], lst[idx]
         self._modify_workflow(m)
 
     def _clear_workflow(self):
-        self._modify_workflow(lambda d: d.update({"actions": []}))
+        self._modify_workflow(lambda lst: lst.clear())
         logger.info("Workflow cleared.")
 
     def _test_action(self, idx: int):
         data = load_json(os.path.join(WORKSPACE_DIR, self.file_var.get()), {})
         acts = data.get("actions", [])
+        
+        for p_idx, sub_key, _ in self._nav_stack:
+            if p_idx < len(acts) and sub_key in acts[p_idx]:
+                acts = acts[p_idx][sub_key]
+            else:
+                acts = []
+                break
+                
         if 0 <= idx < len(acts):
             threading.Thread(
                 target=lambda: Player().play_single_action(acts[idx]),
@@ -1061,12 +1136,11 @@ class AutomatorGUI(ctk.CTk):
         def save():
             try:
                 a = _build_new_action()
-                def m(d):
-                    actions = d.setdefault("actions", [])
+                def m(lst):
                     if insert_idx is not None:
-                        actions.insert(insert_idx, a)
+                        lst.insert(insert_idx, a)
                     else:
-                        actions.append(a)
+                        lst.append(a)
                 self._modify_workflow(m)
                 
                 logger.info(f"Added action: {a['type']}")
@@ -1247,9 +1321,9 @@ class AutomatorGUI(ctk.CTk):
         def save():
             try:
                 upd = _build_updated_action()
-                def m(d):
-                    if 0 <= idx < len(d.get("actions", [])):
-                        d["actions"][idx] = upd
+                def m(lst):
+                    if 0 <= idx < len(lst):
+                        lst[idx] = upd
                 self._modify_workflow(m)
                 logger.info(f"Edited action #{idx+1}")
                 dlg.destroy()
