@@ -1467,6 +1467,17 @@ class AutomatorGUI(ctk.CTk):
                 # Insert at cursor position
                 entry.insert("insert", var_str)
             VariablePicker(self, self.var_manager, on_pick)
+            
+        def open_app_picker():
+            from .app_picker import AppPicker
+            dlg.withdraw()
+            def on_pick(app_name):
+                dlg.deiconify()
+                entry.delete(0, "end")
+                entry.insert(0, app_name)
+            def on_cancel():
+                dlg.deiconify()
+            AppPicker(self, on_pick, on_cancel)
 
         capture_btn = _btn(val_frame, "✂", open_snipping, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         capture_btn.pack(side="right", padx=(4, 0))
@@ -1479,6 +1490,8 @@ class AutomatorGUI(ctk.CTk):
 
         hotkey_btn = _btn(val_frame, "⌨️", open_hotkey_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         hotkey_btn.pack(side="right", padx=(4, 0))
+        
+        app_btn = _btn(val_frame, "📱", open_app_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         
         var_btn = _btn(val_frame, "{x}", open_variable_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         var_btn.pack(side="right", padx=(8, 0))
@@ -1724,6 +1737,17 @@ class AutomatorGUI(ctk.CTk):
                 # Insert at cursor position
                 entry.insert("insert", var_str)
             VariablePicker(self, self.var_manager, on_pick)
+            
+        def open_app_picker():
+            from .app_picker import AppPicker
+            dlg.withdraw()
+            def on_pick(app_name):
+                dlg.deiconify()
+                entry.delete(0, "end")
+                entry.insert(0, app_name)
+            def on_cancel():
+                dlg.deiconify()
+            AppPicker(self, on_pick, on_cancel)
 
         capture_btn = _btn(val_frame, "✂", open_snipping, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         capture_btn.pack(side="right", padx=(4, 0))
@@ -1736,6 +1760,9 @@ class AutomatorGUI(ctk.CTk):
 
         hotkey_btn = _btn(val_frame, "⌨️", open_hotkey_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         hotkey_btn.pack(side="right", padx=(4, 0))
+        
+        app_btn = _btn(val_frame, "📱", open_app_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        app_btn.pack(side="right", padx=(4, 0))
         
         var_btn = _btn(val_frame, "{x}", open_variable_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         var_btn.pack(side="right", padx=(8, 0))
