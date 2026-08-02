@@ -740,6 +740,7 @@ class AutomatorGUI(ctk.CTk):
         _btn(tb, "Console ⌨️", toggle_console, False).pack(side="left", padx=(8, 0), pady=8)
         
         _btn(tb, "Find/Replace 🔍", self._open_find_replace, False).pack(side="right", padx=(0, 8), pady=8)
+        _btn(tb, "Outline 📑", self._toggle_outline, False).pack(side="right", padx=(0, 8), pady=8)
 
         self._wf_search_var = ctk.StringVar()
         self._wf_search_var.trace_add("write", lambda *_: self._refresh_workflow())
@@ -1685,6 +1686,41 @@ class AutomatorGUI(ctk.CTk):
             
         from .template_cropper import TemplateCropper
         TemplateCropper(self, image_path, on_save=self._refresh_workflow)
+
+    def _toggle_outline(self):
+        if hasattr(self, "_outline_hud") and self._outline_hud.winfo_exists():
+            self._outline_hud.destroy()
+            return
+            
+        from .outline_hud import OutlineHUD
+        self._outline_hud = OutlineHUD(
+            self, 
+            actions=self._get_current_actions(),
+            on_jump=self._scroll_to_action
+        )
+        
+    def _scroll_to_action(self, idx: int):
+        if not hasattr(self, "_action_rows") or idx >= len(self._action_rows):
+            return
+            
+        row = self._action_rows[idx]
+        
+        # Highlight row temporarily
+        orig_color = row.cget("fg_color")
+        row.configure(fg_color="#3B82F6") # Bright blue
+        self.after(600, lambda: row.configure(fg_color=orig_color))
+        
+        # Scroll logic
+        try:
+            row_y = row.winfo_y()
+            # Calculate ratio
+            scroll_region = self._wf_list._parent_canvas.bbox("all")
+            if scroll_region:
+                total_height = scroll_region[3]
+                fraction = max(0.0, (row_y / total_height) - 0.1) # Offset slightly
+                self._wf_list._parent_canvas.yview_moveto(fraction)
+        except Exception as e:
+            logger.error(f"Failed to scroll to action {idx}: {e}")
 
     def _clear_workflow(self):
         self._modify_workflow(lambda lst: lst.clear())
