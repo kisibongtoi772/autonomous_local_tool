@@ -854,12 +854,38 @@ class AutomatorGUI(ctk.CTk):
 
     def _cancel_move(self):
         self._move_source_idx = None
+        if hasattr(self, "_bulk_move_indices"):
+            del self._bulk_move_indices
         self._refresh_workflow()
 
     def _execute_move(self, target_idx: int):
         if getattr(self, "_move_source_idx", None) is None:
             return
         src = self._move_source_idx
+        
+        if src == "bulk":
+            indices = getattr(self, "_bulk_move_indices", [])
+            if indices:
+                def m(lst):
+                    items = [lst[i] for i in indices if i < len(lst)]
+                    for i in reversed(indices):
+                        if i < len(lst):
+                            lst.pop(i)
+                    
+                    adjusted_target = target_idx
+                    for i in indices:
+                        if i < target_idx:
+                            adjusted_target -= 1
+                    
+                    for item in reversed(items):
+                        lst.insert(adjusted_target, item)
+                self._modify_workflow(m)
+            self._move_source_idx = None
+            if hasattr(self, "_bulk_move_indices"):
+                del self._bulk_move_indices
+            self._refresh_workflow()
+            return
+            
         if src != target_idx and src != target_idx - 1:
             def m(lst):
                 if 0 <= src < len(lst) and 0 <= target_idx <= len(lst):
@@ -1052,14 +1078,18 @@ class AutomatorGUI(ctk.CTk):
         ctrl.grid(row=0, column=3, padx=8, pady=4)
 
         if getattr(self, "_move_source_idx", None) is not None:
-            if i == self._move_source_idx:
+            move_src = self._move_source_idx
+            is_source = (i == move_src) or (move_src == "bulk" and hasattr(self, "_bulk_move_indices") and i in self._bulk_move_indices)
+            
+            if is_source:
                 row.configure(border_width=2, border_color="#D97706") # Gold border
-                ctk.CTkButton(
-                    ctrl, text="❌ Cancel Move", width=100, height=26,
-                    fg_color="#7F1D1D", hover_color="#991B1B",
-                    text_color="white", font=ctk.CTkFont("SF Pro Text", 11, "bold"),
-                    command=self._cancel_move
-                ).pack(side="left", padx=2)
+                if move_src != "bulk" or i == getattr(self, "_bulk_move_indices", [i])[0]:
+                    ctk.CTkButton(
+                        ctrl, text="❌ Cancel Move", width=100, height=26,
+                        fg_color="#7F1D1D", hover_color="#991B1B",
+                        text_color="white", font=ctk.CTkFont("SF Pro Text", 11, "bold"),
+                        command=self._cancel_move
+                    ).pack(side="left", padx=2)
             else:
                 ctk.CTkButton(
                     ctrl, text="📥 Insert Before", width=100, height=26,
@@ -1120,10 +1150,16 @@ class AutomatorGUI(ctk.CTk):
                 menu.add_command(label="▶▶  Play From Here", command=lambda: self.playback(start_idx=i))
                 menu.add_command(label="▶🛑  Play Until Here", command=lambda: self.playback(start_idx=0, end_idx=i))
             menu.add_separator()
+            if enabled:
+                menu.add_command(label="🔴  Disable Action", command=lambda: self._toggle_action_enable(i))
+            else:
+                menu.add_command(label="🟢  Enable Action", command=lambda: self._toggle_action_enable(i))
             menu.add_command(label="🔀  Move Action...", command=lambda: self._enter_move_mode(i))
             menu.add_separator()
             menu.add_command(label="📋  Copy Action", command=lambda: self._copy_action(action))
             menu.add_command(label="📑  Duplicate", command=lambda: self._duplicate_action(i))
+            if atype == "group":
+                menu.add_command(label="💥  Ungroup", command=lambda: self._ungroup_action(i))
             menu.add_command(label="➕  Insert Below", command=lambda: self._open_add_dialog(insert_idx=i + 1))
             menu.add_separator()
             menu.add_command(label="⏺  Record & Insert Below", command=lambda: self.start_recording(insert_idx=i + 1))
@@ -2047,7 +2083,8 @@ class AutomatorGUI(ctk.CTk):
         
         _btn(self._bulk_toolbar, "Cancel", self._toggle_bulk_mode).pack(side="right", padx=12, pady=6)
         _btn(self._bulk_toolbar, "🗑 Delete", self._bulk_delete, danger=True).pack(side="right", padx=6, pady=6)
-        _btn(self._bulk_toolbar, "▶ Play Selected", self._bulk_play).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "🔀 Move", self._bulk_move).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "▶ Play", self._bulk_play).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "Toggle 🟢", self._bulk_toggle).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "✂️ Extract", self._bulk_extract).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "📦 Group", self._bulk_group).pack(side="right", padx=6, pady=6)
@@ -2108,13 +2145,25 @@ class AutomatorGUI(ctk.CTk):
                 else:
                     logger.info("Selection playback finished.")
             except Exception as e:
+                p.last_error = str(e)
                 logger.error(f"Playback selection error: {e}")
             finally:
+                err_msg = p.last_error if getattr(p, "last_error", None) else None
+                success = not getattr(p, "_stop_requested", False) and not err_msg
                 self._player = None
-                self.after(0, self._on_done)
+                self.after(0, self._on_done, success, err_msg)
                 
         import threading
         threading.Thread(target=run_chunk, daemon=True).start()
+
+    def _bulk_move(self):
+        if not self._selected_indices: return
+        self._move_source_idx = "bulk"
+        self._bulk_move_indices = sorted(list(self._selected_indices))
+        # Don't toggle bulk mode yet, just clear it and refresh to show "Insert Before" buttons
+        self._bulk_mode = False
+        self._selected_indices.clear()
+        self._refresh_workflow()
 
     def _bulk_toggle(self):
         if not self._selected_indices: return
@@ -2125,6 +2174,12 @@ class AutomatorGUI(ctk.CTk):
         self._modify_workflow(m)
         self._selected_indices.clear()
         self._toggle_bulk_mode()
+
+    def _toggle_action_enable(self, idx: int):
+        def m(lst):
+            if 0 <= idx < len(lst):
+                lst[idx]["enabled"] = not lst[idx].get("enabled", True)
+        self._modify_workflow(m)
 
     def _bulk_copy(self):
         if not self._selected_indices: return
@@ -2195,6 +2250,17 @@ class AutomatorGUI(ctk.CTk):
         self._selected_indices.clear()
         self._toggle_bulk_mode()
 
+    def _ungroup_action(self, idx: int):
+        def mutator(lst):
+            if 0 <= idx < len(lst):
+                action = lst[idx]
+                if action.get("type") == "group":
+                    inner_actions = action.get("actions", [])
+                    lst.pop(idx)
+                    for i, inner_a in enumerate(inner_actions):
+                        lst.insert(idx + i, inner_a)
+        self._modify_workflow(mutator)
+        
     def _bulk_extract(self):
         if not self._selected_indices: return
         dlg = ctk.CTkToplevel(self)
@@ -2649,8 +2715,9 @@ class AutomatorGUI(ctk.CTk):
             except Exception as e:
                 logger.error(f"Playback error: {e}")
             finally:
+                err_msg = self._player.last_error if getattr(self, "_player", None) else None
                 self._player = None
-                self.after(0, self._on_done, success)
+                self.after(0, self._on_done, success, err_msg)
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -2830,7 +2897,7 @@ class AutomatorGUI(ctk.CTk):
         else:
             self._set_status("Template not found on screen!", T["err"])
 
-    def _on_done(self, success: bool = True):
+    def _on_done(self, success: bool = True, error_msg: str = None):
         self._set_status("Idle", T["ok"])
         self.play_btn.configure(state="normal")
         self.stop_play_btn.configure(state="disabled", text_color=T["dim"])
@@ -2846,6 +2913,8 @@ class AutomatorGUI(ctk.CTk):
                     self._action_rows[old_idx].configure(fg_color="#064e3b") # Green
                 else:
                     self._action_rows[old_idx].configure(fg_color="#7f1d1d") # Red
+                    if error_msg:
+                        _label(self._action_rows[old_idx], f"❌ {error_msg}", colour="#FCA5A5", weight="bold").grid(row=1, column=0, columnspan=4, sticky="w", padx=10, pady=(0, 6))
             self._current_highlight_idx = None
             
         if hasattr(self, '_floating_status') and self._floating_status.winfo_exists():

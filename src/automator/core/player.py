@@ -77,6 +77,7 @@ class Player:
         self._stop_requested = False
         self._paused = False
         self._last_snapshot = ""
+        self.last_error = None
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -125,6 +126,7 @@ class Player:
                 logger.info("Playback finished successfully.")
             success = not self._stop_requested
         except Exception as e:
+            self.last_error = str(e)
             logger.error(f"Playback error: {e}")
 
         duration = round(time.time() - start, 2)
@@ -146,6 +148,7 @@ class Player:
         except ValidationError as e:
             logger.error(f"Invalid action format: {e}")
         except Exception as e:
+            self.last_error = str(e)
             logger.error(f"Single action error: {e}")
 
     # ── Core execution loop ───────────────────────────────────────────────────
@@ -256,11 +259,43 @@ class Player:
         elif isinstance(action, AppFocusAction):      self._do_app_focus(action)
         elif isinstance(action, NotificationAction):  self._do_notification(action)
         elif isinstance(action, CommentAction):       self._do_comment(action)
+        elif isinstance(action, GroupAction):         self._do_group(action)
 
     # ── Action handlers ───────────────────────────────────────────────────────
     
     def _do_comment(self, a: CommentAction):
         logger.info(f"--- {a.text} ---")
+
+    def _do_group(self, a: GroupAction):
+        logger.info(f"Group: {a.name} ({len(a.actions)} actions)")
+        from .workflow import Workflow
+        sub_player = Player(
+            workflow_path=self.workflow_path,
+            speed=self.speed,
+            step_callback=self.step_callback,
+            progress_callback=self.progress_callback,
+            prompt_callback=self.prompt_callback,
+            ripple_callback=self.ripple_callback,
+            highlight_callback=self.highlight_callback,
+            breakpoint_callback=self.breakpoint_callback,
+            _depth=self._depth + 1
+        )
+        sub_player.var_manager = self.var_manager
+        
+        # Need to construct a temporary workflow in memory for the Player
+        import time
+        sub_player.workflow = Workflow(
+            workflow_name=a.name,
+            created_at=time.strftime("%Y-%m-%dT%H:%M:%S"),
+            actions=a.actions
+        )
+        
+        sub_player._play_actions(a.actions)
+        if sub_player._stop_requested:
+            self._stop_requested = True
+            
+        if hasattr(sub_player, "last_error") and sub_player.last_error:
+            raise Exception(sub_player.last_error)
 
     def _do_app_focus(self, a: AppFocusAction):
         logger.info(f"App Focus: {a.app_name}")
