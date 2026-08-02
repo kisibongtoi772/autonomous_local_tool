@@ -47,6 +47,7 @@ class Player:
         ripple_callback: Callable[[int, int], None] | None = None,
         highlight_callback: Callable[[int, int, int, int], None] | None = None,
         breakpoint_callback: Callable[[int], None] | None = None,
+        on_error_callback: Callable[[dict, Exception], str] | None = None,
         _depth: int = 0,
     ):
         """
@@ -61,6 +62,7 @@ class Player:
                                Must return user input string, or '!CANCEL!'.
             highlight_callback: Optional callable to visually indicate a template match area.
                                Called as highlight_callback(left, top, width, height)
+            on_error_callback: Optional callable on action failure. Must return: "retry" | "skip" | "abort"
             _depth:            Internal recursion guard for run_workflow (max 10 levels).
         """
         self.workflow_path = workflow_path or WORKFLOW_FILE
@@ -70,8 +72,9 @@ class Player:
         self.progress_callback = progress_callback
         self.prompt_callback = prompt_callback
         self.ripple_callback = ripple_callback
-        self._depth = _depth
-        self.ripple_callback = ripple_callback
+        self.highlight_callback = highlight_callback
+        self.breakpoint_callback = breakpoint_callback
+        self.on_error_callback = on_error_callback
         self._depth = _depth
         self.var_manager = VariableManager()
         self._stop_requested = False
@@ -213,33 +216,44 @@ class Player:
         max_attempts = 1 + max(0, action.retry_count)
         delay = action.retry_delay
 
-        for attempt in range(max_attempts):
-            if self._stop_requested:
-                return
-            try:
-                self._dispatch(action)
-                return  # Success — stop retrying
-            except Exception as e:
-                remaining = max_attempts - attempt - 1
-                if remaining > 0:
-                    logger.warning(
-                        f"[Retry {attempt+1}/{action.retry_count}] {action.type} failed: {e} "
-                        f"— retrying in {delay}s"
-                    )
-                    if not self._chunked_sleep(delay):
-                        return
-                else:
-                    # Final attempt failed - capture failure snapshot
-                    try:
-                        timestamp = time.strftime("%Y%m%d_%H%M%S")
-                        snap_name = f"fail_{timestamp}.png"
-                        snap_path = os.path.join(SNAPSHOTS_DIR, snap_name)
-                        pyautogui.screenshot(snap_path)
-                        self._last_snapshot = snap_name
-                        logger.info(f"Failure snapshot saved to {snap_name}")
-                    except Exception as snap_e:
-                        logger.error(f"Failed to capture snapshot: {snap_e}")
-                    raise
+        while True:
+            for attempt in range(max_attempts):
+                if self._stop_requested:
+                    return
+                try:
+                    self._dispatch(action)
+                    return  # Success — stop retrying
+                except Exception as e:
+                    remaining = max_attempts - attempt - 1
+                    if remaining > 0:
+                        logger.warning(
+                            f"[Retry {attempt+1}/{action.retry_count}] {action.type} failed: {e} "
+                            f"— retrying in {delay}s"
+                        )
+                        if not self._chunked_sleep(delay):
+                            return
+                    else:
+                        # Final attempt failed - capture failure snapshot
+                        try:
+                            timestamp = time.strftime("%Y%m%d_%H%M%S")
+                            snap_name = f"fail_{timestamp}.png"
+                            snap_path = os.path.join(SNAPSHOTS_DIR, snap_name)
+                            pyautogui.screenshot(snap_path)
+                            self._last_snapshot = snap_name
+                            logger.info(f"Failure snapshot saved to {snap_name}")
+                        except Exception as snap_e:
+                            logger.error(f"Failed to capture snapshot: {snap_e}")
+                            
+                        # Consult auto-healer
+                        if self.on_error_callback:
+                            resolution = self.on_error_callback(action.model_dump(), e)
+                            if resolution == "retry":
+                                max_attempts = 1  # Give it one more shot
+                                break  # Break inner for-loop, restart while True
+                            elif resolution == "skip":
+                                logger.info(f"User chose to skip action: {action.type}")
+                                return  # Move to next
+                        raise
 
     def _dispatch(self, action: ActionType):
         if isinstance(action, ClickAction):           self._do_click(action)

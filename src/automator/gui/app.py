@@ -892,7 +892,7 @@ class AutomatorGUI(ctk.CTk):
         query = self._wf_search_var.get().strip().lower() if hasattr(self, "_wf_search_var") else ""
 
         if not actions and not self._nav_stack:
-            _label(self._wf_list, "Workflow is empty. Record or add actions.", colour=T["dim"]).pack(pady=30)
+            self._build_empty_dashboard()
             return
         elif not actions:
             _label(self._wf_list, "This block is empty. Add actions here.", colour=T["dim"]).pack(pady=30)
@@ -3217,6 +3217,7 @@ class AutomatorGUI(ctk.CTk):
                     ripple_callback=ripple_cb,
                     highlight_callback=highlight_cb,
                     breakpoint_callback=_on_breakpoint,
+                    on_error_callback=self._make_error_callback(),
                 )
                 self._player = p
                 success = self._player.play(start_idx=start_idx, end_idx=end_idx)
@@ -3247,6 +3248,47 @@ class AutomatorGUI(ctk.CTk):
             self.after(0, self._show_prompt_dialog, action_dict, q)
             return q.get()
         return callback
+
+    def _make_error_callback(self) -> Callable:
+        import queue
+        q: queue.Queue[str] = queue.Queue()
+        def callback(action_dict: dict, exception: Exception) -> str:
+            self.after(0, self._show_error_dialog, action_dict, exception, q)
+            return q.get()
+        return callback
+
+    def _show_error_dialog(self, action_dict: dict, exception: Exception, q: "queue.Queue"):
+        dlg = self._dialog("Action Failed", "450x260")
+        dlg.attributes("-topmost", True)
+        
+        atype = action_dict.get("type", "unknown")
+        
+        ctk.CTkLabel(dlg, text="⚠️ Action Failed!", font=ctk.CTkFont(size=18, weight="bold"), text_color=T["err"]).pack(pady=(20, 10))
+        
+        msg_frame = ctk.CTkFrame(dlg, fg_color=T["raised"], corner_radius=6)
+        msg_frame.pack(padx=20, fill="x", pady=5)
+        ctk.CTkLabel(msg_frame, text=f"Type: {atype}\n\n{str(exception)}", wraplength=380, justify="left", font=ctk.CTkFont(*FONT_BODY)).pack(pady=10, padx=10)
+        
+        def choose(c):
+            q.put(c)
+            dlg.destroy()
+            
+        btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_frame.pack(pady=(15, 20))
+        
+        def _btn_local(parent, txt, cmd, primary=False, danger=False):
+            color = T["accent"] if primary else (T["err"] if danger else T["surface"])
+            return ctk.CTkButton(
+                parent, text=txt, width=100, height=32,
+                fg_color=color, text_color=T["text"], hover_color=T["hover"],
+                command=cmd
+            )
+            
+        _btn_local(btn_frame, "🔄 Retry", lambda: choose("retry"), primary=True).pack(side="left", padx=5)
+        _btn_local(btn_frame, "⏭️ Skip", lambda: choose("skip")).pack(side="left", padx=5)
+        _btn_local(btn_frame, "🛑 Abort", lambda: choose("abort"), danger=True).pack(side="left", padx=5)
+        
+        dlg.protocol("WM_DELETE_WINDOW", lambda: choose("abort"))
         
     def _make_ripple_callback(self) -> Callable:
         import queue
