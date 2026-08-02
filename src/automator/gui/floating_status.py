@@ -2,11 +2,12 @@ from typing import Callable
 import customtkinter as ctk
 
 class FloatingStatus(ctk.CTkToplevel):
-    def __init__(self, parent, on_stop: Callable[[], None], on_pause: Callable[[], None] = None, on_resume: Callable[[], None] = None):
+    def __init__(self, parent, on_stop: Callable[[], None], on_pause: Callable[[], None] = None, on_resume: Callable[[], None] = None, on_view_vars: Callable[[], None] = None):
         super().__init__(parent)
         self.on_stop = on_stop
         self.on_pause = on_pause
         self.on_resume = on_resume
+        self.on_view_vars = on_view_vars
         self._is_paused = False
         
         # Make it stay on top and remove window decorations
@@ -18,7 +19,7 @@ class FloatingStatus(ctk.CTkToplevel):
         self.main_frame.pack(fill="both", expand=True)
         
         # Position at top right
-        w, h = 400, 50
+        w, h = 480, 50
         sw = self.winfo_screenwidth()
         x = sw - w - 20
         y = 40
@@ -35,6 +36,15 @@ class FloatingStatus(ctk.CTkToplevel):
         )
         self.status_label.grid(row=0, column=0, padx=(15, 10), pady=10, sticky="ew")
 
+        # Vars Button
+        self.vars_btn = ctk.CTkButton(
+            self.main_frame, text="{x} Vars", width=70, height=28,
+            fg_color="#0A84FF", hover_color="#006DE6",
+            text_color="white", font=ctk.CTkFont("SF Pro Text", 12, "bold"),
+            corner_radius=4, command=self._handle_view_vars
+        )
+        self.vars_btn.grid(row=0, column=1, padx=(0, 10), pady=10)
+
         # Pause/Resume Button
         self.pause_btn = ctk.CTkButton(
             self.main_frame, text="PAUSE", width=70, height=28,
@@ -42,7 +52,7 @@ class FloatingStatus(ctk.CTkToplevel):
             text_color="white", font=ctk.CTkFont("SF Pro Text", 12, "bold"),
             corner_radius=4, command=self._handle_pause_resume
         )
-        self.pause_btn.grid(row=0, column=1, padx=(0, 10), pady=10)
+        self.pause_btn.grid(row=0, column=2, padx=(0, 10), pady=10)
         
         # Stop Button
         self.stop_btn = ctk.CTkButton(
@@ -51,7 +61,7 @@ class FloatingStatus(ctk.CTkToplevel):
             text_color="white", font=ctk.CTkFont("SF Pro Text", 12, "bold"),
             corner_radius=4, command=self._handle_stop
         )
-        self.stop_btn.grid(row=0, column=2, padx=(0, 15), pady=10)
+        self.stop_btn.grid(row=0, column=3, padx=(0, 15), pady=10)
 
     def update_status(self, text: str):
         if self._is_paused:
@@ -88,3 +98,7 @@ class FloatingStatus(ctk.CTkToplevel):
     def force_pause(self):
         if not self._is_paused:
             self._handle_pause_resume()
+
+    def _handle_view_vars(self):
+        if self.on_view_vars:
+            self.on_view_vars()

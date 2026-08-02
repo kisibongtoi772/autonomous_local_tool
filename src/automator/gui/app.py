@@ -1996,9 +1996,39 @@ class AutomatorGUI(ctk.CTk):
         def _on_resume():
             if hasattr(self, "_player") and self._player:
                 self._player.resume()
-                
+        def _on_view_vars():
+            if not hasattr(self, "_player") or not self._player: return
+            vars_dict = self._player.var_manager.get_all()
+            
+            dlg = ctk.CTkToplevel(self)
+            dlg.title("Live Variables Monitor")
+            dlg.geometry("400x500")
+            dlg.attributes("-topmost", True)
+            
+            frame = ctk.CTkScrollableFrame(dlg, fg_color="transparent")
+            frame.pack(fill="both", expand=True, padx=20, pady=20)
+            
+            ctk.CTkLabel(frame, text="In-Memory Variables", font=ctk.CTkFont("SF Pro Text", 16, "bold")).pack(anchor="w", pady=(0, 10))
+            
+            if not vars_dict:
+                ctk.CTkLabel(frame, text="No variables set.", text_color=T["dim"]).pack(anchor="w")
+            else:
+                for k, v in vars_dict.items():
+                    row = ctk.CTkFrame(frame, fg_color=T["raised"], corner_radius=6)
+                    row.pack(fill="x", pady=4)
+                    
+                    # Key
+                    ctk.CTkLabel(row, text=k, font=ctk.CTkFont("SF Pro Text", 12, "bold"), text_color=T["accent"]).pack(anchor="w", padx=10, pady=(10, 0))
+                    
+                    # Value
+                    val_str = str(v)
+                    if len(val_str) > 100: val_str = val_str[:97] + "..."
+                    ctk.CTkLabel(row, text=val_str, font=ctk.CTkFont("SF Pro Text", 12), text_color=T["text"], justify="left", wraplength=340).pack(anchor="w", padx=10, pady=(2, 10))
+            
+            ctk.CTkButton(dlg, text="Close", command=dlg.destroy, width=100).pack(pady=10)
+
         self._floating_status = FloatingStatus(
-            self, on_stop=self._stop_playback, on_pause=_on_pause, on_resume=_on_resume
+            self, on_stop=self._stop_playback, on_pause=_on_pause, on_resume=_on_resume, on_view_vars=_on_view_vars
         )
 
         def run():
