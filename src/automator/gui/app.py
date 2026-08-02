@@ -2558,8 +2558,9 @@ class AutomatorGUI(ctk.CTk):
             finally:
                 err_msg = p.last_error if getattr(p, "last_error", None) else None
                 success = not getattr(p, "_stop_requested", False) and not err_msg
+                snapshot = getattr(p, "_last_snapshot", None)
                 self._player = None
-                self.after(0, self._on_done, success, err_msg)
+                self.after(0, self._on_done, success, err_msg, snapshot)
                 
         import threading
         threading.Thread(target=run_chunk, daemon=True).start()
@@ -3138,8 +3139,9 @@ class AutomatorGUI(ctk.CTk):
                 logger.error(f"Playback error: {e}")
             finally:
                 err_msg = self._player.last_error if getattr(self, "_player", None) else None
+                snapshot = getattr(self._player, "_last_snapshot", None) if getattr(self, "_player", None) else None
                 self._player = None
-                self.after(0, self._on_done, success, err_msg)
+                self.after(0, self._on_done, success, err_msg, snapshot)
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -3348,7 +3350,7 @@ class AutomatorGUI(ctk.CTk):
             
         self._file_switcher = FileSwitcher(self, files, current, on_select)
 
-    def _on_done(self, success: bool, error: str = None):
+    def _on_done(self, success: bool, error: str = None, snapshot: str = None):
         self._set_status("Idle", T["ok"])
         self.play_btn.configure(state="normal")
         self.stop_play_btn.configure(state="disabled", text_color=T["dim"])
@@ -3364,6 +3366,8 @@ class AutomatorGUI(ctk.CTk):
                     self._action_rows[old_idx].configure(fg_color="#064e3b") # Green
                     self._last_failed_idx = None
                     self.resume_btn.pack_forget()
+                    if hasattr(self, "snapshot_btn"):
+                        self.snapshot_btn.pack_forget()
                 else:
                     self._action_rows[old_idx].configure(fg_color="#7f1d1d") # Red
                     if error:
@@ -3373,11 +3377,36 @@ class AutomatorGUI(ctk.CTk):
                     self.resume_btn.configure(text=f"▶ Resume (Step {old_idx + 1})")
                     self.resume_btn.pack(side="left", padx=(0, 8), before=self.stop_play_btn)
                     
+                    if snapshot:
+                        if not hasattr(self, "snapshot_btn"):
+                            self.snapshot_btn = _btn(self._tb_playback, "📸 Snapshot", None, fg_color=T["raised"], text_color=T["text"])
+                        
+                        import os
+                        from ..utils.config import SNAPSHOTS_DIR
+                        snap_path = os.path.join(SNAPSHOTS_DIR, snapshot) if not os.path.isabs(snapshot) else snapshot
+                        
+                        def view_snapshot():
+                            import subprocess
+                            import platform
+                            if platform.system() == "Darwin":
+                                subprocess.run(["open", snap_path])
+                            elif platform.system() == "Windows":
+                                os.startfile(snap_path)
+                            else:
+                                subprocess.run(["xdg-open", snap_path])
+                                
+                        self.snapshot_btn.configure(command=view_snapshot)
+                        self.snapshot_btn.pack(side="left", padx=(0, 8), before=self.stop_play_btn)
+                    elif hasattr(self, "snapshot_btn"):
+                        self.snapshot_btn.pack_forget()
+                    
             self._current_highlight_idx = None
         else:
             if not success:
                 self._last_failed_idx = None
                 self.resume_btn.pack_forget()
+                if hasattr(self, "snapshot_btn"):
+                    self.snapshot_btn.pack_forget()
             
         if hasattr(self, '_floating_status') and self._floating_status.winfo_exists():
             self._floating_status.destroy()
