@@ -1114,6 +1114,7 @@ class AutomatorGUI(ctk.CTk):
             menu.add_command(label="▶1  Play Single Action", command=lambda: self._test_action(i))
             if not self._nav_stack:
                 menu.add_command(label="▶▶  Play From Here", command=lambda: self.playback(start_idx=i))
+                menu.add_command(label="▶🛑  Play Until Here", command=lambda: self.playback(start_idx=0, end_idx=i))
             menu.add_separator()
             menu.add_command(label="🔀  Move Action...", command=lambda: self._enter_move_mode(i))
             menu.add_separator()
@@ -2029,11 +2030,74 @@ class AutomatorGUI(ctk.CTk):
         
         _btn(self._bulk_toolbar, "Cancel", self._toggle_bulk_mode).pack(side="right", padx=12, pady=6)
         _btn(self._bulk_toolbar, "🗑 Delete", self._bulk_delete, danger=True).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "▶ Play Selected", self._bulk_play).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "Toggle 🟢", self._bulk_toggle).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "✂️ Extract", self._bulk_extract).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "📦 Group", self._bulk_group).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "📋 Copy", self._bulk_copy).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "⧉ Duplicate", self._bulk_duplicate).pack(side="right", padx=6, pady=6)
+
+    def _bulk_play(self):
+        if not self._selected_indices: return
+        
+        # Get actions based on current view depth
+        path = os.path.join(WORKSPACE_DIR, self.file_var.get())
+        data = load_json(path, {})
+        actions = data.get("actions", [])
+        
+        target_container = {"actions": actions}
+        key = "actions"
+        for idx, sub_key, _ in self._nav_stack:
+            if idx < len(target_container[key]):
+                target_container = target_container[key][idx]
+                key = sub_key
+                if key not in target_container:
+                    target_container[key] = []
+        
+        local_actions = target_container[key]
+        sorted_indices = sorted(list(self._selected_indices))
+        selected_acts = [copy.deepcopy(local_actions[i]) for i in sorted_indices]
+        
+        if not selected_acts: return
+        
+        def run_chunk():
+            self._set_status("Playing Selection", T["accent"])
+            self.play_btn.configure(state="disabled")
+            self.stop_play_btn.configure(state="normal", text_color=T["err"])
+            
+            p = Player(
+                workflow_path=path,
+                speed=round(self._speed_var.get(), 2),
+                step_mode=self._step_mode.get(),
+                progress_callback=self._on_progress_update,
+                breakpoint_callback=None
+            )
+            self._player = p
+            
+            try:
+                # We need to construct a temporary workflow in memory for the Player
+                from ..models.workflow import Workflow
+                import time
+                p.workflow = Workflow(
+                    workflow_name="temp_selection",
+                    created_at=time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    actions=selected_acts
+                )
+                p.var_manager.load()
+                logger.info(f"Playing selected chunk ({len(selected_acts)} actions)")
+                p._play_actions(p.workflow.actions)
+                if p._stop_requested:
+                    logger.info("Selection playback stopped.")
+                else:
+                    logger.info("Selection playback finished.")
+            except Exception as e:
+                logger.error(f"Playback selection error: {e}")
+            finally:
+                self._player = None
+                self.after(0, self._on_done)
+                
+        import threading
+        threading.Thread(target=run_chunk, daemon=True).start()
 
     def _bulk_toggle(self):
         if not self._selected_indices: return
@@ -2490,7 +2554,7 @@ class AutomatorGUI(ctk.CTk):
         self.file_dropdown.configure(values=get_workflow_files())
         self._refresh_stats()
 
-    def playback(self, start_idx: int = 0):
+    def playback(self, start_idx: int = 0, end_idx: int = None):
         if self.recording: return
         speed = round(self._speed_var.get(), 2)
         step  = self._step_mode.get()
@@ -2564,7 +2628,7 @@ class AutomatorGUI(ctk.CTk):
                     breakpoint_callback=_on_breakpoint,
                 )
                 self._player = p
-                success = p.play(start_idx=start_idx)
+                success = self._player.play(start_idx=start_idx, end_idx=end_idx)
             except Exception as e:
                 logger.error(f"Playback error: {e}")
             finally:

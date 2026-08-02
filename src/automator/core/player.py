@@ -93,7 +93,7 @@ class Player:
         self._paused = False
         logger.info("Player: Playback resumed.")
 
-    def play(self, start_idx: int = 0) -> bool:
+    def play(self, start_idx: int = 0, end_idx: int = None) -> bool:
         if not os.path.exists(self.workflow_path):
             logger.error(f"Workflow not found: {self.workflow_path}")
             return False
@@ -118,7 +118,7 @@ class Player:
                 f"Starting playback: '{self.workflow.workflow_name}' "
                 f"({action_count} actions, start={start_idx+1}, speed={self.speed}x)"
             )
-            self._play_actions(self.workflow.actions, start_idx=start_idx)
+            self._play_actions(self.workflow.actions, start_idx=start_idx, end_idx=end_idx)
             if self._stop_requested:
                 logger.info("Playback stopped by user.")
             else:
@@ -150,8 +150,11 @@ class Player:
 
     # ── Core execution loop ───────────────────────────────────────────────────
 
-    def _play_actions(self, actions: List[ActionType], start_idx: int = 0):
+    def _play_actions(self, actions: List[ActionType], start_idx: int = 0, end_idx: int = None):
         total_steps = len(actions)
+        if end_idx is not None:
+            total_steps = min(total_steps, end_idx)
+            
         for i in range(start_idx, total_steps):
             if self._stop_requested:
                 return
