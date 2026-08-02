@@ -15,6 +15,7 @@ import threading
 import time
 import zipfile
 import shutil
+import tkinter as tk
 import tkinter.filedialog
 from typing import Any, Callable
 
@@ -1024,10 +1025,6 @@ class AutomatorGUI(ctk.CTk):
                 corner_radius=4, border_width=0, command=cmd
             )
 
-        _ctrl_btn(ctrl, "▶1",  lambda idx=i: self._test_action(idx), text_color=T["accent"]).pack(side="left", padx=1)
-        if not self._nav_stack:
-            _ctrl_btn(ctrl, "▶▶",  lambda idx=i: self.playback(start_idx=idx), text_color=T["accent"]).pack(side="left", padx=1)
-        
         if atype == "loop":
             _ctrl_btn(ctrl, "📂 Mở", lambda idx=i: [self._nav_stack.append((idx, "actions", f"Loop {idx+1}")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=2)
         elif atype == "group":
@@ -1043,15 +1040,9 @@ class AutomatorGUI(ctk.CTk):
         if tmpl_file:
             _ctrl_btn(ctrl, "Img", lambda t=tmpl_file: self._show_template_preview_dialog(t)).pack(side="left", padx=1)
             _ctrl_btn(ctrl, "Find", lambda a=action: self._test_template_match(a)).pack(side="left", padx=1)
-        if i > 0:
-            _ctrl_btn(ctrl, "Up",  lambda idx=i: self._move_up(idx)).pack(side="left", padx=1)
-        if i < total - 1:
-            _ctrl_btn(ctrl, "Dn",  lambda idx=i: self._move_down(idx)).pack(side="left", padx=1)
-        _ctrl_btn(ctrl, "Edit", lambda idx=i, a=action: self._open_edit_dialog(idx, a)).pack(side="left", padx=1)
-        _ctrl_btn(ctrl, "Copy", lambda a=action: self._copy_action(a)).pack(side="left", padx=1)
-        _ctrl_btn(ctrl, "Dupe", lambda idx=i: self._duplicate_action(idx)).pack(side="left", padx=1)
-        _ctrl_btn(ctrl, "Ins",  lambda idx=i: self._open_add_dialog(insert_idx=idx + 1)).pack(side="left", padx=1)
 
+        _ctrl_btn(ctrl, "Edit", lambda idx=i, a=action: self._open_edit_dialog(idx, a)).pack(side="left", padx=1)
+        
         del_btn = ctk.CTkButton(
             ctrl, text="Del", width=32, height=26,
             fg_color="transparent", hover_color="#2A1515",
@@ -1059,6 +1050,39 @@ class AutomatorGUI(ctk.CTk):
             corner_radius=4, command=lambda idx=i: self._delete_action(idx)
         )
         del_btn.pack(side="left", padx=1)
+        
+        # Action Context Menu
+        def show_action_menu(event=None):
+            menu = tk.Menu(self, tearoff=0)
+            menu.add_command(label="▶1  Play Single Action", command=lambda: self._test_action(i))
+            if not self._nav_stack:
+                menu.add_command(label="▶▶  Play From Here", command=lambda: self.playback(start_idx=i))
+            menu.add_separator()
+            if i > 0:
+                menu.add_command(label="⬆  Move Up", command=lambda: self._move_up(i))
+            if i < total - 1:
+                menu.add_command(label="⬇  Move Down", command=lambda: self._move_down(i))
+            menu.add_separator()
+            menu.add_command(label="📋  Copy Action", command=lambda: self._copy_action(action))
+            menu.add_command(label="📑  Duplicate", command=lambda: self._duplicate_action(i))
+            menu.add_command(label="➕  Insert Below", command=lambda: self._open_add_dialog(insert_idx=i + 1))
+            
+            # Show menu at mouse position, or at button position if triggered by button
+            x = event.x_root if event else more_btn.winfo_rootx()
+            y = event.y_root if event else more_btn.winfo_rooty() + more_btn.winfo_height()
+            menu.post(x, y)
+            
+        more_btn = _ctrl_btn(ctrl, "⋮", show_action_menu, text_color=T["dim"])
+        more_btn.pack(side="left", padx=2)
+        
+        # Right-click anywhere on the row to show context menu
+        def right_click_handler(e):
+            show_action_menu(e)
+            
+        # Bind to macOS right click (<Button-2> or <Button-3>)
+        for widget in (row, type_label, summary_label):
+            widget.bind("<Button-2>", right_click_handler)
+            widget.bind("<Button-3>", right_click_handler)
 
     def _action_summary(self, atype: str, a: dict) -> str:
         def preview(actions):
