@@ -741,6 +741,7 @@ class AutomatorGUI(ctk.CTk):
         
         _btn(tb, "Find/Replace 🔍", self._open_find_replace, False).pack(side="right", padx=(0, 8), pady=8)
         _btn(tb, "Outline 📑", self._toggle_outline, False).pack(side="right", padx=(0, 8), pady=8)
+        _btn(tb, "Gallery 🖼", self._open_template_gallery, False).pack(side="right", padx=(0, 8), pady=8)
 
         self._wf_search_var = ctk.StringVar()
         self._wf_search_var.trace_add("write", lambda *_: self._refresh_workflow())
@@ -1686,6 +1687,16 @@ class AutomatorGUI(ctk.CTk):
             
         from .template_cropper import TemplateCropper
         TemplateCropper(self, image_path, on_save=self._refresh_workflow)
+
+    def _open_template_gallery(self):
+        if hasattr(self, "_template_gallery") and self._template_gallery.winfo_exists():
+            self._template_gallery.focus()
+            return
+            
+        from .template_gallery import TemplateGallery
+        def on_close():
+            self._template_gallery = None
+        self._template_gallery = TemplateGallery(self, on_close=on_close)
 
     def _toggle_outline(self):
         if hasattr(self, "_outline_hud") and self._outline_hud.winfo_exists():
