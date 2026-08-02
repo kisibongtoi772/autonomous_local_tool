@@ -664,7 +664,7 @@ class AutomatorGUI(ctk.CTk):
             self._console_visible = not self._console_visible
             if self._console_visible:
                 self._wf_list.grid(pady=(0, 0))
-                self._console_frame.grid(row=4, column=0, sticky="nsew", padx=24, pady=(12, 24))
+                self._console_frame.grid(row=5, column=0, sticky="nsew", padx=24, pady=(12, 24))
             else:
                 self._console_frame.grid_forget()
                 self._wf_list.grid(pady=(0, 24))
@@ -684,9 +684,13 @@ class AutomatorGUI(ctk.CTk):
         )
         search_entry.pack(side="right", padx=8, pady=8)
 
+        # Sticky Breadcrumb Container
+        self._breadcrumb_container = ctk.CTkFrame(p, fg_color="transparent")
+        self._breadcrumb_container.grid(row=1, column=0, sticky="ew", padx=24, pady=(0, 8))
+
         # Column headers
         hdr = ctk.CTkFrame(p, fg_color="transparent")
-        hdr.grid(row=1, column=0, sticky="ew", padx=24)
+        hdr.grid(row=2, column=0, sticky="ew", padx=24)
         hdr.grid_columnconfigure(2, weight=1)
 
         for col, txt, w in [
@@ -699,7 +703,7 @@ class AutomatorGUI(ctk.CTk):
             _label(hdr, txt, size=10, colour=T["dim"], anchor=anchor, width=w
                    ).grid(row=0, column=col, padx=(12 if col == 0 else 4), pady=4, sticky="ew")
 
-        _sep(p).grid(row=2, column=0, sticky="ew", padx=24)
+        _sep(p).grid(row=3, column=0, sticky="ew", padx=24)
 
         # Scrollable list
         self._wf_list = ctk.CTkScrollableFrame(
@@ -707,15 +711,15 @@ class AutomatorGUI(ctk.CTk):
             scrollbar_button_color=T["border"],
             scrollbar_button_hover_color=T["hover"]
         )
-        self._wf_list.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0, 24))
+        self._wf_list.grid(row=4, column=0, sticky="nsew", padx=24, pady=(0, 24))
         self._wf_list.grid_columnconfigure(2, weight=1)
-        p.grid_rowconfigure(3, weight=3)
+        p.grid_rowconfigure(4, weight=3)
         
         # Console Frame (hidden by default)
         self._console_frame = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
         self._console_frame.grid_columnconfigure(0, weight=1)
         self._console_frame.grid_rowconfigure(1, weight=1)
-        p.grid_rowconfigure(4, weight=1) # Give it 1/4 of the space when visible
+        p.grid_rowconfigure(5, weight=1) # Give it 1/4 of the space when visible
         
         c_hdr = ctk.CTkFrame(self._console_frame, fg_color="transparent")
         c_hdr.grid(row=0, column=0, sticky="ew", padx=14, pady=(10, 4))
@@ -754,10 +758,12 @@ class AutomatorGUI(ctk.CTk):
 
         data    = load_json(path, {})
         actions = data.get("actions", [])
-        
         # Build breadcrumb bar
-        self._breadcrumb_bar = ctk.CTkFrame(self._wf_list, fg_color="transparent")
-        self._breadcrumb_bar.pack(fill="x", pady=(0, 10))
+        for w in self._breadcrumb_container.winfo_children():
+            w.destroy()
+            
+        self._breadcrumb_bar = ctk.CTkFrame(self._breadcrumb_container, fg_color="transparent")
+        self._breadcrumb_bar.pack(fill="x")
         
         def _nav_root():
             self._nav_stack.clear()
@@ -786,6 +792,8 @@ class AutomatorGUI(ctk.CTk):
         if self._nav_stack:
             _btn(self._breadcrumb_bar, "⬅ Back", lambda: _nav_pop(len(self._nav_stack)-1), 
                  width=60, border_width=1, border_color=T["border"]).pack(side="right")
+                 
+        _label(self._breadcrumb_bar, f"  ({len(actions)} actions)", size=11, colour=T["dim"], slant="italic").pack(side="left", padx=(8, 0))
                  
         query = self._wf_search_var.get().strip().lower() if hasattr(self, "_wf_search_var") else ""
 
