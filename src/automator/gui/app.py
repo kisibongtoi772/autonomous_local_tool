@@ -655,6 +655,7 @@ class AutomatorGUI(ctk.CTk):
         
         _btn(tb, "Bulk Edit",  self._toggle_bulk_mode, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Export 📦",  self._export_workflow, False).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "Import 📥",  self._import_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
 
@@ -1065,6 +1066,63 @@ class AutomatorGUI(ctk.CTk):
             logger.error(f"Export failed: {e}")
             import tkinter.messagebox as tkmb
             tkmb.showerror("Export Failed", str(e))
+
+    def _import_workflow(self):
+        import tkinter.filedialog as tkfd
+        import zipfile
+        import shutil
+        import tempfile
+        import time
+        
+        zip_path = tkfd.askopenfilename(
+            title="Select Workflow ZIP",
+            filetypes=[("ZIP files", "*.zip")],
+            initialdir=os.path.join(WORKSPACE_DIR, "exports")
+        )
+        if not zip_path:
+            return
+            
+        try:
+            with tempfile.TemporaryDirectory() as tmpdir:
+                with zipfile.ZipFile(zip_path, 'r') as zipf:
+                    zipf.extractall(tmpdir)
+                
+                json_files = [f for f in os.listdir(tmpdir) if f.endswith('.json') and os.path.isfile(os.path.join(tmpdir, f))]
+                
+                if not json_files:
+                    raise ValueError("No .json workflow file found in the ZIP archive.")
+                
+                main_wf_name = None
+                for jf in json_files:
+                    base = os.path.splitext(jf)[0]
+                    new_name = jf
+                    if os.path.exists(os.path.join(WORKSPACE_DIR, jf)):
+                        new_name = f"{base}_imported_{int(time.time())}.json"
+                    
+                    shutil.copy2(os.path.join(tmpdir, jf), os.path.join(WORKSPACE_DIR, new_name))
+                    if not main_wf_name:
+                        main_wf_name = new_name
+                
+                tmpl_dir = os.path.join(tmpdir, "templates")
+                if os.path.exists(tmpl_dir) and os.path.isdir(tmpl_dir):
+                    os.makedirs(TEMPLATES_DIR, exist_ok=True)
+                    for tf in os.listdir(tmpl_dir):
+                        src_tf = os.path.join(tmpl_dir, tf)
+                        if os.path.isfile(src_tf):
+                            shutil.copy2(src_tf, os.path.join(TEMPLATES_DIR, tf))
+                
+            self._refresh_workflow_list()
+            if main_wf_name:
+                self.file_var.set(main_wf_name)
+                self._load_selected_workflow()
+                
+            import tkinter.messagebox as tkmb
+            tkmb.showinfo("Import Successful", f"Workflow imported successfully as:\n{main_wf_name}")
+            
+        except Exception as e:
+            logger.error(f"Import failed: {e}")
+            import tkinter.messagebox as tkmb
+            tkmb.showerror("Import Failed", str(e))
 
     def _undo(self):
         if not self._undo_stack: return
