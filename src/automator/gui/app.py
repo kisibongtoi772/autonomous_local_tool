@@ -1144,8 +1144,16 @@ class AutomatorGUI(ctk.CTk):
                         
                         cached_img = self._thumbnail_cache.get(tmpl_path)
                         if cached_img:
-                            thumb_label = ctk.CTkLabel(top_line, image=cached_img, text="", corner_radius=2, fg_color=T["border"])
+                            thumb_label = ctk.CTkLabel(top_line, image=cached_img, text="", corner_radius=2, fg_color=T["border"], cursor="hand2")
                             thumb_label.pack(side="left", padx=(0, 10))
+                            
+                            def on_enter_thumb(e, path=tmpl_path):
+                                self._show_image_peek(e, path)
+                            def on_leave_thumb(e):
+                                self._hide_image_peek()
+                                
+                            thumb_label.bind("<Enter>", on_enter_thumb)
+                            thumb_label.bind("<Leave>", on_leave_thumb)
             
             _label(top_line, summary, size=11, colour=sub_color).pack(side="left")
                 
