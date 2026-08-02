@@ -11,6 +11,7 @@ class BaseAction(BaseModel):
         description="How many times to retry this action if it fails (0 = no retry)")
     retry_delay: float = Field(default=0.5, ge=0.0,
         description="Seconds to wait between retries")
+    color_tag: Optional[str] = Field(default=None, description="Visual badge color for UI")
 
 
 class CommentAction(BaseAction):

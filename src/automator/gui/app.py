@@ -849,7 +849,16 @@ class AutomatorGUI(ctk.CTk):
                    anchor="center", width=20).pack(side="left")
 
             # Type badge
-            badge = ctk.CTkFrame(row, fg_color=T["border"], corner_radius=4, width=80)
+            badge_bg = T["border"]
+            color_tag = action.get("color_tag")
+            if color_tag:
+                tag_colors = {
+                    "Red": "#7F1D1D", "Green": "#14532D", "Blue": "#1E3A8A",
+                    "Yellow": "#713F12", "Purple": "#581C87", "Orange": "#7C2D12"
+                }
+                badge_bg = tag_colors.get(color_tag, badge_bg)
+                
+            badge = ctk.CTkFrame(row, fg_color=badge_bg, corner_radius=4, width=80)
             badge.grid(row=0, column=1, padx=8, pady=8)
             badge_color = T["text"] if enabled else T["dim"]
             _label(badge, label, size=10, colour=badge_color).pack(padx=8, pady=3)
@@ -1343,6 +1352,16 @@ class AutomatorGUI(ctk.CTk):
         )
         note_entry.pack(padx=20)
         
+        _label(dlg, "Color Tag (Optional)", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
+        color_var = ctk.StringVar(value="None")
+        ctk.CTkOptionMenu(
+            dlg, variable=color_var,
+            values=["None", "Red", "Green", "Blue", "Yellow", "Purple", "Orange"],
+            fg_color=T["raised"], button_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
+            height=28
+        ).pack(padx=20, fill="x")
+        
         adv_frame = ctk.CTkFrame(dlg, fg_color="transparent")
         adv_frame.pack(padx=20, pady=(16, 2), fill="x")
         
@@ -1410,6 +1429,10 @@ class AutomatorGUI(ctk.CTk):
             note_val = note_entry.get().strip()
             if note_val:
                 a["note"] = note_val
+                
+            color_val = color_var.get()
+            if color_val != "None":
+                a["color_tag"] = color_val
                 
             rc = int(retry_count.get() or 0)
             rd = float(retry_delay.get() or 0.5)
@@ -1567,6 +1590,16 @@ class AutomatorGUI(ctk.CTk):
         note_entry.pack(padx=20)
         note_entry.insert(0, action.get("note", ""))
 
+        _label(dlg, "Color Tag (Optional)", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
+        color_var = ctk.StringVar(value=action.get("color_tag", "None"))
+        ctk.CTkOptionMenu(
+            dlg, variable=color_var,
+            values=["None", "Red", "Green", "Blue", "Yellow", "Purple", "Orange"],
+            fg_color=T["raised"], button_color=T["border"],
+            text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
+            height=28
+        ).pack(padx=20, fill="x")
+
         adv_frame = ctk.CTkFrame(dlg, fg_color="transparent")
         adv_frame.pack(padx=20, pady=(16, 2), fill="x")
         
@@ -1635,6 +1668,12 @@ class AutomatorGUI(ctk.CTk):
                 upd["note"] = note_val
             elif "note" in upd:
                 del upd["note"]
+                
+            color_val = color_var.get()
+            if color_val != "None":
+                upd["color_tag"] = color_val
+            elif "color_tag" in upd:
+                del upd["color_tag"]
 
             rc = int(retry_count.get() or 0)
             rd = float(retry_delay.get() or 0.5)
