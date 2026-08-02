@@ -967,7 +967,11 @@ class AutomatorGUI(ctk.CTk):
                 
         if 0 <= idx < len(acts):
             threading.Thread(
-                target=lambda: Player().play_single_action(acts[idx]),
+                target=lambda: Player(
+                    speed=self._speed_var.get(),
+                    highlight_callback=self._make_highlight_callback(),
+                    ripple_callback=self._make_ripple_callback()
+                ).play_single_action(acts[idx]),
                 daemon=True
             ).start()
 
@@ -1176,7 +1180,11 @@ class AutomatorGUI(ctk.CTk):
             try:
                 a = _build_new_action()
                 threading.Thread(
-                    target=lambda: Player(speed=self._speed_var.get()).play_single_action(a),
+                    target=lambda: Player(
+                        speed=self._speed_var.get(),
+                        highlight_callback=self._make_highlight_callback(),
+                        ripple_callback=self._make_ripple_callback()
+                    ).play_single_action(a),
                     daemon=True
                 ).start()
             except Exception as e:
@@ -1771,6 +1779,7 @@ class AutomatorGUI(ctk.CTk):
         step_cb = self._make_step_callback() if step else None
         prompt_cb = self._make_prompt_callback()
         ripple_cb = self._make_ripple_callback()
+        highlight_cb = self._make_highlight_callback()
 
         from .floating_status import FloatingStatus
         def _on_pause():
@@ -1794,6 +1803,7 @@ class AutomatorGUI(ctk.CTk):
                     progress_callback=self._on_progress_update,
                     prompt_callback=prompt_cb,
                     ripple_callback=ripple_cb,
+                    highlight_callback=highlight_cb,
                 )
                 self._player = p
                 p.play(start_idx=start_idx)
@@ -1830,6 +1840,17 @@ class AutomatorGUI(ctk.CTk):
             def _show():
                 from .click_ripple import ClickRipple
                 ClickRipple(self, x, y, on_complete=lambda: q.put("done"))
+            self.after(0, _show)
+            return q.get()
+        return callback
+        
+    def _make_highlight_callback(self) -> Callable:
+        import queue
+        q: queue.Queue[str] = queue.Queue()
+        def callback(x: int, y: int, w: int, h: int):
+            def _show():
+                from .box_highlight import BoxHighlight
+                BoxHighlight(self, x, y, w, h, on_complete=lambda: q.put("done"))
             self.after(0, _show)
             return q.get()
         return callback

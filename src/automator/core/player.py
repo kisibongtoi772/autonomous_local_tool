@@ -44,6 +44,7 @@ class Player:
         progress_callback: Callable[[int, int, dict], None] | None = None,
         prompt_callback: Callable[[dict], str] | None = None,
         ripple_callback: Callable[[int, int], None] | None = None,
+        highlight_callback: Callable[[int, int, int, int], None] | None = None,
         _depth: int = 0,
     ):
         """
@@ -56,6 +57,8 @@ class Player:
                                Called as progress_callback(step_index_1_based, total_steps, raw_action_dict)
             prompt_callback:   Optional callable for interactive PromptUserAction.
                                Must return user input string, or '!CANCEL!'.
+            highlight_callback: Optional callable to visually indicate a template match area.
+                               Called as highlight_callback(left, top, width, height)
             _depth:            Internal recursion guard for run_workflow (max 10 levels).
         """
         self.workflow_path = workflow_path or WORKFLOW_FILE
@@ -274,7 +277,11 @@ class Player:
         if a.template_image:
             loc = locate_template(a.template_image, confidence=a.confidence)
             if loc:
-                x, y = loc[0] + a.offset_x, loc[1] + a.offset_y
+                left, top, w, h = loc
+                if self.highlight_callback:
+                    self.highlight_callback(left, top, w, h)
+                x = left + w // 2 + a.offset_x
+                y = top + h // 2 + a.offset_y
                 logger.info(f"Template matched. Target set to ({x}, {y}) [offset: {a.offset_x}, {a.offset_y}]")
             else:
                 logger.warning(f"Template not found — falling back to ({a.x}, {a.y})")
@@ -358,6 +365,8 @@ class Player:
         loc  = locate_template(path, confidence=a.confidence)
         if loc is None:
             raise RuntimeError(f"Assertion failed: '{a.template}' not found on screen.")
+        if self.highlight_callback:
+            self.highlight_callback(*loc)
         logger.info(f"Assert OK: '{a.template}' at {loc}")
 
     def _do_clipboard(self, a: ClipboardAction):
@@ -378,6 +387,8 @@ class Player:
         path = os.path.join(TEMPLATES_DIR, a.template)
         loc  = locate_template(path, confidence=a.confidence)
         if loc:
+            if self.highlight_callback:
+                self.highlight_callback(*loc)
             logger.info(f"Conditional: '{a.template}' FOUND → then ({len(a.then_actions)} actions)")
             self._play_actions(a.then_actions)
         else:
@@ -399,6 +410,8 @@ class Player:
                 return
             loc = locate_template(path, confidence=a.confidence)
             if loc:
+                if self.highlight_callback:
+                    self.highlight_callback(*loc)
                 elapsed = round(time.time() - (deadline - a.timeout), 2)
                 logger.info(f"  Found '{a.template}' at {loc} after {elapsed}s")
                 return
