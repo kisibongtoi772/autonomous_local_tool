@@ -776,23 +776,46 @@ class AutomatorGUI(ctk.CTk):
             badge_color = T["text"] if enabled else T["dim"]
             _label(badge, label, size=10, colour=badge_color).pack(padx=8, pady=3)
 
-            # Summary & Note
+            # Summary & Note & Warnings
             summary_frame = ctk.CTkFrame(row, fg_color="transparent")
             summary_frame.grid(row=0, column=2, padx=4, pady=8, sticky="ew")
+            
+            # --- Workflow Linter / Validation ---
+            warnings = []
+            if atype in ("wait_for_template", "assert_template", "if_template", "click"):
+                tmpl = action.get("template") or action.get("template_image")
+                if tmpl and not os.path.exists(os.path.join(TEMPLATES_DIR, tmpl)):
+                    warnings.append(f"Image '{tmpl}' not found")
+            elif atype == "run_workflow":
+                wf = action.get("workflow_file")
+                if wf and not os.path.exists(os.path.join(WORKSPACE_DIR, wf)):
+                    warnings.append(f"Workflow '{wf}' not found")
             
             note = action.get("note", "").strip()
             main_color = "#FFFFFF" if enabled else T["dim"]
             sub_color = T["text"] if enabled else T["dim"]
             
+            top_line = ctk.CTkFrame(summary_frame, fg_color="transparent")
+            top_line.pack(anchor="w", fill="x")
+            
             if note:
-                _label(summary_frame, f"[{note}]", size=11, colour=main_color, weight="bold").pack(side="left", padx=(0, 8))
-                _label(summary_frame, summary, size=11, colour=T["dim"]).pack(side="left")
+                _label(top_line, f"[{note}]", size=11, colour=main_color, weight="bold").pack(side="left", padx=(0, 8))
+                _label(top_line, summary, size=11, colour=T["dim"]).pack(side="left")
             else:
-                _label(summary_frame, summary, size=11, colour=sub_color).pack(side="left")
+                _label(top_line, summary, size=11, colour=sub_color).pack(side="left")
                 
             retry = action.get("retry_count", 0)
             if retry > 0:
-                _label(summary_frame, f"[↺ {retry}x]", size=11, colour=T["warn"]).pack(side="left", padx=(8, 0))
+                _label(top_line, f"[↺ {retry}x]", size=11, colour=T["warn"]).pack(side="left", padx=(8, 0))
+                
+            # Render Warnings
+            if warnings:
+                warn_line = ctk.CTkFrame(summary_frame, fg_color="transparent")
+                warn_line.pack(anchor="w", fill="x", pady=(2, 0))
+                for w in warnings:
+                    _label(warn_line, f"⚠️ {w}", size=11, colour="#FCA5A5", weight="bold").pack(side="left", padx=(0, 10))
+                    # Visually highlight the row border
+                    row.configure(border_width=1, border_color="#7F1D1D")
 
         # Controls — plain text buttons only
         ctrl = ctk.CTkFrame(row, fg_color="transparent")
