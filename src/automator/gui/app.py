@@ -243,6 +243,9 @@ class AutomatorGUI(ctk.CTk):
 
         # Action Clipboard
         self._action_clipboard = []
+        
+        # Click-to-Move Mode
+        self._move_source_idx = None
 
         os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
@@ -820,7 +823,16 @@ class AutomatorGUI(ctk.CTk):
         if query and rendered_count == 0:
             _label(self._wf_list, f"No actions match '{query}'", colour=T["dim"]).pack(pady=30)
             
-        if not self._bulk_mode and not query:
+        if getattr(self, "_move_source_idx", None) is not None:
+            end_row = ctk.CTkFrame(self._wf_list, fg_color="transparent")
+            end_row.pack(fill="x", pady=(12, 4), padx=8)
+            ctk.CTkButton(
+                end_row, text="⬇️ Insert at End", width=120, height=28,
+                fg_color=T["accent"], hover_color=T["accent_d"],
+                text_color=T["text"], font=ctk.CTkFont("SF Pro Text", 12, "bold"),
+                command=lambda: self._execute_move(len(actions))
+            ).pack(pady=4)
+        elif not self._bulk_mode and not query:
             qa_row = ctk.CTkFrame(self._wf_list, fg_color="transparent")
             qa_row.pack(fill="x", pady=(12, 4), padx=8)
             
@@ -835,6 +847,28 @@ class AutomatorGUI(ctk.CTk):
             _btn(qa_row, "🖼 Image", lambda: qa("assert_template"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
             
             _btn(qa_row, "➕ More...", lambda: qa("sleep"), fg_color="transparent", text_color=T["accent"]).pack(side="left", padx=8)
+
+    def _enter_move_mode(self, source_idx: int):
+        self._move_source_idx = source_idx
+        self._refresh_workflow()
+
+    def _cancel_move(self):
+        self._move_source_idx = None
+        self._refresh_workflow()
+
+    def _execute_move(self, target_idx: int):
+        if getattr(self, "_move_source_idx", None) is None:
+            return
+        src = self._move_source_idx
+        if src != target_idx and src != target_idx - 1:
+            def m(lst):
+                if 0 <= src < len(lst) and 0 <= target_idx <= len(lst):
+                    item = lst.pop(src)
+                    insert_pos = target_idx if target_idx < src else target_idx - 1
+                    lst.insert(insert_pos, item)
+            self._modify_workflow(m)
+        self._move_source_idx = None
+        self._refresh_workflow()
 
     def _render_action_row(self, i: int, action: dict, total: int):
         atype   = action.get("type", "unknown")
@@ -1017,6 +1051,29 @@ class AutomatorGUI(ctk.CTk):
         ctrl = ctk.CTkFrame(row, fg_color="transparent")
         ctrl.grid(row=0, column=3, padx=8, pady=4)
 
+        if getattr(self, "_move_source_idx", None) is not None:
+            if i == self._move_source_idx:
+                row.configure(border_width=2, border_color="#D97706") # Gold border
+                ctk.CTkButton(
+                    ctrl, text="❌ Cancel Move", width=100, height=26,
+                    fg_color="#7F1D1D", hover_color="#991B1B",
+                    text_color="white", font=ctk.CTkFont("SF Pro Text", 11, "bold"),
+                    command=self._cancel_move
+                ).pack(side="left", padx=2)
+            else:
+                ctk.CTkButton(
+                    ctrl, text="📥 Insert Before", width=100, height=26,
+                    fg_color=T["accent"], hover_color=T["accent_d"],
+                    text_color=T["text"], font=ctk.CTkFont("SF Pro Text", 11, "bold"),
+                    command=lambda idx=i: self._execute_move(idx)
+                ).pack(side="left", padx=2)
+            
+            # Disable right-click in move mode
+            for widget in (row, type_label, summary_label):
+                widget.bind("<Button-2>", lambda e: "break")
+                widget.bind("<Button-3>", lambda e: "break")
+            return
+
         def _ctrl_btn(parent, txt, cmd, text_color=T["dim"]):
             return ctk.CTkButton(
                 parent, text=txt, width=32, height=26,
@@ -1058,10 +1115,7 @@ class AutomatorGUI(ctk.CTk):
             if not self._nav_stack:
                 menu.add_command(label="▶▶  Play From Here", command=lambda: self.playback(start_idx=i))
             menu.add_separator()
-            if i > 0:
-                menu.add_command(label="⬆  Move Up", command=lambda: self._move_up(i))
-            if i < total - 1:
-                menu.add_command(label="⬇  Move Down", command=lambda: self._move_down(i))
+            menu.add_command(label="🔀  Move Action...", command=lambda: self._enter_move_mode(i))
             menu.add_separator()
             menu.add_command(label="📋  Copy Action", command=lambda: self._copy_action(action))
             menu.add_command(label="📑  Duplicate", command=lambda: self._duplicate_action(i))
