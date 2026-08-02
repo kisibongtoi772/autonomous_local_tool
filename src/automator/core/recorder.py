@@ -97,12 +97,13 @@ class Recorder:
         self.last_action_time = None
         logger.info("Started recording... Do your actions now!")
 
-    def stop(self):
+    def stop(self, save: bool = True):
         if not self.recording:
             return
         self.recording = False
         logger.info("Stopped recording.")
-        self.save()
+        if save:
+            self.save()
 
     def save(self):
         workflow = Workflow(

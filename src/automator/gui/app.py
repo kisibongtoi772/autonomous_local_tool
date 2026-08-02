@@ -1120,6 +1120,8 @@ class AutomatorGUI(ctk.CTk):
             menu.add_command(label="📋  Copy Action", command=lambda: self._copy_action(action))
             menu.add_command(label="📑  Duplicate", command=lambda: self._duplicate_action(i))
             menu.add_command(label="➕  Insert Below", command=lambda: self._open_add_dialog(insert_idx=i + 1))
+            menu.add_separator()
+            menu.add_command(label="⏺  Record & Insert Below", command=lambda: self.start_recording(insert_idx=i + 1))
             
             # Show menu at mouse position, or at button position if triggered by button
             x = event.x_root if event else more_btn.winfo_rootx()
@@ -2436,9 +2438,10 @@ class AutomatorGUI(ctk.CTk):
 
     # ── Recording / Playback ──────────────────────────────────────────────────
 
-    def start_recording(self):
+    def start_recording(self, insert_idx: int = None):
         if self.recording: return
         self.recording = True
+        self._record_insert_idx = insert_idx
         
         self._set_status("Prepare...", T["warn"])
         self.record_btn.configure(state="disabled")
@@ -2466,8 +2469,19 @@ class AutomatorGUI(ctk.CTk):
             self._countdown.destroy()
             
         if self.recorder:
-            self.recorder.stop()
-        logger.info(f"Stopped  →  saved to  {self.file_var.get()}")
+            self.recorder.stop(save=False)
+            new_actions = self.recorder.actions
+            if new_actions:
+                def m(lst):
+                    idx = getattr(self, "_record_insert_idx", None)
+                    if idx is not None and 0 <= idx <= len(lst):
+                        lst[idx:idx] = new_actions
+                    else:
+                        lst.extend(new_actions)
+                self._modify_workflow(m)
+                logger.info(f"Inserted {len(new_actions)} actions into {self.file_var.get()}")
+            self._record_insert_idx = None
+            
         self._set_status("Idle", T["ok"])
         self.record_btn.configure(state="normal")
         self.stop_btn.configure(state="disabled", fg_color=T["raised"], text_color=T["dim"])
