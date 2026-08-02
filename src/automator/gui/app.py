@@ -887,6 +887,30 @@ class AutomatorGUI(ctk.CTk):
             top_line = ctk.CTkFrame(summary_frame, fg_color="transparent")
             top_line.pack(anchor="w", fill="x")
             
+            # --- Visual Action Thumbnail ---
+            if atype in ("wait_for_template", "assert_template", "if_template", "click"):
+                tmpl_file = action.get("template") or action.get("template_image")
+                if tmpl_file:
+                    tmpl_path = os.path.join(TEMPLATES_DIR, tmpl_file)
+                    if os.path.exists(tmpl_path):
+                        if not hasattr(self, "_thumbnail_cache"):
+                            self._thumbnail_cache = {}
+                        if tmpl_path not in self._thumbnail_cache:
+                            try:
+                                from PIL import Image
+                                img = Image.open(tmpl_path)
+                                w, h = img.size
+                                new_w = max(1, int(w * (24 / h))) if h > 0 else 24
+                                ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(new_w, 24))
+                                self._thumbnail_cache[tmpl_path] = ctk_img
+                            except Exception:
+                                self._thumbnail_cache[tmpl_path] = None
+                        
+                        cached_img = self._thumbnail_cache.get(tmpl_path)
+                        if cached_img:
+                            thumb_label = ctk.CTkLabel(top_line, image=cached_img, text="", corner_radius=2, fg_color=T["border"])
+                            thumb_label.pack(side="left", padx=(0, 10))
+            
             if note:
                 _label(top_line, f"[{note}]", size=11, colour=main_color, weight="bold").pack(side="left", padx=(0, 8))
                 _label(top_line, summary, size=11, colour=T["dim"]).pack(side="left")
