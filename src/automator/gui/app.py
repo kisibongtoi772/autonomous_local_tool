@@ -1502,41 +1502,100 @@ class AutomatorGUI(ctk.CTk):
         
         _btn(self._bulk_toolbar, "Cancel", self._toggle_bulk_mode).pack(side="right", padx=12, pady=6)
         _btn(self._bulk_toolbar, "🗑 Delete", self._bulk_delete, danger=True).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "✂️ Extract", self._bulk_extract).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "📦 Group", self._bulk_group).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "⧉ Duplicate", self._bulk_duplicate).pack(side="right", padx=6, pady=6)
 
     def _bulk_delete(self):
         if not self._selected_indices: return
-        self._push_undo()
-        path = os.path.join(WORKSPACE_DIR, self.file_var.get())
-        data = load_json(path, {})
-        actions = data.get("actions", [])
-        
-        new_actions = [a for i, a in enumerate(actions) if i not in self._selected_indices]
-        data["actions"] = new_actions
-        save_json(path, data)
+        def mutator(lst):
+            new_lst = [a for i, a in enumerate(lst) if i not in self._selected_indices]
+            lst.clear()
+            lst.extend(new_lst)
+        self._modify_workflow(mutator)
         self._selected_indices.clear()
-        self._toggle_bulk_mode()  # exit bulk mode
-        self._refresh_stats()
+        self._toggle_bulk_mode()
 
     def _bulk_duplicate(self):
         if not self._selected_indices: return
-        self._push_undo()
-        path = os.path.join(WORKSPACE_DIR, self.file_var.get())
-        data = load_json(path, {})
-        actions = data.get("actions", [])
-        
-        new_actions = []
-        for i, a in enumerate(actions):
-            new_actions.append(a)
-            if i in self._selected_indices:
-                dupe = copy.deepcopy(a)
-                new_actions.append(dupe)
-                
-        data["actions"] = new_actions
-        save_json(path, data)
+        def mutator(lst):
+            new_lst = []
+            for i, a in enumerate(lst):
+                new_lst.append(a)
+                if i in self._selected_indices:
+                    new_lst.append(copy.deepcopy(a))
+            lst.clear()
+            lst.extend(new_lst)
+        self._modify_workflow(mutator)
         self._selected_indices.clear()
-        self._toggle_bulk_mode()  # exit bulk mode
-        self._refresh_stats()
+        self._toggle_bulk_mode()
+
+    def _bulk_group(self):
+        if not self._selected_indices: return
+        sorted_indices = sorted(list(self._selected_indices))
+        first_idx = sorted_indices[0]
+        def mutator(lst):
+            grouped_actions = [copy.deepcopy(lst[i]) for i in sorted_indices]
+            group_node = {"type": "group", "name": "New Group", "actions": grouped_actions}
+            new_lst = []
+            for i, a in enumerate(lst):
+                if i == first_idx:
+                    new_lst.append(group_node)
+                elif i not in self._selected_indices:
+                    new_lst.append(a)
+            lst.clear()
+            lst.extend(new_lst)
+        self._modify_workflow(mutator)
+        self._selected_indices.clear()
+        self._toggle_bulk_mode()
+
+    def _bulk_extract(self):
+        if not self._selected_indices: return
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Extract to Sub-Workflow")
+        dlg.geometry("400x180")
+        dlg.attributes("-topmost", True)
+        
+        _label(dlg, "Tên file kịch bản con mới (vd: login.json):", size=12).pack(pady=10)
+        entry = ctk.CTkEntry(dlg, width=300)
+        entry.pack(pady=5)
+        entry.focus()
+        
+        def on_confirm():
+            filename = entry.get().strip()
+            if not filename: return
+            if not filename.endswith(".json"):
+                filename += ".json"
+            
+            dlg.destroy()
+            sorted_indices = sorted(list(self._selected_indices))
+            first_idx = sorted_indices[0]
+            
+            def mutator(lst):
+                extracted_actions = [copy.deepcopy(lst[i]) for i in sorted_indices]
+                # Save extracted actions to new file
+                new_path = os.path.join(WORKSPACE_DIR, filename)
+                save_json(new_path, {
+                    "workflow_name": filename.replace(".json", ""),
+                    "created_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
+                    "actions": extracted_actions
+                })
+                
+                run_node = {"type": "run_workflow", "workflow_file": filename}
+                new_lst = []
+                for i, a in enumerate(lst):
+                    if i == first_idx:
+                        new_lst.append(run_node)
+                    elif i not in self._selected_indices:
+                        new_lst.append(a)
+                lst.clear()
+                lst.extend(new_lst)
+                
+            self._modify_workflow(mutator)
+            self._selected_indices.clear()
+            self._toggle_bulk_mode()
+            
+        _btn(dlg, "Extract", on_confirm, primary=True).pack(pady=10)
 
     # ── PANEL: Scheduler ──────────────────────────────────────────────────────
 
