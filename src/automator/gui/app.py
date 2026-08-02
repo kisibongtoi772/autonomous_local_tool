@@ -249,6 +249,10 @@ class AutomatorGUI(ctk.CTk):
         
         # Smart Resume
         self._last_failed_idx = None
+        
+        # IDE Navigation History
+        self._file_history = ["workflow.json"]
+        self._file_ptr = 0
 
         os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
@@ -330,8 +334,17 @@ class AutomatorGUI(ctk.CTk):
         # Workflow selector
         sel = ctk.CTkFrame(sb, fg_color="transparent")
         sel.pack(fill="x", padx=12, pady=12)
-
-        _label(sel, "Workflow", size=10, colour=T["dim"]).pack(anchor="w", pady=(0, 4))
+        
+        lbl_frame = ctk.CTkFrame(sel, fg_color="transparent")
+        lbl_frame.pack(fill="x", pady=(0, 4))
+        
+        _label(lbl_frame, "Workflow", size=10, colour=T["dim"]).pack(side="left")
+        
+        self.fwd_btn = _btn(lbl_frame, "▶", self._nav_file_forward, width=20, height=20, fg_color="transparent")
+        self.fwd_btn.pack(side="right")
+        self.back_btn = _btn(lbl_frame, "◀", self._nav_file_back, width=20, height=20, fg_color="transparent")
+        self.back_btn.pack(side="right", padx=(0, 2))
+        
         self.file_dropdown = ctk.CTkOptionMenu(
             sel, variable=self.file_var,
             values=get_workflow_files(),
@@ -344,6 +357,8 @@ class AutomatorGUI(ctk.CTk):
             corner_radius=6
         )
         self.file_dropdown.pack(fill="x")
+        
+        self.after(100, self._update_nav_buttons)
 
         _btn(sel, "New Workflow", self._new_workflow, width=166,
              fg_color="transparent",
@@ -1138,6 +1153,15 @@ class AutomatorGUI(ctk.CTk):
         elif atype == "if_color":
             _ctrl_btn(ctrl, "📂 Then", lambda idx=i: [self._nav_stack.append((idx, "then_actions", f"IfColor {idx+1} (Then)")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=1)
             _ctrl_btn(ctrl, "📂 Else", lambda idx=i: [self._nav_stack.append((idx, "else_actions", f"IfColor {idx+1} (Else)")), self._refresh_workflow()], text_color=T["warn"]).pack(side="left", padx=1)
+        elif atype == "run_workflow":
+            wf_file = action.get("workflow_file")
+            if wf_file:
+                def go_to_wf(f=wf_file):
+                    if f in get_workflow_files():
+                        self.file_dropdown.set(f)
+                        self._on_file_select(f)
+                        self._nav_to("workflow")
+                _ctrl_btn(ctrl, "🔗 Mở", go_to_wf, text_color=T["ok"]).pack(side="left", padx=1)
             
         tmpl_file = action.get("template") or action.get("template_image")
         if tmpl_file:
@@ -2965,10 +2989,17 @@ class AutomatorGUI(ctk.CTk):
 
     # ── Workflow file management ───────────────────────────────────────────────
 
-    def _on_file_select(self, choice: str):
+    def _on_file_select(self, choice: str, record_history: bool = True):
         self.file_var.set(choice)
         logger.info(f"Workflow: {choice}")
         
+        if record_history:
+            self._file_history = self._file_history[:self._file_ptr + 1]
+            if not self._file_history or self._file_history[-1] != choice:
+                self._file_history.append(choice)
+                self._file_ptr += 1
+            self._update_nav_buttons()
+            
         # Reset undo/redo when switching files
         self._undo_stack.clear()
         self._redo_stack.clear()
@@ -2977,6 +3008,33 @@ class AutomatorGUI(ctk.CTk):
         if self._active_nav == "workflow":
             self._refresh_workflow()
         self._refresh_stats()
+
+    def _update_nav_buttons(self):
+        if self._file_ptr > 0:
+            self.back_btn.configure(state="normal", text_color=T["text"])
+        else:
+            self.back_btn.configure(state="disabled", text_color=T["dim"])
+            
+        if self._file_ptr < len(self._file_history) - 1:
+            self.fwd_btn.configure(state="normal", text_color=T["text"])
+        else:
+            self.fwd_btn.configure(state="disabled", text_color=T["dim"])
+
+    def _nav_file_back(self):
+        if self._file_ptr > 0:
+            self._file_ptr -= 1
+            choice = self._file_history[self._file_ptr]
+            self.file_dropdown.set(choice)
+            self._on_file_select(choice, record_history=False)
+            self._update_nav_buttons()
+
+    def _nav_file_forward(self):
+        if self._file_ptr < len(self._file_history) - 1:
+            self._file_ptr += 1
+            choice = self._file_history[self._file_ptr]
+            self.file_dropdown.set(choice)
+            self._on_file_select(choice, record_history=False)
+            self._update_nav_buttons()
 
     def _new_workflow(self):
         dlg = self._dialog("New Workflow", "360x260")
