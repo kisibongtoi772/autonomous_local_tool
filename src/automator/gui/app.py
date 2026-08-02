@@ -964,6 +964,27 @@ class AutomatorGUI(ctk.CTk):
                 warn_line.pack(anchor="w", fill="x", pady=(2, 0))
                 for w in warnings:
                     _label(warn_line, f"⚠️ {w}", size=11, colour="#FCA5A5", weight="bold").pack(side="left", padx=(0, 10))
+                    
+                    if w.startswith("Image '") and w.endswith("' not found"):
+                        tmpl_name = w.split("'")[1]
+                        
+                        def do_recapture(fname=tmpl_name):
+                            from .snipping_tool import SnippingTool
+                            def on_capture(saved_name):
+                                self.deiconify()
+                                self._refresh_workflow()
+                            def on_cancel():
+                                self.deiconify()
+                            self.withdraw()
+                            SnippingTool(self, on_capture, on_cancel, force_filename=fname)
+                            
+                        ctk.CTkButton(
+                            warn_line, text="✂ Recapture", width=30, height=20,
+                            fg_color="transparent", hover_color=T["hover"],
+                            text_color=T["text"], font=ctk.CTkFont("SF Pro Text", 10, "bold"),
+                            corner_radius=4, border_width=1, border_color=T["border"], command=do_recapture
+                        ).pack(side="left")
+                        
                     # Visually highlight the row border
                     row.configure(border_width=1, border_color="#7F1D1D")
 

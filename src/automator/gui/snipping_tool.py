@@ -10,10 +10,11 @@ from ..utils.logger import get_logger
 logger = get_logger(__name__)
 
 class SnippingTool(ctk.CTkToplevel):
-    def __init__(self, parent, on_capture: Callable[[str], None], on_cancel: Optional[Callable[[], None]] = None):
+    def __init__(self, parent, on_capture: Callable[[str], None], on_cancel: Optional[Callable[[], None]] = None, force_filename: Optional[str] = None):
         super().__init__(parent)
         self.on_capture = on_capture
         self.on_cancel = on_cancel
+        self.force_filename = force_filename
         self.title("Snipping Tool")
         
         # Take full screen capture
@@ -99,8 +100,12 @@ class SnippingTool(ctk.CTkToplevel):
         self.prompt_save(cropped)
 
     def prompt_save(self, image: Image.Image):
-        dialog = ctk.CTkInputDialog(text="Enter filename for template (e.g. icon.png):", title="Save Template")
-        filename = dialog.get_input()
+        if self.force_filename:
+            filename = self.force_filename
+        else:
+            dialog = ctk.CTkInputDialog(text="Enter filename for template (e.g. icon.png):", title="Save Template")
+            filename = dialog.get_input()
+            
         if filename:
             filename = filename.strip()
             if not filename.endswith(".png"):
