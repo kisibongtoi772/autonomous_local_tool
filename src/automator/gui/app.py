@@ -659,6 +659,18 @@ class AutomatorGUI(ctk.CTk):
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
         
+        self._console_visible = False
+        def toggle_console():
+            self._console_visible = not self._console_visible
+            if self._console_visible:
+                self._wf_list.grid(pady=(0, 0))
+                self._console_frame.grid(row=4, column=0, sticky="nsew", padx=24, pady=(12, 24))
+            else:
+                self._console_frame.grid_forget()
+                self._wf_list.grid(pady=(0, 24))
+                
+        _btn(tb, "Console ⌨️", toggle_console, False).pack(side="left", padx=(8, 0), pady=8)
+        
         _btn(tb, "Find/Replace 🔍", self._open_find_replace, False).pack(side="right", padx=(0, 8), pady=8)
 
         self._wf_search_var = ctk.StringVar()
@@ -697,7 +709,32 @@ class AutomatorGUI(ctk.CTk):
         )
         self._wf_list.grid(row=3, column=0, sticky="nsew", padx=24, pady=(0, 24))
         self._wf_list.grid_columnconfigure(2, weight=1)
-        p.grid_rowconfigure(3, weight=1)
+        p.grid_rowconfigure(3, weight=3)
+        
+        # Console Frame (hidden by default)
+        self._console_frame = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
+        self._console_frame.grid_columnconfigure(0, weight=1)
+        self._console_frame.grid_rowconfigure(1, weight=1)
+        p.grid_rowconfigure(4, weight=1) # Give it 1/4 of the space when visible
+        
+        c_hdr = ctk.CTkFrame(self._console_frame, fg_color="transparent")
+        c_hdr.grid(row=0, column=0, sticky="ew", padx=14, pady=(10, 4))
+        _label(c_hdr, "Terminal Output", size=11, colour=T["dim"]).pack(side="left")
+        
+        self.wf_log_box = ctk.CTkTextbox(
+            self._console_frame, fg_color=T["bg"], text_color=T["text"],
+            font=ctk.CTkFont("Menlo", 11)
+        )
+        self.wf_log_box.grid(row=1, column=0, sticky="nsew", padx=8, pady=(0, 8))
+        
+        def clear_wf_log():
+            self.wf_log_box.delete("0.0", "end")
+        _btn(c_hdr, "Clear", clear_wf_log, width=60, height=24, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"]).pack(side="right")
+        
+        from ..utils.logger import LogHandler
+        import logging
+        handler = LogHandler(self.wf_log_box)
+        logging.getLogger().addHandler(handler)
 
     def _refresh_workflow(self):
         self._action_rows = []
