@@ -1285,8 +1285,9 @@ class AutomatorGUI(ctk.CTk):
         val_frame = ctk.CTkFrame(dlg, fg_color="transparent")
         val_frame.pack(padx=20, fill="x")
         
+        val_var = ctk.StringVar()
         entry = ctk.CTkEntry(
-            val_frame, fg_color=T["raised"], border_color=T["border"],
+            val_frame, textvariable=val_var, fg_color=T["raised"], border_color=T["border"],
             text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6
         )
         entry.pack(side="left", fill="x", expand=True)
@@ -1359,6 +1360,21 @@ class AutomatorGUI(ctk.CTk):
         
         var_btn = _btn(val_frame, "{x}", open_variable_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         var_btn.pack(side="right", padx=(8, 0))
+
+        preview_label = ctk.CTkLabel(dlg, text="", font=ctk.CTkFont(*FONT_BODY, slant="italic"), text_color=T["dim"])
+        preview_label.pack(padx=20, pady=(2, 0), anchor="w")
+        
+        def update_preview(*args):
+            text = val_var.get()
+            if "{{" in text and "}}" in text:
+                resolved = self.var_manager.resolve(text)
+                if resolved != text:
+                    preview_label.configure(text=f"Preview: {resolved}")
+                    return
+            preview_label.configure(text="")
+            
+        val_var.trace_add("write", update_preview)
+        update_preview()
 
         HINTS = {
             "sleep": "seconds  (e.g. 1.5)",
@@ -1526,8 +1542,9 @@ class AutomatorGUI(ctk.CTk):
         val_frame = ctk.CTkFrame(dlg, fg_color="transparent")
         val_frame.pack(padx=20, fill="x")
         
+        val_var = ctk.StringVar()
         entry = ctk.CTkEntry(
-            val_frame, fg_color=T["raised"], border_color=T["border"],
+            val_frame, textvariable=val_var, fg_color=T["raised"], border_color=T["border"],
             text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6
         )
         entry.pack(side="left", fill="x", expand=True)
@@ -1623,6 +1640,21 @@ class AutomatorGUI(ctk.CTk):
             "if_color":         f"{action.get('x',0)},{action.get('y',0)},{action.get('color','#000000')}",
         }.get(atype, "")
         entry.insert(0, cur)
+        
+        preview_label = ctk.CTkLabel(dlg, text="", font=ctk.CTkFont(*FONT_BODY, slant="italic"), text_color=T["dim"])
+        preview_label.pack(padx=20, pady=(2, 0), anchor="w")
+        
+        def update_preview(*args):
+            text = val_var.get()
+            if "{{" in text and "}}" in text:
+                resolved = self.var_manager.resolve(text)
+                if resolved != text:
+                    preview_label.configure(text=f"Preview: {resolved}")
+                    return
+            preview_label.configure(text="")
+            
+        val_var.trace_add("write", update_preview)
+        update_preview()
         
         _label(dlg, "Note (Optional)", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
         note_entry = ctk.CTkEntry(
