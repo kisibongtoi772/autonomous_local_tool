@@ -744,6 +744,10 @@ class AutomatorGUI(ctk.CTk):
         _btn(tb, "Find/Replace 🔍", self._open_find_replace, False).pack(side="right", padx=(0, 8), pady=8)
         _btn(tb, "Outline 📑", self._toggle_outline, False).pack(side="right", padx=(0, 8), pady=8)
         _btn(tb, "Gallery 🖼", self._open_template_gallery, False).pack(side="right", padx=(0, 8), pady=8)
+        
+        self._is_code_mode = False
+        self._code_btn = _btn(tb, "</> Code", self._toggle_code_mode, False)
+        self._code_btn.pack(side="right", padx=(0, 8), pady=8)
 
         self._wf_search_var = ctk.StringVar()
         self._wf_search_var.trace_add("write", lambda *_: self._refresh_workflow())
@@ -786,6 +790,17 @@ class AutomatorGUI(ctk.CTk):
         self._wf_list.grid(row=4, column=0, sticky="nsew", padx=24, pady=(0, 24))
         self._wf_list.grid_columnconfigure(2, weight=1)
         p.grid_rowconfigure(4, weight=3)
+        
+        # Code Editor Frame (hidden by default)
+        self._code_frame = ctk.CTkFrame(p, fg_color="transparent")
+        self._code_frame.grid_columnconfigure(0, weight=1)
+        self._code_frame.grid_rowconfigure(0, weight=1)
+        
+        self._code_textbox = ctk.CTkTextbox(
+            self._code_frame, font=ctk.CTkFont("Menlo", 13),
+            fg_color=T["raised"], text_color=T["text"], border_width=1, border_color=T["border"]
+        )
+        self._code_textbox.grid(row=0, column=0, sticky="nsew", padx=24, pady=(0, 24))
         
         # Console Frame (hidden by default)
         self._console_frame = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
@@ -1654,6 +1669,48 @@ class AutomatorGUI(ctk.CTk):
         self._modify_workflow(mutator)
         if hasattr(self, "_floating_status") and self._floating_status.winfo_exists():
             self._floating_status.update_status(f"Pasted {len(self._action_clipboard)} action(s)")
+
+    def _toggle_outline(self):
+        if hasattr(self, "_outline_hud") and self._outline_hud.winfo_exists():
+            self._outline_hud.destroy()
+            return
+            
+        from .outline_hud import OutlineHUD
+        self._outline_hud = OutlineHUD(self)
+        self._outline_hud.update_outline(self.data.get("actions", []))
+
+    def _toggle_code_mode(self):
+        if not self._is_code_mode:
+            # Switch to Code Mode
+            try:
+                raw_json = json.dumps(self.data, indent=4, ensure_ascii=False)
+                self._code_textbox.delete("0.0", "end")
+                self._code_textbox.insert("0.0", raw_json)
+                self._wf_list.grid_remove()
+                self._code_frame.grid(row=4, column=0, sticky="nsew")
+                self._code_btn.configure(text="🎨 UI View", text_color=T["ok"])
+                self._is_code_mode = True
+            except Exception as e:
+                logger.error(f"Failed to switch to code mode: {e}")
+        else:
+            # Switch back to UI Mode
+            raw_json = self._code_textbox.get("0.0", "end").strip()
+            try:
+                parsed = json.loads(raw_json)
+                # Save it to disk and memory
+                self.data = parsed
+                with open(os.path.join(WORKSPACE_DIR, self.file_var.get()), "w", encoding="utf-8") as f:
+                    json.dump(self.data, f, indent=2, ensure_ascii=False)
+                
+                self._code_frame.grid_remove()
+                self._wf_list.grid()
+                self._code_btn.configure(text="</> Code", text_color=T["text"])
+                self._is_code_mode = False
+                self._refresh_workflow()
+            except json.JSONDecodeError as e:
+                logger.error(f"Invalid JSON format: {e}")
+                import tkinter.messagebox
+                tkinter.messagebox.showerror("JSON Error", f"Invalid JSON format. Please fix the errors before switching back to UI mode.\n\nDetails: {e}")
 
     def _delete_action(self, idx: int):
         self._modify_workflow(lambda lst: lst.pop(idx))
