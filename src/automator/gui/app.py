@@ -237,6 +237,9 @@ class AutomatorGUI(ctk.CTk):
         self._bulk_mode = False
         self._selected_indices = set()
         
+        # X-Ray Mode
+        self._xray_mode_var = ctk.BooleanVar(value=False)
+        
         # Navigation Stack for Nested Editing
         # Format: [(index, key, label), ...] e.g. [(3, "actions", "Loop")]
         self._nav_stack: list[tuple[int, str, str]] = []
@@ -856,6 +859,13 @@ class AutomatorGUI(ctk.CTk):
             _btn(self._breadcrumb_bar, "⬅ Back", lambda: _nav_pop(len(self._nav_stack)-1), 
                  width=60, border_width=1, border_color=T["border"]).pack(side="right")
                  
+        # X-Ray Toggle
+        ctk.CTkSwitch(
+            self._breadcrumb_bar, text="👁 X-Ray", variable=self._xray_mode_var,
+            command=self._refresh_workflow, width=80, height=20, switch_width=32, switch_height=16,
+            progress_color=T["accent"], font=ctk.CTkFont(*FONT_SM)
+        ).pack(side="right", padx=16)
+                 
         _label(self._breadcrumb_bar, f"  ({len(actions)} actions)", size=11, colour=T["dim"], slant="italic").pack(side="left", padx=(8, 0))
                  
         query = self._wf_search_var.get().strip().lower() if hasattr(self, "_wf_search_var") else ""
@@ -955,6 +965,21 @@ class AutomatorGUI(ctk.CTk):
         self._move_source_idx = None
         self._refresh_workflow()
 
+    def _move_action_up(self, idx: int):
+        if idx <= 0: return
+        def m(lst):
+            if 0 < idx < len(lst):
+                lst[idx-1], lst[idx] = lst[idx], lst[idx-1]
+        self._modify_workflow(m)
+        self._refresh_workflow()
+
+    def _move_action_down(self, idx: int):
+        def m(lst):
+            if 0 <= idx < len(lst) - 1:
+                lst[idx], lst[idx+1] = lst[idx+1], lst[idx]
+        self._modify_workflow(m)
+        self._refresh_workflow()
+
     def _render_action_row(self, i: int, action: dict, total: int):
         atype   = action.get("type", "unknown")
         
@@ -963,6 +988,10 @@ class AutomatorGUI(ctk.CTk):
         display_type = f"{ACTION_LABELS.get(atype, atype.upper())}: {custom_label}" if custom_label else ACTION_LABELS.get(atype, atype.upper())
         
         summary = self._action_summary(atype, action)
+        if self._xray_mode_var.get():
+            self.var_manager.load()
+            summary = self.var_manager.resolve(summary)
+            
         enabled = action.get("enabled", True)
         
         row = ctk.CTkFrame(self._wf_list, fg_color=T["raised"], corner_radius=6)
@@ -1105,6 +1134,8 @@ class AutomatorGUI(ctk.CTk):
                 
             # Render Rich Note (DocString)
             if note:
+                if self._xray_mode_var.get():
+                    note = self.var_manager.resolve(note)
                 note_frame = ctk.CTkFrame(summary_frame, fg_color="transparent")
                 note_frame.pack(anchor="w", fill="x", pady=(4, 0))
                 
@@ -1216,6 +1247,11 @@ class AutomatorGUI(ctk.CTk):
 
         _ctrl_btn(ctrl, "Edit", lambda idx=i, a=action: self._open_edit_dialog(idx, a)).pack(side="left", padx=1)
         
+        if i > 0:
+            _ctrl_btn(ctrl, "▲", lambda idx=i: self._move_action_up(idx)).pack(side="left", padx=1)
+        if i < total - 1:
+            _ctrl_btn(ctrl, "▼", lambda idx=i: self._move_action_down(idx)).pack(side="left", padx=1)
+            
         del_btn = ctk.CTkButton(
             ctrl, text="Del", width=32, height=26,
             fg_color="transparent", hover_color="#2A1515",
