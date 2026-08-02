@@ -46,6 +46,7 @@ class Player:
         prompt_callback: Callable[[dict], str] | None = None,
         ripple_callback: Callable[[int, int], None] | None = None,
         highlight_callback: Callable[[int, int, int, int], None] | None = None,
+        breakpoint_callback: Callable[[int], None] | None = None,
         _depth: int = 0,
     ):
         """
@@ -155,14 +156,17 @@ class Player:
             if self._stop_requested:
                 return
 
-            while self._paused and not self._stop_requested:
-                time.sleep(0.1)
-
-            if self._stop_requested:
-                return
-
             action = actions[i]
             idx_1_based = i + 1
+
+            if getattr(action, "breakpoint", False):
+                logger.info(f"⏸ Breakpoint hit at action {idx_1_based}")
+                if self.breakpoint_callback:
+                    self.breakpoint_callback(idx_1_based)
+                self.pause()
+
+            while self._paused and not self._stop_requested:
+                time.sleep(0.1)
 
             if not getattr(action, "enabled", True):
                 continue

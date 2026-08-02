@@ -776,6 +776,23 @@ class AutomatorGUI(ctk.CTk):
                     text_color=toggle_color, font=ctk.CTkFont("SF Pro Text", 12),
                     corner_radius=4, border_width=0, command=toggle
                 ).pack(side="left")
+                
+                is_bp = action.get("breakpoint", False)
+                bp_color = "#FF3B30" if is_bp else "#4B5563"
+                bp_text = "🛑" if is_bp else "⭕"
+                
+                def toggle_bp():
+                    def m(lst):
+                        if 0 <= i < len(lst):
+                            lst[i]["breakpoint"] = not is_bp
+                    self._modify_workflow(m)
+                    
+                ctk.CTkButton(
+                    idx_frame, text=bp_text, width=24, height=24,
+                    fg_color="transparent", hover_color=T["hover"],
+                    text_color=bp_color, font=ctk.CTkFont("SF Pro Text", 10),
+                    corner_radius=4, border_width=0, command=toggle_bp
+                ).pack(side="left")
             
             _label(idx_frame, str(i + 1), size=10, colour=T["dim"],
                    anchor="center", width=20).pack(side="left")
@@ -1850,6 +1867,9 @@ class AutomatorGUI(ctk.CTk):
         prompt_cb = self._make_prompt_callback()
         ripple_cb = self._make_ripple_callback()
         highlight_cb = self._make_highlight_callback()
+        
+        def _on_breakpoint(idx):
+            self.after(0, lambda: self._floating_status.force_pause())
 
         from .floating_status import FloatingStatus
         def _on_pause():
@@ -1874,6 +1894,7 @@ class AutomatorGUI(ctk.CTk):
                     prompt_callback=prompt_cb,
                     ripple_callback=ripple_cb,
                     highlight_callback=highlight_cb,
+                    breakpoint_callback=_on_breakpoint,
                 )
                 self._player = p
                 p.play(start_idx=start_idx)

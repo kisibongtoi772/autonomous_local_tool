@@ -84,3 +84,7 @@ class FloatingStatus(ctk.CTkToplevel):
         self.pause_btn.configure(state="disabled")
         if self.on_stop:
             self.on_stop()
+            
+    def force_pause(self):
+        if not self._is_paused:
+            self._handle_pause_resume()
