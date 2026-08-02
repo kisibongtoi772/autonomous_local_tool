@@ -270,6 +270,8 @@ class AutomatorGUI(ctk.CTk):
         # Mac / Win standard shortcuts
         self.bind("<Command-z>", self._safe_undo)
         self.bind("<Control-z>", self._safe_undo)
+        self.bind("<Command-p>", self._open_file_switcher)
+        self.bind("<Control-p>", self._open_file_switcher)
         
         self.bind("<Command-Shift-Z>", self._safe_redo)
         self.bind("<Control-Shift-Z>", self._safe_redo)
@@ -3268,7 +3270,26 @@ class AutomatorGUI(ctk.CTk):
         else:
             self._set_status("Template not found on screen!", T["err"])
 
-    def _on_done(self, success: bool = True, error_msg: str = None):
+    def _bind_canvas_mousewheel(self):
+        # Implementation for canvas mousewheel binding
+        pass
+
+    def _open_file_switcher(self, event=None):
+        if hasattr(self, "_file_switcher") and self._file_switcher.winfo_exists():
+            return
+            
+        from .file_switcher import FileSwitcher
+        # Get all json files from the combobox values
+        files = self.file_dropdown.cget("values")
+        current = self.file_var.get()
+        
+        def on_select(filename):
+            self.file_var.set(filename)
+            self._on_file_select(filename)
+            
+        self._file_switcher = FileSwitcher(self, files, current, on_select)
+
+    def _on_done(self, success: bool, error: str = None):
         self._set_status("Idle", T["ok"])
         self.play_btn.configure(state="normal")
         self.stop_play_btn.configure(state="disabled", text_color=T["dim"])
