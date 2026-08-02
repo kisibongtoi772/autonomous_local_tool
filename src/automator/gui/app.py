@@ -219,6 +219,10 @@ class AutomatorGUI(ctk.CTk):
         # Undo/Redo Stacks
         self._undo_stack = []
         self._redo_stack = []
+        
+        # Bulk Edit Mode
+        self._bulk_mode = False
+        self._selected_indices = set()
 
         os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
@@ -584,6 +588,7 @@ class AutomatorGUI(ctk.CTk):
         self._redo_btn.pack(side="left", padx=(8, 0), pady=8)
         
         _btn(tb, "Add Action", self._open_add_dialog,  True).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "Bulk Edit",  self._toggle_bulk_mode, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
 
@@ -629,6 +634,9 @@ class AutomatorGUI(ctk.CTk):
         self._action_rows = []
         for w in self._wf_list.winfo_children():
             w.destroy()
+            
+        if hasattr(self, "_bulk_toolbar") and self._bulk_toolbar.winfo_exists():
+            self._bulk_toolbar.destroy()
 
         path = os.path.join(WORKSPACE_DIR, self.file_var.get())
         if not os.path.exists(path):
@@ -642,6 +650,9 @@ class AutomatorGUI(ctk.CTk):
         if not actions:
             _label(self._wf_list, "Workflow is empty. Record or add actions.", colour=T["dim"]).pack(pady=30)
             return
+
+        if self._bulk_mode:
+            self._build_bulk_toolbar(self._wf_list)
 
         rendered_count = 0
         for i, action in enumerate(actions):
@@ -669,7 +680,7 @@ class AutomatorGUI(ctk.CTk):
 
         # Index & Toggle
         idx_frame = ctk.CTkFrame(row, fg_color="transparent")
-        idx_frame.grid(row=0, column=0, padx=(10, 0), pady=8)
+        idx_frame.grid(row=0, column=0, padx=8, pady=8)
         
         if atype == "comment":
             row.configure(fg_color="#1F2937") # deep blue-grey for separator
@@ -679,21 +690,35 @@ class AutomatorGUI(ctk.CTk):
             summary_frame.grid(row=0, column=1, columnspan=2, padx=12, pady=8, sticky="ew")
             _label(summary_frame, f"--- {action.get('text', '')} ---", size=11, colour=T["accent"], weight="bold").pack(side="left")
         else:
-            toggle_text = "✔" if enabled else "✕"
-            toggle_color = T["ok"] if enabled else T["err"]
-            
-            def toggle():
-                def m(d):
-                    if 0 <= i < len(d.get("actions", [])):
-                        d["actions"][i]["enabled"] = not enabled
-                self._modify_workflow(m)
+            if self._bulk_mode:
+                def on_check(checked_idx=i, var=None):
+                    if var.get():
+                        self._selected_indices.add(checked_idx)
+                    else:
+                        self._selected_indices.discard(checked_idx)
+                        
+                chk_var = ctk.BooleanVar(value=(i in self._selected_indices))
+                ctk.CTkCheckBox(
+                    idx_frame, text="", width=24, height=24, checkbox_width=20, checkbox_height=20,
+                    border_width=2, corner_radius=4, variable=chk_var,
+                    command=lambda i=i, v=chk_var: on_check(i, v)
+                ).pack(side="left")
+            else:
+                toggle_text = "●" if enabled else "○"
+                toggle_color = T["ok"] if enabled else T["dim"]
                 
-            ctk.CTkButton(
-                idx_frame, text=toggle_text, width=24, height=24,
-                fg_color="transparent", hover_color=T["hover"],
-                text_color=toggle_color, font=ctk.CTkFont("SF Pro Text", 12),
-                corner_radius=4, border_width=0, command=toggle
-            ).pack(side="left")
+                def toggle():
+                    def m(d):
+                        if 0 <= i < len(d.get("actions", [])):
+                            d["actions"][i]["enabled"] = not enabled
+                    self._modify_workflow(m)
+                
+                ctk.CTkButton(
+                    idx_frame, text=toggle_text, width=24, height=24,
+                    fg_color="transparent", hover_color=T["hover"],
+                    text_color=toggle_color, font=ctk.CTkFont("SF Pro Text", 12),
+                    corner_radius=4, border_width=0, command=toggle
+                ).pack(side="left")
             
             _label(idx_frame, str(i + 1), size=10, colour=T["dim"],
                    anchor="center", width=20).pack(side="left")
@@ -1221,6 +1246,55 @@ class AutomatorGUI(ctk.CTk):
         
         _btn(btn_frame, "Save Changes", save, primary=True, width=250).pack(side="left")
         _btn(btn_frame, "▶ Test", test, width=100, fg_color=T["accent"], text_color=T["text"]).pack(side="right")
+
+    def _toggle_bulk_mode(self):
+        self._bulk_mode = not self._bulk_mode
+        self._selected_indices.clear()
+        self._refresh_workflow()
+
+    def _build_bulk_toolbar(self, parent):
+        self._bulk_toolbar = ctk.CTkFrame(parent, fg_color=T["surface"], corner_radius=6)
+        self._bulk_toolbar.pack(fill="x", pady=(0, 10))
+        
+        _label(self._bulk_toolbar, "Bulk Edit Mode", colour=T["accent"], weight="bold").pack(side="left", padx=12)
+        
+        _btn(self._bulk_toolbar, "Cancel", self._toggle_bulk_mode).pack(side="right", padx=12, pady=6)
+        _btn(self._bulk_toolbar, "🗑 Delete", self._bulk_delete, danger=True).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "⧉ Duplicate", self._bulk_duplicate).pack(side="right", padx=6, pady=6)
+
+    def _bulk_delete(self):
+        if not self._selected_indices: return
+        self._push_undo()
+        path = os.path.join(WORKSPACE_DIR, self.file_var.get())
+        data = load_json(path, {})
+        actions = data.get("actions", [])
+        
+        new_actions = [a for i, a in enumerate(actions) if i not in self._selected_indices]
+        data["actions"] = new_actions
+        save_json(path, data)
+        self._selected_indices.clear()
+        self._toggle_bulk_mode()  # exit bulk mode
+        self._refresh_stats()
+
+    def _bulk_duplicate(self):
+        if not self._selected_indices: return
+        self._push_undo()
+        path = os.path.join(WORKSPACE_DIR, self.file_var.get())
+        data = load_json(path, {})
+        actions = data.get("actions", [])
+        
+        new_actions = []
+        for i, a in enumerate(actions):
+            new_actions.append(a)
+            if i in self._selected_indices:
+                dupe = copy.deepcopy(a)
+                new_actions.append(dupe)
+                
+        data["actions"] = new_actions
+        save_json(path, data)
+        self._selected_indices.clear()
+        self._toggle_bulk_mode()  # exit bulk mode
+        self._refresh_stats()
 
     # ── PANEL: Scheduler ──────────────────────────────────────────────────────
 
