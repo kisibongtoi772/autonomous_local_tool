@@ -95,15 +95,33 @@ class Recorder:
         self.actions = []
         self.start_time = time.time()
         self.last_action_time = None
+        
+        self.mouse_listener = mouse.Listener(on_click=self.on_click)
+        self.keyboard_listener = keyboard.Listener(on_press=self.on_press)
+        
+        self.mouse_listener.start()
+        self.keyboard_listener.start()
+        
         logger.info("Started recording... Do your actions now!")
 
     def stop(self, save: bool = True):
         if not self.recording:
             return
         self.recording = False
+        
+        if self.mouse_listener:
+            self.mouse_listener.stop()
+            self.mouse_listener = None
+        if self.keyboard_listener:
+            self.keyboard_listener.stop()
+            self.keyboard_listener = None
+            
         logger.info("Stopped recording.")
         if save:
             self.save()
+
+    def get_recorded_actions(self) -> List[dict]:
+        return [a.model_dump(exclude_none=True) for a in self.actions]
 
     def save(self):
         workflow = Workflow(

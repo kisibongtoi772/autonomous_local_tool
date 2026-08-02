@@ -717,6 +717,8 @@ class AutomatorGUI(ctk.CTk):
         
         _btn(tb, "Add Action", self._open_add_dialog,  True).pack(side="left", padx=(8, 0), pady=8)
         
+        _btn(tb, "⏺ Record", self._open_recorder, True).pack(side="left", padx=(8, 0), pady=8)
+        
         self._paste_btn = _btn(tb, "📋 Paste", self._paste_action, False)
         self._paste_btn.pack(side="left", padx=(8, 0), pady=8)
         self._update_paste_btn()
@@ -1874,6 +1876,21 @@ class AutomatorGUI(ctk.CTk):
                 ).play_single_action(acts[idx]),
                 daemon=True
             ).start()
+
+    def _open_recorder(self):
+        if hasattr(self, "_recorder_hud") and self._recorder_hud.winfo_exists():
+            self._recorder_hud.focus()
+            return
+            
+        def on_stop(actions):
+            if actions:
+                # Append to current workflow
+                idx = len(self.data.get("actions", []))
+                self._modify_workflow("insert", index=idx, action=actions)
+            self._recorder_hud = None
+            
+        from .recorder_hud import RecorderHUD
+        self._recorder_hud = RecorderHUD(self, on_stop=on_stop)
 
     def _open_add_dialog(self, insert_idx: int = None, default_type: str = "sleep"):
         dlg = self._dialog("Add Action" if insert_idx is None else "Insert Action", "400x470")
