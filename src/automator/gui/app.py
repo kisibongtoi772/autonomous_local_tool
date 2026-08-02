@@ -2537,6 +2537,7 @@ class AutomatorGUI(ctk.CTk):
         )
 
         def run():
+            success = False
             try:
                 p = Player(
                     workflow_path=os.path.join(WORKSPACE_DIR, self.file_var.get()),
@@ -2549,12 +2550,12 @@ class AutomatorGUI(ctk.CTk):
                     breakpoint_callback=_on_breakpoint,
                 )
                 self._player = p
-                p.play(start_idx=start_idx)
+                success = p.play(start_idx=start_idx)
             except Exception as e:
                 logger.error(f"Playback error: {e}")
             finally:
                 self._player = None
-                self.after(0, self._on_done)
+                self.after(0, self._on_done, success)
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -2678,10 +2679,13 @@ class AutomatorGUI(ctk.CTk):
         # If dialog is closed by X, treat as stop
         dlg.protocol("WM_DELETE_WINDOW", lambda: choose("stop"))
 
-    def _on_progress_update(self, step: int, total: int, action_dict: dict):
-        self.after(0, self._update_progress_ui, step, total, action_dict)
+    def _on_progress_update(self, step: int, total: int, action_dict: dict, depth: int = 0):
+        self.after(0, self._update_progress_ui, step, total, action_dict, depth)
 
-    def _update_progress_ui(self, step: int, total: int, action_dict: dict):
+    def _update_progress_ui(self, step: int, total: int, action_dict: dict, depth: int):
+        if depth != len(self._nav_stack):
+            return
+
         pct = step / max(1, total)
         self.progress_bar.set(pct)
         atype = action_dict.get("type", "?")
@@ -2698,7 +2702,7 @@ class AutomatorGUI(ctk.CTk):
             if hasattr(self, "_current_highlight_idx") and self._current_highlight_idx is not None:
                 old_idx = self._current_highlight_idx
                 if 0 <= old_idx < len(self._action_rows):
-                    self._action_rows[old_idx].configure(fg_color=T["raised"])
+                    self._action_rows[old_idx].configure(fg_color="#064e3b") # Success Green
             
             self._action_rows[idx].configure(fg_color=T["accent"])
             self._current_highlight_idx = idx
@@ -2731,7 +2735,7 @@ class AutomatorGUI(ctk.CTk):
         else:
             self._set_status("Template not found on screen!", T["err"])
 
-    def _on_done(self):
+    def _on_done(self, success: bool = True):
         self._set_status("Idle", T["ok"])
         self.play_btn.configure(state="normal")
         self.stop_play_btn.configure(state="disabled", text_color=T["dim"])
@@ -2739,11 +2743,14 @@ class AutomatorGUI(ctk.CTk):
             self.progress_bar.set(0.0)
             self.progress_label.configure(text="Ready", text_color=T["dim"])
             
-        # Reset highlight
+        # Highlight final action status
         if hasattr(self, "_current_highlight_idx") and self._current_highlight_idx is not None:
             old_idx = self._current_highlight_idx
             if hasattr(self, "_action_rows") and 0 <= old_idx < len(self._action_rows):
-                self._action_rows[old_idx].configure(fg_color=T["raised"])
+                if success:
+                    self._action_rows[old_idx].configure(fg_color="#064e3b") # Green
+                else:
+                    self._action_rows[old_idx].configure(fg_color="#7f1d1d") # Red
             self._current_highlight_idx = None
             
         if hasattr(self, '_floating_status') and self._floating_status.winfo_exists():

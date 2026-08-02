@@ -173,7 +173,12 @@ class Player:
 
             if self.progress_callback is not None:
                 try:
-                    self.progress_callback(idx_1_based, total_steps, action.model_dump())
+                    import inspect
+                    sig = inspect.signature(self.progress_callback)
+                    if len(sig.parameters) >= 4:
+                        self.progress_callback(idx_1_based, total_steps, action.model_dump(), self._depth)
+                    else:
+                        self.progress_callback(idx_1_based, total_steps, action.model_dump())
                 except Exception:
                     pass
 
