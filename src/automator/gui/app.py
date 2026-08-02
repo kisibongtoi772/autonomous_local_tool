@@ -247,8 +247,49 @@ class AutomatorGUI(ctk.CTk):
 
         self._build()
         self._start_listeners()
+        self._bind_hotkeys()
+        
         self.scheduler.set_play_callback(self._run_scheduled)
         self.scheduler.start()
+
+    def _bind_hotkeys(self):
+        # Mac / Win standard shortcuts
+        self.bind("<Command-z>", self._safe_undo)
+        self.bind("<Control-z>", self._safe_undo)
+        
+        self.bind("<Command-Shift-Z>", self._safe_redo)
+        self.bind("<Control-Shift-Z>", self._safe_redo)
+        self.bind("<Command-y>", self._safe_redo)
+        self.bind("<Control-y>", self._safe_redo)
+        
+        self.bind("<Command-r>", self._safe_play)
+        self.bind("<Control-r>", self._safe_play)
+        
+        # Stop playback on Escape
+        self.bind("<Escape>", self._safe_stop)
+
+    def _is_typing(self) -> bool:
+        widget = self.focus_get()
+        # If user is in an Entry or Textbox, do not capture hotkey globally
+        return isinstance(widget, (ctk.CTkEntry, ctk.CTkTextbox))
+
+    def _safe_undo(self, event):
+        if self._is_typing(): return
+        self._undo()
+        
+    def _safe_redo(self, event):
+        if self._is_typing(): return
+        self._redo()
+        
+    def _safe_play(self, event):
+        if self._is_typing(): return
+        self.playback()
+        
+    def _safe_stop(self, event):
+        if self._bulk_mode:
+            self._toggle_bulk_mode()
+        else:
+            self._stop_playback()
 
     # ── Top-level layout ──────────────────────────────────────────────────────
 
