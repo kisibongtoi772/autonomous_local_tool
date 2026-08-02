@@ -106,6 +106,7 @@ def get_workflow_files():
 ACTION_TYPES = [
     "click", "type", "sleep", "hotkey", "scroll", "run_command", "screenshot", 
     "assert_template", "if_template", "wait_for_template", "clipboard",
+    "assert_color", "if_color",
     "run_workflow", "prompt_user", "app_focus", "notification", "comment", "group"
 ]
 
@@ -122,10 +123,12 @@ ACTION_LABELS = {
     "clipboard":        "Clipboard",
     "if_template":      "Conditional",
     "wait_for_template":"Wait For",
-    "run_workflow":      "Sub-Workflow",
-    "prompt_user":       "Prompt",
-    "app_focus":         "App Focus",
-    "notification":      "Notification",
+    "assert_color":     "Assert Color",
+    "if_color":         "If Color",
+    "run_workflow":     "Sub-Workflow",
+    "prompt_user":      "Prompt",
+    "app_focus":        "App Focus",
+    "notification":     "Notification",
     "comment":          "Comment",
     "group":            "Group",
 }
@@ -847,6 +850,9 @@ class AutomatorGUI(ctk.CTk):
         elif atype == "if_template":
             _ctrl_btn(ctrl, "📂 Then", lambda idx=i: [self._nav_stack.append((idx, "then_actions", f"If {idx+1} (Then)")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=1)
             _ctrl_btn(ctrl, "📂 Else", lambda idx=i: [self._nav_stack.append((idx, "else_actions", f"If {idx+1} (Else)")), self._refresh_workflow()], text_color=T["warn"]).pack(side="left", padx=1)
+        elif atype == "if_color":
+            _ctrl_btn(ctrl, "📂 Then", lambda idx=i: [self._nav_stack.append((idx, "then_actions", f"IfColor {idx+1} (Then)")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=1)
+            _ctrl_btn(ctrl, "📂 Else", lambda idx=i: [self._nav_stack.append((idx, "else_actions", f"IfColor {idx+1} (Else)")), self._refresh_workflow()], text_color=T["warn"]).pack(side="left", padx=1)
             
         tmpl_file = action.get("template") or action.get("template_image")
         if tmpl_file:
@@ -890,6 +896,7 @@ class AutomatorGUI(ctk.CTk):
         if atype == "notification":     return f"title={a.get('title','')}  msg={a.get('message','')[:30]}"
         if atype == "comment":          return a.get("text", "")
         if atype == "group":            return f"Group: {a.get('name', '')} ({len(a.get('actions',[]))} actions)"
+        if atype in ("assert_color", "if_color"): return f"({a.get('x')}, {a.get('y')}) == {a.get('color')} (±{a.get('tolerance')})"
         for k in ["template", "template_image"]:
             if k in a: return a[k]
         return ""
@@ -1045,10 +1052,13 @@ class AutomatorGUI(ctk.CTk):
         def open_coord_picker():
             from .coord_picker import CoordinatePicker
             dlg.withdraw()
-            def on_pick(x, y):
+            def on_pick(x, y, hex_col):
                 dlg.deiconify()
                 entry.delete(0, "end")
-                entry.insert(0, f"{x},{y}")
+                if atype.get() in ("assert_color", "if_color"):
+                    entry.insert(0, f"{x},{y},{hex_col}")
+                else:
+                    entry.insert(0, f"{x},{y}")
             def on_cancel():
                 dlg.deiconify()
             CoordinatePicker(self, on_pick, on_cancel)
@@ -1107,6 +1117,8 @@ class AutomatorGUI(ctk.CTk):
             "assert_template": "template filename in workspace/templates/",
             "clipboard": "action text  (e.g. set Hello World)",
             "if_template": "template filename  (add branches via Edit)",
+            "assert_color": "x,y,hex_color  (e.g. 500,300,#FF0000)",
+            "if_color": "x,y,hex_color  (add branches via Edit)",
             "click": "x,y  (e.g. 500,300)",
             "loop": "count  (e.g. 3)",
             "group": "group name",
@@ -1162,6 +1174,14 @@ class AutomatorGUI(ctk.CTk):
                 a["x"] = int(x); a["y"] = int(y)
             elif t == "loop": a["count"] = int(val or 1); a["actions"] = []
             elif t == "group": a["name"] = val or "New Group"; a["actions"] = []
+            elif t in ("assert_color", "if_color"):
+                parts = [v.strip() for v in val.split(",")]
+                a["x"] = int(parts[0]) if len(parts) > 0 else 0
+                a["y"] = int(parts[1]) if len(parts) > 1 else 0
+                a["color"] = parts[2] if len(parts) > 2 else "#000000"
+                a["tolerance"] = 10
+                if t == "if_color":
+                    a["then_actions"] = []; a["else_actions"] = []
             elif t == "if_template": a["template"] = val; a["then_actions"] = []; a["else_actions"] = []
             elif t == "wait_for_template":
                 parts = [v.strip() for v in val.split(",")]
@@ -1259,10 +1279,13 @@ class AutomatorGUI(ctk.CTk):
         def open_coord_picker():
             from .coord_picker import CoordinatePicker
             dlg.withdraw()
-            def on_pick(x, y):
+            def on_pick(x, y, hex_col):
                 dlg.deiconify()
                 entry.delete(0, "end")
-                entry.insert(0, f"{x},{y}")
+                if atype in ("assert_color", "if_color"):
+                    entry.insert(0, f"{x},{y},{hex_col}")
+                else:
+                    entry.insert(0, f"{x},{y}")
             def on_cancel():
                 dlg.deiconify()
             CoordinatePicker(self, on_pick, on_cancel)
@@ -1329,6 +1352,8 @@ class AutomatorGUI(ctk.CTk):
             "notification":     action.get("message", "") + (f"|{action.get('title')}" if action.get("title") != "Automator" else ""),
             "comment":          action.get("text", ""),
             "group":            action.get("name", ""),
+            "assert_color":     f"{action.get('x',0)},{action.get('y',0)},{action.get('color','#000000')}",
+            "if_color":         f"{action.get('x',0)},{action.get('y',0)},{action.get('color','#000000')}",
         }.get(atype, "")
         entry.insert(0, cur)
         
@@ -1394,6 +1419,14 @@ class AutomatorGUI(ctk.CTk):
                     upd["message"] = val
             elif atype == "comment":          upd["text"] = val
             elif atype == "group":            upd["name"] = val
+            elif atype in ("assert_color", "if_color"):
+                parts = [v.strip() for v in val.split(",")]
+                if len(parts) >= 3:
+                    upd["x"], upd["y"], upd["color"] = int(parts[0]), int(parts[1]), parts[2]
+                try:
+                    # In edit dialog, we could have a tolerance field, but here we just keep existing if any
+                    pass
+                except Exception: pass
             
             note_val = note_entry.get().strip()
             if note_val:

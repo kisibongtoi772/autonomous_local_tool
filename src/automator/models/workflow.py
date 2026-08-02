@@ -139,6 +139,26 @@ class GroupAction(BaseAction):
     actions: List['ActionType'] = Field(default_factory=list)
 
 
+class AssertColorAction(BaseAction):
+    """Assert that a pixel has a specific HEX color."""
+    type: Literal["assert_color"]
+    x: int
+    y: int
+    color: str = Field(description="HEX color string (e.g. #FF0000)")
+    tolerance: int = Field(default=10, ge=0, le=255, description="Allowed per-channel difference")
+
+
+class IfColorAction(BaseAction):
+    """Branch execution based on pixel color."""
+    type: Literal["if_color"]
+    x: int
+    y: int
+    color: str = Field(description="HEX color string (e.g. #FF0000)")
+    tolerance: int = Field(default=10, ge=0, le=255)
+    then_actions: List['ActionType'] = Field(default_factory=list)
+    else_actions: List['ActionType'] = Field(default_factory=list)
+
+
 ActionType = Annotated[
     Union[
         ClickAction, TypeAction, LoopAction, RunCommandAction,
@@ -146,6 +166,7 @@ ActionType = Annotated[
         AssertTemplateAction, ClipboardAction, IfTemplateAction,
         WaitForTemplateAction, RunWorkflowAction, PromptUserAction,
         AppFocusAction, NotificationAction, CommentAction, GroupAction,
+        AssertColorAction, IfColorAction,
     ],
     Field(discriminator='type')
 ]

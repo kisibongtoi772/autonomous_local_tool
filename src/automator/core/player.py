@@ -24,7 +24,8 @@ from ..models.workflow import (
     HotkeyAction, IfTemplateAction, LoopAction, RunCommandAction,
     RunWorkflowAction, ScreenshotAction, ScrollAction, SleepAction,
     TypeAction, WaitForTemplateAction, Workflow, PromptUserAction,
-    AppFocusAction, NotificationAction, CommentAction, GroupAction
+    AppFocusAction, NotificationAction, CommentAction, GroupAction,
+    AssertColorAction, IfColorAction
 )
 from ..utils.config import RUN_HISTORY_FILE, TEMPLATES_DIR, WORKFLOW_FILE, WORKSPACE_DIR, SNAPSHOTS_DIR
 from ..utils.logger import get_logger
@@ -397,6 +398,40 @@ class Player:
             self._play_actions(a.then_actions)
         else:
             logger.info(f"Conditional: '{a.template}' NOT FOUND → else ({len(a.else_actions)} actions)")
+            self._play_actions(a.else_actions)
+
+    def _hex_to_rgb(self, h: str):
+        h = h.lstrip('#')
+        if len(h) != 6: return (0,0,0)
+        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+    def _check_color(self, x, y, target_hex, tolerance):
+        try:
+            r, g, b = pyautogui.pixel(x, y)
+        except Exception as e:
+            # Fallback if pyautogui.pixel fails on some OS configurations
+            from PIL import ImageGrab
+            r, g, b = ImageGrab.grab(bbox=(x, y, x+1, y+1)).getpixel((0, 0))[:3]
+            
+        tr, tg, tb = self._hex_to_rgb(target_hex)
+        diff = max(abs(r - tr), abs(g - tg), abs(b - tb))
+        return diff <= tolerance, (r, g, b)
+
+    def _do_assert_color(self, a: AssertColorAction):
+        match, actual = self._check_color(a.x, a.y, a.color, a.tolerance)
+        if not match:
+            actual_hex = f"#{actual[0]:02X}{actual[1]:02X}{actual[2]:02X}"
+            raise RuntimeError(f"Color assertion failed at ({a.x},{a.y}): expected {a.color} ±{a.tolerance}, got {actual_hex}")
+        logger.info(f"Assert Color OK: ({a.x},{a.y}) matched {a.color}")
+
+    def _do_if_color(self, a: IfColorAction):
+        match, actual = self._check_color(a.x, a.y, a.color, a.tolerance)
+        if match:
+            logger.info(f"Conditional: Color {a.color} MATCHED at ({a.x},{a.y}) → then ({len(a.then_actions)} actions)")
+            self._play_actions(a.then_actions)
+        else:
+            actual_hex = f"#{actual[0]:02X}{actual[1]:02X}{actual[2]:02X}"
+            logger.info(f"Conditional: Color mismatch ({actual_hex} != {a.color}) → else ({len(a.else_actions)} actions)")
             self._play_actions(a.else_actions)
 
     # ── New action handlers ───────────────────────────────────────────────────

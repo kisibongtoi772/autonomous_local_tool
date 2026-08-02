@@ -55,6 +55,14 @@ class CoordinatePicker(ctk.CTkToplevel):
         if self.on_cancel:
             self.on_cancel()
 
+    def _get_hex_color(self, x, y):
+        try:
+            # Pillow image getpixel returns (r, g, b) or (r, g, b, a)
+            pixel = self.screenshot.getpixel((x, y))
+            return f"#{pixel[0]:02X}{pixel[1]:02X}{pixel[2]:02X}"
+        except Exception:
+            return "#000000"
+
     def on_mouse_move(self, event):
         x, y = event.x, event.y
         w = self.winfo_screenwidth()
@@ -72,15 +80,17 @@ class CoordinatePicker(ctk.CTkToplevel):
         if text_y > h - 80:
             text_y = y - 80
             
-        coord_str = f"X: {x}\nY: {y}"
+        hex_col = self._get_hex_color(x, y)
+        coord_str = f"X: {x}\nY: {y}\nC: {hex_col}"
         self.canvas.coords(self.shadow_text, text_x + 2, text_y + 2)
         self.canvas.itemconfig(self.shadow_text, text=coord_str)
         
         self.canvas.coords(self.coord_text, text_x, text_y)
-        self.canvas.itemconfig(self.coord_text, text=coord_str)
+        self.canvas.itemconfig(self.coord_text, text=coord_str, fill=hex_col if hex_col != "#000000" else "#FFFFFF")
 
     def on_click(self, event):
         x, y = event.x, event.y
+        hex_col = self._get_hex_color(x, y)
         self.destroy()
         if self.on_pick:
-            self.on_pick(x, y)
+            self.on_pick(x, y, hex_col)
