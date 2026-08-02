@@ -2952,6 +2952,10 @@ class AutomatorGUI(ctk.CTk):
             logger.info(f"Recording  →  {self.file_var.get()}")
             self._set_status("Recording", T["err"])
             
+            # Spawn FloatingRecorder HUD
+            from .floating_recorder import FloatingRecorder
+            self._floating_recorder = FloatingRecorder(self, self.recorder, on_stop=self.stop_recording)
+            
         from .countdown_overlay import CountdownOverlay
         self._countdown = CountdownOverlay(self, on_complete=_do_start)
 
@@ -2961,6 +2965,9 @@ class AutomatorGUI(ctk.CTk):
         
         if hasattr(self, '_countdown') and self._countdown.winfo_exists():
             self._countdown.destroy()
+            
+        if hasattr(self, '_floating_recorder') and self._floating_recorder.winfo_exists():
+            self._floating_recorder.destroy()
             
         if self.recorder:
             self.recorder.stop(save=False)
