@@ -1275,6 +1275,10 @@ class AutomatorGUI(ctk.CTk):
             _ctrl_btn(ctrl, "🎯 Loc", lambda x=action["x"], y=action["y"]: ClickRipple(self, x, y)).pack(side="left", padx=1)
 
         _ctrl_btn(ctrl, "Edit", lambda idx=i, a=action: self._open_edit_dialog(idx, a)).pack(side="left", padx=1)
+        _ctrl_btn(ctrl, "⧉ Clone", lambda idx=i: self._duplicate_action(idx)).pack(side="left", padx=1)
+        
+        if not self._nav_stack:
+            _ctrl_btn(ctrl, "▶ Run", lambda idx=i: self.playback(start_idx=idx), text_color=T["accent"]).pack(side="left", padx=1)
         
         if i > 0:
             _ctrl_btn(ctrl, "▲", lambda idx=i: self._move_action_up(idx)).pack(side="left", padx=1)
