@@ -1026,15 +1026,39 @@ class AutomatorGUI(ctk.CTk):
             def on_cancel():
                 dlg.deiconify()
             HotkeyPicker(self, on_capture, on_cancel)
+            
+        def open_template_picker():
+            from .template_picker import TemplatePicker
+            dlg.withdraw()
+            def on_pick(filename):
+                dlg.deiconify()
+                entry.delete(0, "end")
+                entry.insert(0, filename)
+            def on_cancel():
+                dlg.deiconify()
+            TemplatePicker(self, on_pick, on_cancel)
+            
+        def open_variable_picker():
+            from .variable_picker import VariablePicker
+            def on_pick(var_str):
+                # Insert at cursor position
+                entry.insert("insert", var_str)
+            VariablePicker(self, self.var_manager, on_pick)
 
-        capture_btn = _btn(val_frame, "✂", open_snipping, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
-        capture_btn.pack(side="right", padx=(8, 0))
+        capture_btn = _btn(val_frame, "✂", open_snipping, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        capture_btn.pack(side="right", padx=(4, 0))
         
-        coord_btn = _btn(val_frame, "🎯", open_coord_picker, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
-        coord_btn.pack(side="right", padx=(8, 0))
+        tpl_btn = _btn(val_frame, "🖼", open_template_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        tpl_btn.pack(side="right", padx=(4, 0))
+        
+        coord_btn = _btn(val_frame, "🎯", open_coord_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        coord_btn.pack(side="right", padx=(4, 0))
 
-        hotkey_btn = _btn(val_frame, "⌨️", open_hotkey_picker, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
-        hotkey_btn.pack(side="right", padx=(8, 0))
+        hotkey_btn = _btn(val_frame, "⌨️", open_hotkey_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        hotkey_btn.pack(side="right", padx=(4, 0))
+        
+        var_btn = _btn(val_frame, "{x}", open_variable_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        var_btn.pack(side="right", padx=(8, 0))
 
         HINTS = {
             "sleep": "seconds  (e.g. 1.5)",
@@ -1210,15 +1234,39 @@ class AutomatorGUI(ctk.CTk):
             def on_cancel():
                 dlg.deiconify()
             HotkeyPicker(self, on_capture, on_cancel)
+            
+        def open_template_picker():
+            from .template_picker import TemplatePicker
+            dlg.withdraw()
+            def on_pick(filename):
+                dlg.deiconify()
+                entry.delete(0, "end")
+                entry.insert(0, filename)
+            def on_cancel():
+                dlg.deiconify()
+            TemplatePicker(self, on_pick, on_cancel)
+            
+        def open_variable_picker():
+            from .variable_picker import VariablePicker
+            def on_pick(var_str):
+                # Insert at cursor position
+                entry.insert("insert", var_str)
+            VariablePicker(self, self.var_manager, on_pick)
 
-        capture_btn = _btn(val_frame, "✂", open_snipping, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
-        capture_btn.pack(side="right", padx=(8, 0))
+        capture_btn = _btn(val_frame, "✂", open_snipping, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        capture_btn.pack(side="right", padx=(4, 0))
         
-        coord_btn = _btn(val_frame, "🎯", open_coord_picker, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
-        coord_btn.pack(side="right", padx=(8, 0))
+        tpl_btn = _btn(val_frame, "🖼", open_template_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        tpl_btn.pack(side="right", padx=(4, 0))
+        
+        coord_btn = _btn(val_frame, "🎯", open_coord_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        coord_btn.pack(side="right", padx=(4, 0))
 
-        hotkey_btn = _btn(val_frame, "⌨️", open_hotkey_picker, width=32, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
-        hotkey_btn.pack(side="right", padx=(8, 0))
+        hotkey_btn = _btn(val_frame, "⌨️", open_hotkey_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        hotkey_btn.pack(side="right", padx=(4, 0))
+        
+        var_btn = _btn(val_frame, "{x}", open_variable_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        var_btn.pack(side="right", padx=(8, 0))
 
         cur = {
             "sleep":            str(action.get("duration", 1.0)),
