@@ -1289,6 +1289,13 @@ class AutomatorGUI(ctk.CTk):
             color_menu.add_separator()
             color_menu.add_command(label="Reset Color", command=lambda: self._set_color_tag(i, None))
             menu.add_cascade(label="🎨  Color Tag", menu=color_menu)
+            
+            # Template Cropper
+            tmpl = action.get("template") or action.get("template_image")
+            if tmpl:
+                menu.add_separator()
+                menu.add_command(label="✂️  Crop Template", command=lambda: self._crop_template(tmpl))
+                
             if atype == "group":
                 menu.add_command(label="💥  Ungroup", command=lambda: self._ungroup_action(i))
             menu.add_command(label="➕  Insert Below", command=lambda: self._open_add_dialog(insert_idx=i + 1))
@@ -1662,6 +1669,22 @@ class AutomatorGUI(ctk.CTk):
             if idx < len(lst) - 1:
                 lst[idx], lst[idx+1] = lst[idx+1], lst[idx]
         self._modify_workflow(m)
+
+    def _crop_template(self, image_path: str):
+        if not image_path: return
+        
+        # Resolve absolute path if necessary
+        from ..utils.config import TEMPLATES_DIR
+        import os
+        if not os.path.isabs(image_path):
+            image_path = os.path.join(TEMPLATES_DIR, image_path)
+            
+        if not os.path.exists(image_path):
+            self._set_status("Template image not found", T["err"])
+            return
+            
+        from .template_cropper import TemplateCropper
+        TemplateCropper(self, image_path, on_save=self._refresh_workflow)
 
     def _clear_workflow(self):
         self._modify_workflow(lambda lst: lst.clear())
@@ -3307,8 +3330,8 @@ class AutomatorGUI(ctk.CTk):
                     self.resume_btn.pack_forget()
                 else:
                     self._action_rows[old_idx].configure(fg_color="#7f1d1d") # Red
-                    if error_msg:
-                        _label(self._action_rows[old_idx], f"❌ {error_msg}", colour="#FCA5A5", weight="bold").grid(row=1, column=0, columnspan=4, sticky="w", padx=10, pady=(0, 6))
+                    if error:
+                        _label(self._action_rows[old_idx], f"❌ {error}", colour="#FCA5A5", weight="bold").grid(row=1, column=0, columnspan=4, sticky="w", padx=10, pady=(0, 6))
                     
                     self._last_failed_idx = old_idx
                     self.resume_btn.configure(text=f"▶ Resume (Step {old_idx + 1})")
