@@ -28,7 +28,7 @@ from ..core.scheduler import WorkflowScheduler
 from ..core.variable_manager import VariableManager
 from ..utils.logger import get_logger
 from ..utils.config import (
-    WORKSPACE_DIR, VARIABLES_FILE, RUN_HISTORY_FILE, SCHEDULES_FILE, TEMPLATES_DIR
+    WORKSPACE_DIR, VARIABLES_FILE, RUN_HISTORY_FILE, SCHEDULES_FILE, TEMPLATES_DIR, SNAPSHOTS_DIR
 )
 
 # macOS: pre-load HIServices on main thread to prevent pynput crash on bg threads
@@ -1552,8 +1552,42 @@ class AutomatorGUI(ctk.CTk):
                 row=0, column=4, padx=8, pady=8)
 
             if entry.get("error"):
-                _label(row, entry["error"], size=10, colour=T["err"], anchor="w").grid(
-                    row=1, column=0, columnspan=5, padx=12, pady=(0, 6), sticky="ew")
+                err_frame = ctk.CTkFrame(row, fg_color="transparent")
+                err_frame.grid(row=1, column=0, columnspan=5, padx=12, pady=(0, 6), sticky="ew")
+                
+                _label(err_frame, entry["error"], size=10, colour=T["err"], anchor="w").pack(side="left")
+                
+                snap = entry.get("snapshot")
+                if snap and os.path.exists(os.path.join(SNAPSHOTS_DIR, snap)):
+                    _btn(err_frame, "👁 View", lambda s=snap: self._show_snapshot_dialog(s), 
+                         width=60, height=20, fg_color=T["bg"], text_color=T["text"],
+                         border_width=1, border_color=T["border"]).pack(side="right")
+
+    def _show_snapshot_dialog(self, filename: str):
+        path = os.path.join(SNAPSHOTS_DIR, filename)
+        if not os.path.exists(path):
+            return
+            
+        dlg = self._dialog(f"Failure Snapshot - {filename}", "800x600")
+        
+        try:
+            img = Image.open(path)
+            
+            # Calculate scaled size preserving aspect ratio
+            w, h = img.size
+            ratio = min(760 / w, 520 / h)
+            new_w, new_h = int(w * ratio), int(h * ratio)
+            
+            ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=(new_w, new_h))
+            
+            lbl = ctk.CTkLabel(dlg, text="", image=ctk_img)
+            lbl.pack(padx=20, pady=20, expand=True)
+            
+        except Exception as e:
+            logger.error(f"Cannot load snapshot {filename}: {e}")
+            _label(dlg, f"Error loading image: {e}", colour=T["err"]).pack(pady=20)
+            
+        _btn(dlg, "Close", dlg.destroy, width=100).pack(pady=(0, 20))
 
     def _clear_history(self):
         save_json(RUN_HISTORY_FILE, [])

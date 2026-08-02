@@ -24,9 +24,9 @@ from ..models.workflow import (
     HotkeyAction, IfTemplateAction, LoopAction, RunCommandAction,
     RunWorkflowAction, ScreenshotAction, ScrollAction, SleepAction,
     TypeAction, WaitForTemplateAction, Workflow, PromptUserAction,
-    AppFocusAction, NotificationAction
+    AppFocusAction, NotificationAction, CommentAction
 )
-from ..utils.config import RUN_HISTORY_FILE, TEMPLATES_DIR, WORKFLOW_FILE, WORKSPACE_DIR
+from ..utils.config import RUN_HISTORY_FILE, TEMPLATES_DIR, WORKFLOW_FILE, WORKSPACE_DIR, SNAPSHOTS_DIR
 from ..utils.logger import get_logger
 from .variable_manager import VariableManager
 from .vision import locate_template
@@ -66,9 +66,12 @@ class Player:
         self.prompt_callback = prompt_callback
         self.ripple_callback = ripple_callback
         self._depth = _depth
+        self.ripple_callback = ripple_callback
+        self._depth = _depth
         self.var_manager = VariableManager()
         self._stop_requested = False
         self._paused = False
+        self._last_snapshot = ""
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -100,7 +103,7 @@ class Player:
             self.workflow = Workflow.model_validate(data)
         except (ValidationError, Exception) as e:
             logger.error(f"Cannot load workflow: {e}")
-            self._log_run(False, 0, 0, str(e))
+            self._log_run(False, 0, 0, str(e), snapshot="")
             return False
 
         try:
@@ -120,8 +123,9 @@ class Player:
             logger.error(f"Playback error: {e}")
 
         duration = round(time.time() - start, 2)
+        duration = round(time.time() - start, 2)
         if self._depth == 0:  # Only log for top-level workflows
-            self._log_run(success, action_count, duration)
+            self._log_run(success, action_count, duration, snapshot=self._last_snapshot)
         return success
 
     def play_single_action(self, action_dict: dict):
@@ -206,7 +210,16 @@ class Player:
                     if not self._chunked_sleep(delay):
                         return
                 else:
-                    # Final attempt failed
+                    # Final attempt failed - capture failure snapshot
+                    try:
+                        timestamp = time.strftime("%Y%m%d_%H%M%S")
+                        snap_name = f"fail_{timestamp}.png"
+                        snap_path = os.path.join(SNAPSHOTS_DIR, snap_name)
+                        pyautogui.screenshot(snap_path)
+                        self._last_snapshot = snap_name
+                        logger.info(f"Failure snapshot saved to {snap_name}")
+                    except Exception as snap_e:
+                        logger.error(f"Failed to capture snapshot: {snap_e}")
                     raise
 
     def _dispatch(self, action: ActionType):
@@ -436,7 +449,7 @@ class Player:
 
     # ── Run History ───────────────────────────────────────────────────────────
 
-    def _log_run(self, success: bool, action_count: int, duration: float, error: str = ""):
+    def _log_run(self, success: bool, action_count: int, duration: float, error: str = "", snapshot: str = ""):
         entry = {
             "workflow":     os.path.basename(self.workflow_path),
             "timestamp":    time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -445,6 +458,7 @@ class Player:
             "duration_sec": duration,
             "speed":        self.speed,
             "error":        error,
+            "snapshot":     snapshot,
         }
         history: list = []
         if os.path.exists(RUN_HISTORY_FILE):
