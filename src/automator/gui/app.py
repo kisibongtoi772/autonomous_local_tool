@@ -240,6 +240,9 @@ class AutomatorGUI(ctk.CTk):
         # Format: [(index, key, label), ...] e.g. [(3, "actions", "Loop")]
         self._nav_stack: list[tuple[int, str, str]] = []
 
+        # Action Clipboard
+        self._action_clipboard = []
+
         os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
         self._build()
@@ -604,6 +607,11 @@ class AutomatorGUI(ctk.CTk):
         self._redo_btn.pack(side="left", padx=(8, 0), pady=8)
         
         _btn(tb, "Add Action", self._open_add_dialog,  True).pack(side="left", padx=(8, 0), pady=8)
+        
+        self._paste_btn = _btn(tb, "📋 Paste", self._paste_action, False)
+        self._paste_btn.pack(side="left", padx=(8, 0), pady=8)
+        self._update_paste_btn()
+        
         _btn(tb, "Bulk Edit",  self._toggle_bulk_mode, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
@@ -880,6 +888,7 @@ class AutomatorGUI(ctk.CTk):
         if i < total - 1:
             _ctrl_btn(ctrl, "Dn",  lambda idx=i: self._move_down(idx)).pack(side="left", padx=1)
         _ctrl_btn(ctrl, "Edit", lambda idx=i, a=action: self._open_edit_dialog(idx, a)).pack(side="left", padx=1)
+        _ctrl_btn(ctrl, "Copy", lambda a=action: self._copy_action(a)).pack(side="left", padx=1)
         _ctrl_btn(ctrl, "Dupe", lambda idx=i: self._duplicate_action(idx)).pack(side="left", padx=1)
         _ctrl_btn(ctrl, "Ins",  lambda idx=i: self._open_add_dialog(insert_idx=idx + 1)).pack(side="left", padx=1)
 
@@ -987,6 +996,28 @@ class AutomatorGUI(ctk.CTk):
         self._update_undo_redo_buttons()
         logger.info("Redo successful.")
         self._refresh_stats()
+
+    def _update_paste_btn(self):
+        if not hasattr(self, "_paste_btn"): return
+        if self._action_clipboard:
+            self._paste_btn.configure(state="normal", text_color=T["text"])
+        else:
+            self._paste_btn.configure(state="disabled", text_color=T["dim"])
+
+    def _copy_action(self, action: dict):
+        self._action_clipboard = [copy.deepcopy(action)]
+        self._update_paste_btn()
+        if hasattr(self, "_floating_status") and self._floating_status.winfo_exists():
+            self._floating_status.update_status(f"Copied 1 action")
+        
+    def _paste_action(self):
+        if not self._action_clipboard: return
+        def mutator(lst):
+            for a in self._action_clipboard:
+                lst.append(copy.deepcopy(a))
+        self._modify_workflow(mutator)
+        if hasattr(self, "_floating_status") and self._floating_status.winfo_exists():
+            self._floating_status.update_status(f"Pasted {len(self._action_clipboard)} action(s)")
 
     def _delete_action(self, idx: int):
         self._modify_workflow(lambda lst: lst.pop(idx))
@@ -1504,7 +1535,34 @@ class AutomatorGUI(ctk.CTk):
         _btn(self._bulk_toolbar, "🗑 Delete", self._bulk_delete, danger=True).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "✂️ Extract", self._bulk_extract).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "📦 Group", self._bulk_group).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "📋 Copy", self._bulk_copy).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "⧉ Duplicate", self._bulk_duplicate).pack(side="right", padx=6, pady=6)
+
+    def _bulk_copy(self):
+        if not self._selected_indices: return
+        path = os.path.join(WORKSPACE_DIR, self.file_var.get())
+        data = load_json(path, {})
+        actions = data.get("actions", [])
+        
+        target_container = {"actions": actions}
+        key = "actions"
+        for idx, sub_key, _ in self._nav_stack:
+            if idx < len(target_container[key]):
+                target_container = target_container[key][idx]
+                key = sub_key
+                if key not in target_container:
+                    target_container[key] = []
+        
+        local_actions = target_container[key]
+        sorted_indices = sorted(list(self._selected_indices))
+        
+        self._action_clipboard = [copy.deepcopy(local_actions[i]) for i in sorted_indices]
+        self._update_paste_btn()
+        self._selected_indices.clear()
+        self._toggle_bulk_mode()
+        
+        if hasattr(self, "_floating_status") and self._floating_status.winfo_exists():
+            self._floating_status.update_status(f"Copied {len(self._action_clipboard)} action(s)")
 
     def _bulk_delete(self):
         if not self._selected_indices: return
