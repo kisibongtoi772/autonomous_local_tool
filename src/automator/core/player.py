@@ -79,8 +79,9 @@ class Player:
         self.var_manager = VariableManager()
         self._stop_requested = False
         self._paused = False
+        self.last_error = ""
         self._last_snapshot = ""
-        self.last_error = None
+        self.profiler_data = []
 
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -209,8 +210,18 @@ class Player:
                 if not self._chunked_sleep(scaled_offset):
                     return
 
-            # ── Execute with optional retry ──────────────────────────────────
-            self._execute_with_retry(action)
+            # ── Execute with optional retry & Profile ────────────────────────
+            start_t = time.time()
+            try:
+                self._execute_with_retry(action)
+            finally:
+                dur = time.time() - start_t
+                self.profiler_data.append({
+                    "step": idx_1_based,
+                    "type": action.type,
+                    "label": getattr(action, "label", None),
+                    "duration": round(dur, 3)
+                })
 
     def _execute_with_retry(self, action: ActionType):
         max_attempts = 1 + max(0, action.retry_count)
@@ -563,6 +574,19 @@ class Player:
     # ── Run History ───────────────────────────────────────────────────────────
 
     def _log_run(self, success: bool, action_count: int, duration: float, error: str = "", snapshot: str = ""):
+        timestamp = time.strftime("%Y%m%d_%H%M%S")
+        profiler_file = f"profiler_{timestamp}.json"
+        
+        if self.profiler_data:
+            try:
+                prof_path = os.path.join(WORKSPACE_DIR, ".history", profiler_file)
+                os.makedirs(os.path.dirname(prof_path), exist_ok=True)
+                with open(prof_path, "w", encoding="utf-8") as f:
+                    json.dump(self.profiler_data, f, indent=2, ensure_ascii=False)
+            except Exception as e:
+                logger.error(f"Failed to write profiler file: {e}")
+                profiler_file = ""
+                
         entry = {
             "workflow":     os.path.basename(self.workflow_path),
             "timestamp":    time.strftime("%Y-%m-%d %H:%M:%S"),
@@ -572,6 +596,7 @@ class Player:
             "speed":        self.speed,
             "error":        error,
             "snapshot":     snapshot,
+            "profiler":     profiler_file,
         }
         history: list = []
         if os.path.exists(RUN_HISTORY_FILE):

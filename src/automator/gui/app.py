@@ -3044,6 +3044,71 @@ class AutomatorGUI(ctk.CTk):
                     _btn(err_frame, "👁 View", lambda s=snap: self._show_snapshot_dialog(s), 
                          width=60, height=20, fg_color=T["bg"], text_color=T["text"],
                          border_width=1, border_color=T["border"]).pack(side="right")
+            
+            # --- Profiler Button ---
+            prof = entry.get("profiler")
+            if prof:
+                btn_frame = err_frame if entry.get("error") else ctk.CTkFrame(row, fg_color="transparent")
+                if not entry.get("error"):
+                    btn_frame.grid(row=1, column=0, columnspan=5, padx=12, pady=(0, 6), sticky="ew")
+                _btn(btn_frame, "📊 Profiler", lambda p=prof: self._open_profiler(p),
+                     width=70, height=20, fg_color=T["raised"], text_color=T["accent"],
+                     border_width=1, border_color=T["accent"]).pack(side="right", padx=(0, 6))
+
+    def _open_profiler(self, profiler_file: str):
+        path = os.path.join(WORKSPACE_DIR, ".history", profiler_file)
+        if not os.path.exists(path):
+            self._set_status(f"Profiler file not found", T["err"])
+            return
+            
+        data = load_json(path, [])
+        if not data:
+            self._set_status(f"Profiler data empty", T["err"])
+            return
+            
+        dlg = self._dialog("Action Profiler", "550x650")
+        
+        # Header
+        hdr = ctk.CTkFrame(dlg, fg_color="transparent")
+        hdr.pack(fill="x", padx=20, pady=(20, 10))
+        ctk.CTkLabel(hdr, text="Performance Analytics", font=ctk.CTkFont(size=18, weight="bold"), text_color=T["text"]).pack(side="left")
+        
+        # Sort by duration descending
+        data.sort(key=lambda x: x.get("duration", 0), reverse=True)
+        max_dur = data[0].get("duration", 0.001) if data else 0.001
+        total_dur = sum(x.get("duration", 0) for x in data)
+        
+        ctk.CTkLabel(hdr, text=f"Total: {total_dur:.2f}s", font=ctk.CTkFont(size=12), text_color=T["dim"]).pack(side="right")
+        
+        # Scrollable list
+        scroll = ctk.CTkScrollableFrame(dlg, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        
+        for item in data:
+            dur = item.get("duration", 0)
+            step = item.get("step", "?")
+            atype = item.get("type", "unknown")
+            label = item.get("label")
+            disp_type = f"{atype}: {label}" if label else atype
+            
+            row = ctk.CTkFrame(scroll, fg_color=T["raised"], corner_radius=6)
+            row.pack(fill="x", pady=2)
+            row.grid_columnconfigure(0, weight=1)
+            
+            # Top row text
+            txt_frame = ctk.CTkFrame(row, fg_color="transparent")
+            txt_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=(8, 4))
+            
+            ctk.CTkLabel(txt_frame, text=f"#{step} {disp_type}", font=ctk.CTkFont(*FONT_BODY, weight="bold"), text_color=T["text"]).pack(side="left")
+            ctk.CTkLabel(txt_frame, text=f"{dur:.3f}s", font=ctk.CTkFont(*FONT_MONO), text_color=T["accent"]).pack(side="right")
+            
+            # Bottom row progress bar (heatmap)
+            pct = dur / max(0.001, max_dur)
+            color = T["err"] if dur > 5 else (T["warn"] if dur > 1 else T["ok"])
+            
+            pb = ctk.CTkProgressBar(row, height=6, fg_color=T["bg"], progress_color=color)
+            pb.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
+            pb.set(pct)
 
     def _show_snapshot_dialog(self, filename: str):
         path = os.path.join(SNAPSHOTS_DIR, filename)
