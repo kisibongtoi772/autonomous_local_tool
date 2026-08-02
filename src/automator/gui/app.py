@@ -246,6 +246,9 @@ class AutomatorGUI(ctk.CTk):
         
         # Click-to-Move Mode
         self._move_source_idx = None
+        
+        # Smart Resume
+        self._last_failed_idx = None
 
         os.makedirs(WORKSPACE_DIR, exist_ok=True)
 
@@ -517,6 +520,14 @@ class AutomatorGUI(ctk.CTk):
             corner_radius=6, command=self.playback
         )
         self.play_btn.pack(side="left", padx=(0, 8))
+        
+        self.resume_btn = ctk.CTkButton(
+            btn_row, text="▶ Resume", height=36, width=110,
+            fg_color=T["warn"], hover_color="#C06000",
+            text_color="#FFFFFF", font=ctk.CTkFont(*FONT_BOLD),
+            corner_radius=6, command=self._resume_playback
+        )
+        # resume_btn is hidden by default
 
         self.stop_play_btn = ctk.CTkButton(
             btn_row, text="Stop Playback", height=36, width=120,
@@ -898,7 +909,11 @@ class AutomatorGUI(ctk.CTk):
 
     def _render_action_row(self, i: int, action: dict, total: int):
         atype   = action.get("type", "unknown")
-        label   = ACTION_LABELS.get(atype, atype.upper())
+        
+        # Custom label parsing
+        custom_label = action.get("label")
+        display_type = f"{ACTION_LABELS.get(atype, atype.upper())}: {custom_label}" if custom_label else ACTION_LABELS.get(atype, atype.upper())
+        
         summary = self._action_summary(atype, action)
         enabled = action.get("enabled", True)
         
@@ -982,10 +997,11 @@ class AutomatorGUI(ctk.CTk):
                 }
                 badge_bg = tag_colors.get(color_tag, badge_bg)
                 
-            badge = ctk.CTkFrame(row, fg_color=badge_bg, corner_radius=4, width=80)
+            badge = ctk.CTkFrame(row, fg_color=badge_bg, corner_radius=4)
             badge.grid(row=0, column=1, padx=8, pady=8)
             badge_color = T["text"] if enabled else T["dim"]
-            _label(badge, label, size=10, colour=badge_color).pack(padx=8, pady=3)
+            type_label = _label(badge, display_type, size=10, colour=badge_color, weight="bold")
+            type_label.pack(padx=8, pady=3)
 
             # Summary & Note & Warnings
             summary_frame = ctk.CTkFrame(row, fg_color="transparent")
@@ -1099,7 +1115,7 @@ class AutomatorGUI(ctk.CTk):
                 ).pack(side="left", padx=2)
             
             # Disable right-click in move mode
-            for widget in (row, type_label, summary_label):
+            for widget in (row, type_label, summary_frame):
                 widget.bind("<Button-2>", lambda e: "break")
                 widget.bind("<Button-3>", lambda e: "break")
             return
@@ -1158,6 +1174,7 @@ class AutomatorGUI(ctk.CTk):
             menu.add_separator()
             menu.add_command(label="📋  Copy Action", command=lambda: self._copy_action(action))
             menu.add_command(label="📑  Duplicate", command=lambda: self._duplicate_action(i))
+            menu.add_command(label="🏷  Rename / Label", command=lambda: self._rename_action(i))
             if atype == "group":
                 menu.add_command(label="💥  Ungroup", command=lambda: self._ungroup_action(i))
             menu.add_command(label="➕  Insert Below", command=lambda: self._open_add_dialog(insert_idx=i + 1))
@@ -1177,7 +1194,7 @@ class AutomatorGUI(ctk.CTk):
             show_action_menu(e)
             
         # Bind to macOS right click (<Button-2> or <Button-3>)
-        for widget in (row, type_label, summary_label):
+        for widget in (row, type_label, summary_frame):
             widget.bind("<Button-2>", right_click_handler)
             widget.bind("<Button-3>", right_click_handler)
 
@@ -2637,8 +2654,15 @@ class AutomatorGUI(ctk.CTk):
         self.file_dropdown.configure(values=get_workflow_files())
         self._refresh_stats()
 
+    def _resume_playback(self):
+        if self._last_failed_idx is not None:
+            self.playback(start_idx=self._last_failed_idx)
+
     def playback(self, start_idx: int = 0, end_idx: int = None):
         if self.recording: return
+        self.resume_btn.pack_forget()
+        self._last_failed_idx = None
+        
         speed = round(self._speed_var.get(), 2)
         step  = self._step_mode.get()
         logger.info(f"Playback  →  {self.file_var.get()}  start={start_idx+1}  speed={speed}x  step={step}")
@@ -2911,11 +2935,22 @@ class AutomatorGUI(ctk.CTk):
             if hasattr(self, "_action_rows") and 0 <= old_idx < len(self._action_rows):
                 if success:
                     self._action_rows[old_idx].configure(fg_color="#064e3b") # Green
+                    self._last_failed_idx = None
+                    self.resume_btn.pack_forget()
                 else:
                     self._action_rows[old_idx].configure(fg_color="#7f1d1d") # Red
                     if error_msg:
                         _label(self._action_rows[old_idx], f"❌ {error_msg}", colour="#FCA5A5", weight="bold").grid(row=1, column=0, columnspan=4, sticky="w", padx=10, pady=(0, 6))
+                    
+                    self._last_failed_idx = old_idx
+                    self.resume_btn.configure(text=f"▶ Resume (Step {old_idx + 1})")
+                    self.resume_btn.pack(side="left", padx=(0, 8), before=self.stop_play_btn)
+                    
             self._current_highlight_idx = None
+        else:
+            if not success:
+                self._last_failed_idx = None
+                self.resume_btn.pack_forget()
             
         if hasattr(self, '_floating_status') and self._floating_status.winfo_exists():
             self._floating_status.destroy()
