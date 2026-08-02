@@ -276,6 +276,9 @@ class AutomatorGUI(ctk.CTk):
         self.bind("<Command-r>", self._safe_play)
         self.bind("<Control-r>", self._safe_play)
         
+        self.bind("<Command-k>", self._safe_open_command_palette)
+        self.bind("<Control-k>", self._safe_open_command_palette)
+        
         # Stop playback on Escape
         self.bind("<Escape>", self._safe_stop)
 
@@ -301,6 +304,29 @@ class AutomatorGUI(ctk.CTk):
             self._toggle_bulk_mode()
         else:
             self._stop_playback()
+
+    def _safe_open_command_palette(self, event):
+        if self._is_typing(): return
+        self._open_command_palette()
+
+    def _open_command_palette(self):
+        from .command_palette import CommandPalette
+        CommandPalette(self, self._on_quick_action_add)
+
+    def _on_quick_action_add(self, action: dict):
+        def _mutator(data):
+            acts = data.get("actions", [])
+            for _idx, sub_key, _ in self._nav_stack:
+                if sub_key not in acts[_idx]:
+                    acts[_idx][sub_key] = []
+                acts = acts[_idx][sub_key]
+            acts.append(action)
+        self._modify_workflow(_mutator)
+        
+        self._set_status(f"Quick added: {action['type'].upper()}", T["ok"])
+        
+        # Scroll to bottom
+        self.after(100, lambda: self._wf_list._parent_canvas.yview_moveto(1.0))
 
     # ── Top-level layout ──────────────────────────────────────────────────────
 
