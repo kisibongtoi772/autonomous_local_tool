@@ -658,6 +658,8 @@ class AutomatorGUI(ctk.CTk):
         _btn(tb, "Import 📥",  self._import_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
+        
+        _btn(tb, "Find/Replace 🔍", self._open_find_replace, False).pack(side="right", padx=(0, 8), pady=8)
 
         self._wf_search_var = ctk.StringVar()
         self._wf_search_var.trace_add("write", lambda *_: self._refresh_workflow())
@@ -1204,6 +1206,46 @@ class AutomatorGUI(ctk.CTk):
     def _clear_workflow(self):
         self._modify_workflow(lambda lst: lst.clear())
         logger.info("Workflow cleared.")
+
+    def _open_find_replace(self):
+        dlg = self._dialog("Find & Replace", "400x250")
+        
+        _label(dlg, "Find (Text, File, Variable)", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
+        find_entry = ctk.CTkEntry(dlg, width=360, fg_color=T["raised"], border_color=T["border"], text_color=T["text"])
+        find_entry.pack(padx=20)
+        
+        _label(dlg, "Replace with", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
+        repl_entry = ctk.CTkEntry(dlg, width=360, fg_color=T["raised"], border_color=T["border"], text_color=T["text"])
+        repl_entry.pack(padx=20)
+        
+        def on_replace():
+            f = find_entry.get()
+            r = repl_entry.get()
+            if not f: return
+            
+            count = 0
+            def mutator(lst):
+                nonlocal count
+                def traverse(node):
+                    nonlocal count
+                    if isinstance(node, dict):
+                        for k, v in node.items():
+                            if isinstance(v, str) and f in v:
+                                node[k] = v.replace(f, r)
+                                count += 1
+                            elif isinstance(v, (dict, list)):
+                                traverse(v)
+                    elif isinstance(node, list):
+                        for item in node:
+                            traverse(item)
+                traverse(lst)
+            
+            self._modify_workflow(mutator)
+            import tkinter.messagebox as tkmb
+            tkmb.showinfo("Replace All", f"Replaced {count} occurrences of '{f}'.")
+            dlg.destroy()
+            
+        _btn(dlg, "Replace All", on_replace, primary=True).pack(pady=24)
 
     def _test_action(self, idx: int):
         data = load_json(os.path.join(WORKSPACE_DIR, self.file_var.get()), {})
