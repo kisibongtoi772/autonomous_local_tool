@@ -3108,16 +3108,26 @@ class AutomatorGUI(ctk.CTk):
         loc = locate_template(tmpl, confidence=conf)
         
         if loc:
-            x, y = loc
+            x, y, w, h = loc
+            
+            # Show glowing bounding box overlay
+            from .bounding_box_overlay import BoundingBoxOverlay
+            BoundingBoxOverlay(self, x, y, w, h)
+            
             if action.get("type") == "click":
-                x += action.get("offset_x", 0)
-                y += action.get("offset_y", 0)
-            
-            # Show ripple
-            from .click_ripple import ClickRipple
-            ClickRipple(self, x, y)
-            
-            self._set_status(f"Template found at ({x}, {y})", T["ok"])
+                # For click actions, calculate the center plus offsets
+                cx = x + w // 2
+                cy = y + h // 2
+                click_x = cx + action.get("offset_x", 0)
+                click_y = cy + action.get("offset_y", 0)
+                
+                # Show ripple at exact click location
+                from .click_ripple import ClickRipple
+                ClickRipple(self, click_x, click_y)
+                
+                self._set_status(f"Template found at ({x}, {y}). Clicking ({click_x}, {click_y})", T["ok"])
+            else:
+                self._set_status(f"Template found at ({x}, {y}) [w:{w}, h:{h}]", T["ok"])
         else:
             self._set_status("Template not found on screen!", T["err"])
 
