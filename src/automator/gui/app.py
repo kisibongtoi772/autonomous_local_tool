@@ -367,6 +367,13 @@ class AutomatorGUI(ctk.CTk):
              hover_color=T["hover"]
              ).pack(pady=(6, 2), fill="x")
 
+        _btn(sel, "🔍 Search Project", self._open_global_search, width=166,
+             fg_color="transparent",
+             border_width=1, border_color=T["border"],
+             text_color=T["accent"],
+             hover_color=T["hover"]
+             ).pack(pady=(2, 2), fill="x")
+
         wf_mgmt_row = ctk.CTkFrame(sel, fg_color="transparent")
         wf_mgmt_row.pack(fill="x", pady=(2, 0))
         wf_mgmt_row.grid_columnconfigure((0, 1, 2), weight=1)
@@ -1635,6 +1642,83 @@ class AutomatorGUI(ctk.CTk):
             dlg.destroy()
             
         _btn(dlg, "Replace All", on_replace, primary=True).pack(pady=24)
+
+    def _open_global_search(self):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Workspace Global Search")
+        dlg.geometry("550x500")
+        dlg.attributes("-topmost", True)
+        
+        _label(dlg, "Search in all .json files (case-insensitive):", size=12, colour=T["dim"]).pack(padx=20, pady=(16, 8), anchor="w")
+        
+        search_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        search_frame.pack(padx=20, fill="x")
+        
+        search_entry = ctk.CTkEntry(search_frame, width=400, fg_color=T["raised"], border_color=T["border"], text_color=T["text"])
+        search_entry.pack(side="left", fill="x", expand=True)
+        
+        results_frame = ctk.CTkScrollableFrame(dlg, fg_color=T["surface"], corner_radius=8)
+        results_frame.pack(padx=20, pady=16, fill="both", expand=True)
+        
+        def perform_search(event=None):
+            for child in results_frame.winfo_children():
+                child.destroy()
+            
+            query = search_entry.get().strip().lower()
+            if not query:
+                return
+                
+            match_count = 0
+            for file in os.listdir(WORKSPACE_DIR):
+                if not file.endswith(".json"): continue
+                path = os.path.join(WORKSPACE_DIR, file)
+                try:
+                    data = load_json(path, {})
+                    acts = data.get("actions", [])
+                    
+                    def scan_actions(action_list, depth_label=""):
+                        nonlocal match_count
+                        for i, a in enumerate(action_list):
+                            summary = self._action_summary(a.get("type", ""), a)
+                            text_repr = (str(a) + summary + a.get("note", "") + a.get("label", "")).lower()
+                            if query in text_repr:
+                                match_count += 1
+                                item_frame = ctk.CTkFrame(results_frame, fg_color="transparent")
+                                item_frame.pack(fill="x", pady=2)
+                                
+                                title = f"📄 {file}"
+                                if depth_label: title += f" > {depth_label}"
+                                title += f" > Action {i+1}: {a.get('type', '')}"
+                                
+                                _label(item_frame, title, size=11, colour=T["accent"], weight="bold").pack(anchor="w")
+                                _label(item_frame, summary[:100], size=10, colour=T["text"]).pack(anchor="w", padx=16)
+                                
+                                def jump(f=file):
+                                    dlg.destroy()
+                                    if f in get_workflow_files():
+                                        self.file_dropdown.set(f)
+                                        self._on_file_select(f)
+                                
+                                _btn(item_frame, "Go ➔", jump, width=40, height=20, fg_color=T["border"]).pack(side="right", pady=2)
+                                _sep(results_frame).pack(fill="x", pady=4)
+                            
+                            if "actions" in a and isinstance(a["actions"], list):
+                                scan_actions(a["actions"], depth_label=a.get("type", "nested"))
+                            if "then_actions" in a and isinstance(a["then_actions"], list):
+                                scan_actions(a["then_actions"], depth_label="then")
+                            if "else_actions" in a and isinstance(a["else_actions"], list):
+                                scan_actions(a["else_actions"], depth_label="else")
+                                
+                    scan_actions(acts)
+                except Exception as e:
+                    logger.error(f"Search error in {file}: {e}")
+            
+            if match_count == 0:
+                _label(results_frame, f"No matches found for '{query}'", colour=T["dim"]).pack(pady=20)
+        
+        search_entry.bind("<Return>", perform_search)
+        _btn(search_frame, "Search", perform_search, primary=True).pack(side="left", padx=(10, 0))
+        search_entry.focus()
 
     def _test_action(self, idx: int):
         data = load_json(os.path.join(WORKSPACE_DIR, self.file_var.get()), {})
