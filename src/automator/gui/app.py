@@ -1097,6 +1097,10 @@ class AutomatorGUI(ctk.CTk):
         if tmpl_file:
             _ctrl_btn(ctrl, "Img", lambda t=tmpl_file: self._show_template_preview_dialog(t)).pack(side="left", padx=1)
             _ctrl_btn(ctrl, "Find", lambda a=action: self._test_template_match(a)).pack(side="left", padx=1)
+            
+        if atype in ("click", "assert_color", "if_color") and "x" in action and "y" in action:
+            from .click_ripple import ClickRipple
+            _ctrl_btn(ctrl, "🎯 Loc", lambda x=action["x"], y=action["y"]: ClickRipple(self, x, y)).pack(side="left", padx=1)
 
         _ctrl_btn(ctrl, "Edit", lambda idx=i, a=action: self._open_edit_dialog(idx, a)).pack(side="left", padx=1)
         
@@ -1173,7 +1177,20 @@ class AutomatorGUI(ctk.CTk):
         if atype == "loop":      return f"repeat={a.get('count',1)}  steps={len(a.get('actions',[]))}" + preview(a.get('actions', []))
         if atype == "wait_for_template":
             return f"template={a.get('template','')}  timeout={a.get('timeout',10)}s  on_timeout={a.get('on_timeout','error')}"
-        if atype == "run_workflow":     return f"file={a.get('workflow_file','')}"
+        if atype == "run_workflow":
+            wf_file = a.get("workflow_file", "")
+            res = f"file={wf_file}"
+            if wf_file:
+                path = os.path.join(WORKSPACE_DIR, wf_file)
+                if os.path.exists(path):
+                    try:
+                        data = load_json(path, {})
+                        acts = data.get("actions", [])
+                        if acts:
+                            res += f" ({len(acts)} actions)" + preview(acts)
+                    except Exception:
+                        pass
+            return res
         if atype == "prompt_user":      return f"msg={a.get('message','')[:50]}"
         if atype == "app_focus":        return f"app={a.get('app_name','')}"
         if atype == "notification":     return f"title={a.get('title','')}  msg={a.get('message','')[:30]}"
