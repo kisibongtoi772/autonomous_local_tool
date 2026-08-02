@@ -1064,16 +1064,25 @@ class AutomatorGUI(ctk.CTk):
                             thumb_label = ctk.CTkLabel(top_line, image=cached_img, text="", corner_radius=2, fg_color=T["border"])
                             thumb_label.pack(side="left", padx=(0, 10))
             
-            if note:
-                _label(top_line, f"[{note}]", size=11, colour=main_color, weight="bold").pack(side="left", padx=(0, 8))
-                _label(top_line, summary, size=11, colour=T["dim"]).pack(side="left")
-            else:
-                _label(top_line, summary, size=11, colour=sub_color).pack(side="left")
+            _label(top_line, summary, size=11, colour=sub_color).pack(side="left")
                 
             retry = action.get("retry_count", 0)
             if retry > 0:
                 _label(top_line, f"[↺ {retry}x]", size=11, colour=T["warn"]).pack(side="left", padx=(8, 0))
                 
+            # Render Rich Note (DocString)
+            if note:
+                note_frame = ctk.CTkFrame(summary_frame, fg_color="transparent")
+                note_frame.pack(anchor="w", fill="x", pady=(4, 0))
+                
+                # Create a pseudo-docstring UI: slightly dimmed text, maybe with a left border
+                doc_lbl = ctk.CTkLabel(
+                    note_frame, text=f"📝 {note}",
+                    text_color=T["dim"], font=ctk.CTkFont("SF Pro Text", 11, "italic"),
+                    justify="left"
+                )
+                doc_lbl.pack(side="left", padx=(0, 10))
+
             # Render Warnings
             if warnings:
                 warn_line = ctk.CTkFrame(summary_frame, fg_color="transparent")
@@ -1199,6 +1208,16 @@ class AutomatorGUI(ctk.CTk):
             menu.add_command(label="📋  Copy Action", command=lambda: self._copy_action(action))
             menu.add_command(label="📑  Duplicate", command=lambda: self._duplicate_action(i))
             menu.add_command(label="🏷  Rename / Label", command=lambda: self._rename_action(i))
+            menu.add_command(label="📝  Add/Edit Note", command=lambda: self._edit_action_note(i))
+            
+            # Color Tag Cascade
+            color_menu = tk.Menu(menu, tearoff=0)
+            colors = {"Red": "#7F1D1D", "Green": "#14532D", "Blue": "#1E3A8A", "Yellow": "#713F12", "Purple": "#581C87", "Orange": "#7C2D12"}
+            for cname in colors.keys():
+                color_menu.add_command(label=f"● {cname}", command=lambda c=cname: self._set_color_tag(i, c))
+            color_menu.add_separator()
+            color_menu.add_command(label="Reset Color", command=lambda: self._set_color_tag(i, None))
+            menu.add_cascade(label="🎨  Color Tag", menu=color_menu)
             if atype == "group":
                 menu.add_command(label="💥  Ungroup", command=lambda: self._ungroup_action(i))
             menu.add_command(label="➕  Insert Below", command=lambda: self._open_add_dialog(insert_idx=i + 1))
@@ -1471,6 +1490,79 @@ class AutomatorGUI(ctk.CTk):
         self._update_paste_btn()
         if hasattr(self, "_floating_status") and self._floating_status.winfo_exists():
             self._floating_status.update_status(f"Copied 1 action")
+            
+    def _rename_action(self, idx: int):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Rename Action")
+        dlg.geometry("340x160")
+        dlg.attributes("-topmost", True)
+        
+        _label(dlg, "Custom label (leave empty to reset):", size=12).pack(pady=(16, 8))
+        entry = ctk.CTkEntry(dlg, width=280)
+        entry.pack(pady=5)
+        
+        current_actions = self._get_current_actions()
+        if 0 <= idx < len(current_actions):
+            current_label = current_actions[idx].get("label", "")
+            entry.insert(0, current_label)
+        entry.focus()
+        
+        def on_confirm(event=None):
+            val = entry.get().strip()
+            dlg.destroy()
+            def mutator(lst):
+                if 0 <= idx < len(lst):
+                    if val:
+                        lst[idx]["label"] = val
+                    elif "label" in lst[idx]:
+                        del lst[idx]["label"]
+            self._modify_workflow(mutator)
+            
+        entry.bind("<Return>", on_confirm)
+        btn = ctk.CTkButton(dlg, text="Save", width=100, command=on_confirm)
+        btn.pack(pady=(12, 0))
+
+    def _edit_action_note(self, idx: int):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Action Description")
+        dlg.geometry("400x300")
+        dlg.attributes("-topmost", True)
+        
+        _label(dlg, "DocString / Note (Markdown/Text):", size=12).pack(pady=(16, 8), padx=20, anchor="w")
+        
+        textbox = ctk.CTkTextbox(dlg, width=360, height=180, wrap="word", fg_color=T["surface"], text_color=T["text"])
+        textbox.pack(padx=20, pady=5)
+        
+        current_actions = self._get_current_actions()
+        if 0 <= idx < len(current_actions):
+            current_note = current_actions[idx].get("note", "")
+            if current_note:
+                textbox.insert("1.0", current_note)
+        textbox.focus()
+        
+        def on_save():
+            val = textbox.get("1.0", "end-1c").strip()
+            dlg.destroy()
+            def mutator(lst):
+                if 0 <= idx < len(lst):
+                    if val:
+                        lst[idx]["note"] = val
+                    elif "note" in lst[idx]:
+                        del lst[idx]["note"]
+            self._modify_workflow(mutator)
+            
+        btn = ctk.CTkButton(dlg, text="Save Description", width=120, command=on_save, fg_color=T["accent"])
+        btn.pack(pady=(12, 0))
+
+    def _set_color_tag(self, idx: int, color: str | None):
+        def mutator(lst):
+            if 0 <= idx < len(lst):
+                if color:
+                    lst[idx]["color_tag"] = color
+                elif "color_tag" in lst[idx]:
+                    del lst[idx]["color_tag"]
+        self._modify_workflow(mutator)
+
         
     def _paste_action(self):
         if not self._action_clipboard: return
