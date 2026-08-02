@@ -818,6 +818,22 @@ class AutomatorGUI(ctk.CTk):
 
         if query and rendered_count == 0:
             _label(self._wf_list, f"No actions match '{query}'", colour=T["dim"]).pack(pady=30)
+            
+        if not self._bulk_mode and not query:
+            qa_row = ctk.CTkFrame(self._wf_list, fg_color="transparent")
+            qa_row.pack(fill="x", pady=(12, 4), padx=8)
+            
+            _label(qa_row, "Quick Add:", size=11, colour=T["dim"]).pack(side="left", padx=(0, 8))
+            
+            def qa(atype):
+                self._open_add_dialog(insert_idx=len(actions), default_type=atype)
+                
+            _btn(qa_row, "⏳ Sleep", lambda: qa("sleep"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
+            _btn(qa_row, "👆 Click", lambda: qa("click"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
+            _btn(qa_row, "⌨️ Type", lambda: qa("type"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
+            _btn(qa_row, "🖼 Image", lambda: qa("assert_template"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
+            
+            _btn(qa_row, "➕ More...", lambda: qa("sleep"), fg_color="transparent", text_color=T["accent"]).pack(side="left", padx=8)
 
     def _render_action_row(self, i: int, action: dict, total: int):
         atype   = action.get("type", "unknown")
@@ -1358,11 +1374,11 @@ class AutomatorGUI(ctk.CTk):
                 daemon=True
             ).start()
 
-    def _open_add_dialog(self, insert_idx: int = None):
+    def _open_add_dialog(self, insert_idx: int = None, default_type: str = "sleep"):
         dlg = self._dialog("Add Action" if insert_idx is None else "Insert Action", "400x470")
 
         _label(dlg, "Type", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
-        type_var = ctk.StringVar(value="sleep")
+        type_var = ctk.StringVar(value=default_type)
         ctk.CTkOptionMenu(
             dlg, variable=type_var, values=list(ACTION_LABELS.keys()),
             fg_color=T["raised"], button_color=T["border"],
