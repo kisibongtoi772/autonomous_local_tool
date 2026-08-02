@@ -49,18 +49,51 @@ class VariablePicker(ctk.CTkToplevel):
         for v_name, v_desc in BUILTIN_VARS:
             self._render_var_row(scroll, v_name, v_desc)
             
+        self.var_manager = var_manager
+        
         # User Variables Section
         ctk.CTkLabel(
             scroll, text="User Variables",
             font=ctk.CTkFont("SF Pro Display", 14, "bold"), text_color=T["dim"]
         ).pack(anchor="w", pady=(20, 5))
         
-        var_manager.load()
-        if not var_manager.variables:
-            ctk.CTkLabel(scroll, text="No user variables defined.", text_color=T["dim"]).pack(anchor="w")
+        # Quick Add Row
+        add_frame = ctk.CTkFrame(scroll, fg_color="transparent")
+        add_frame.pack(fill="x", pady=(0, 10))
+        
+        self.new_var_name = ctk.CTkEntry(add_frame, placeholder_text="Name (e.g. url)", width=120, height=28, fg_color=T["raised"], border_color=T["border"])
+        self.new_var_name.pack(side="left", padx=(0, 4))
+        
+        self.new_var_val = ctk.CTkEntry(add_frame, placeholder_text="Value", width=160, height=28, fg_color=T["raised"], border_color=T["border"])
+        self.new_var_val.pack(side="left", fill="x", expand=True, padx=(0, 4))
+        
+        add_btn = ctk.CTkButton(add_frame, text="+", width=28, height=28, fg_color=T["accent"], text_color=T["text"], command=self._quick_add)
+        add_btn.pack(side="right")
+        
+        self.user_vars_container = ctk.CTkFrame(scroll, fg_color="transparent")
+        self.user_vars_container.pack(fill="x")
+        
+        self._refresh_user_vars()
+        
+    def _quick_add(self):
+        k = self.new_var_name.get().strip()
+        v = self.new_var_val.get()
+        if k:
+            self.var_manager.set(k, v)
+            self.new_var_name.delete(0, "end")
+            self.new_var_val.delete(0, "end")
+            self._refresh_user_vars()
+            
+    def _refresh_user_vars(self):
+        for w in self.user_vars_container.winfo_children():
+            w.destroy()
+            
+        self.var_manager.load()
+        if not self.var_manager.variables:
+            ctk.CTkLabel(self.user_vars_container, text="No user variables defined.", text_color=T["dim"]).pack(anchor="w")
         else:
-            for k, v in var_manager.variables.items():
-                self._render_var_row(scroll, k, f"Current value: {v}")
+            for k, v in self.var_manager.variables.items():
+                self._render_var_row(self.user_vars_container, k, f"Current value: {v}")
 
     def _render_var_row(self, parent, name, desc):
         row = ctk.CTkFrame(parent, fg_color=T["raised"], corner_radius=6)
