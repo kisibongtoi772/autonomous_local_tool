@@ -1912,16 +1912,51 @@ class AutomatorGUI(ctk.CTk):
         preview_label = ctk.CTkLabel(dlg, text="", font=ctk.CTkFont(*FONT_BODY, slant="italic"), text_color=T["dim"])
         preview_label.pack(padx=20, pady=(2, 0), anchor="w")
         
+        img_preview_lbl = ctk.CTkLabel(dlg, text="")
+        img_preview_lbl.pack(padx=20, pady=(4, 0), anchor="w")
+        
         def update_preview(*args):
-            text = val_var.get()
+            text = val_var.get().strip()
+            
+            # Handle Variable live evaluation
             if "{{" in text and "}}" in text:
                 resolved = self.var_manager.resolve(text)
                 if resolved != text:
-                    preview_label.configure(text=f"Preview: {resolved}")
+                    preview_label.configure(text=f"↳ Evaluates to: {resolved}")
+                    img_preview_lbl.configure(image="")
                     return
+                    
+            # Handle Image preview
+            t = type_var.get()
+            if t in ("wait_for_template", "assert_template", "if_template", "click"):
+                # if text is a comma separated string (e.g. wait_for_template), the first part is image
+                fname = text.split(",")[0].strip() if "," in text else text
+                if fname.lower().endswith(".png"):
+                    import os
+                    from PIL import Image
+                    from ..utils.config import WORKSPACE_DIR
+                    
+                    img_path = fname if os.path.isabs(fname) else os.path.join(WORKSPACE_DIR, fname)
+                    if os.path.exists(img_path):
+                        try:
+                            pil_img = Image.open(img_path)
+                            # Resize to fit max width 360, height 100
+                            pil_img.thumbnail((360, 100))
+                            ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=pil_img.size)
+                            img_preview_lbl.configure(image=ctk_img)
+                            preview_label.configure(text=f"↳ Image Preview: {os.path.basename(fname)}")
+                            # keep reference
+                            img_preview_lbl.image = ctk_img
+                            return
+                        except Exception:
+                            pass
+                            
+            # Clear previews
             preview_label.configure(text="")
+            img_preview_lbl.configure(image="")
             
         val_var.trace_add("write", update_preview)
+        type_var.trace_add("write", update_preview)
         update_preview()
 
         HINTS = {
@@ -2206,14 +2241,47 @@ class AutomatorGUI(ctk.CTk):
         preview_label = ctk.CTkLabel(dlg, text="", font=ctk.CTkFont(*FONT_BODY, slant="italic"), text_color=T["dim"])
         preview_label.pack(padx=20, pady=(2, 0), anchor="w")
         
+        img_preview_lbl = ctk.CTkLabel(dlg, text="")
+        img_preview_lbl.pack(padx=20, pady=(4, 0), anchor="w")
+        
         def update_preview(*args):
-            text = val_var.get()
+            text = val_var.get().strip()
+            
+            # Handle Variable live evaluation
             if "{{" in text and "}}" in text:
                 resolved = self.var_manager.resolve(text)
                 if resolved != text:
-                    preview_label.configure(text=f"Preview: {resolved}")
+                    preview_label.configure(text=f"↳ Evaluates to: {resolved}")
+                    img_preview_lbl.configure(image="")
                     return
+                    
+            # Handle Image preview
+            if atype in ("wait_for_template", "assert_template", "if_template", "click"):
+                # if text is a comma separated string (e.g. wait_for_template), the first part is image
+                fname = text.split(",")[0].strip() if "," in text else text
+                if fname.lower().endswith(".png"):
+                    import os
+                    from PIL import Image
+                    from ..utils.config import WORKSPACE_DIR
+                    
+                    img_path = fname if os.path.isabs(fname) else os.path.join(WORKSPACE_DIR, fname)
+                    if os.path.exists(img_path):
+                        try:
+                            pil_img = Image.open(img_path)
+                            # Resize to fit max width 360, height 100
+                            pil_img.thumbnail((360, 100))
+                            ctk_img = ctk.CTkImage(light_image=pil_img, dark_image=pil_img, size=pil_img.size)
+                            img_preview_lbl.configure(image=ctk_img)
+                            preview_label.configure(text=f"↳ Image Preview: {os.path.basename(fname)}")
+                            # keep reference
+                            img_preview_lbl.image = ctk_img
+                            return
+                        except Exception:
+                            pass
+                            
+            # Clear previews
             preview_label.configure(text="")
+            img_preview_lbl.configure(image="")
             
         val_var.trace_add("write", update_preview)
         update_preview()
