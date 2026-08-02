@@ -654,6 +654,7 @@ class AutomatorGUI(ctk.CTk):
         self._update_paste_btn()
         
         _btn(tb, "Bulk Edit",  self._toggle_bulk_mode, False).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "Export 📦",  self._export_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
 
@@ -1010,6 +1011,60 @@ class AutomatorGUI(ctk.CTk):
             
         save_json(path, data)
         self._refresh_workflow()
+
+    def _export_workflow(self):
+        wf_name = self.file_var.get()
+        wf_path = os.path.join(WORKSPACE_DIR, wf_name)
+        if not os.path.exists(wf_path): return
+        
+        files_to_pack = {wf_path}
+        
+        def _scan_deps(path):
+            data = load_json(path, {})
+            def _scan_actions(actions):
+                for a in actions:
+                    tmpl = a.get("template") or a.get("template_image")
+                    if tmpl:
+                        files_to_pack.add(os.path.join(TEMPLATES_DIR, tmpl))
+                    
+                    if a.get("type") == "run_workflow":
+                        child = a.get("workflow_file")
+                        if child:
+                            child_path = os.path.join(WORKSPACE_DIR, child)
+                            if child_path not in files_to_pack and os.path.exists(child_path):
+                                files_to_pack.add(child_path)
+                                _scan_deps(child_path)
+                    
+                    _scan_actions(a.get("then_actions", []))
+                    _scan_actions(a.get("else_actions", []))
+                    _scan_actions(a.get("actions", []))
+            _scan_actions(data.get("actions", []))
+            
+        _scan_deps(wf_path)
+        
+        export_dir = os.path.join(WORKSPACE_DIR, "exports")
+        os.makedirs(export_dir, exist_ok=True)
+        
+        zip_filename = wf_name.replace(".json", ".zip")
+        zip_path = os.path.join(export_dir, zip_filename)
+        
+        import zipfile
+        try:
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for f in files_to_pack:
+                    if not os.path.exists(f): continue
+                    if f.startswith(TEMPLATES_DIR):
+                        arcname = os.path.join("templates", os.path.basename(f))
+                    else:
+                        arcname = os.path.basename(f)
+                    zipf.write(f, arcname)
+            
+            import tkinter.messagebox as tkmb
+            tkmb.showinfo("Export Successful", f"Packaged {len(files_to_pack)} files to:\nexports/{zip_filename}")
+        except Exception as e:
+            logger.error(f"Export failed: {e}")
+            import tkinter.messagebox as tkmb
+            tkmb.showerror("Export Failed", str(e))
 
     def _undo(self):
         if not self._undo_stack: return
