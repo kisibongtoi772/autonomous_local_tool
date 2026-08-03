@@ -5197,3 +5197,68 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
 def run_gui():
     app = AutomatorGUI()
     app.mainloop()
+
+
+    def _open_mission_control(self):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Mission Control")
+        dlg.geometry("700x550")
+        dlg.attributes("-topmost", True)
+        
+        # Header
+        header = ctk.CTkFrame(dlg, fg_color="transparent")
+        header.pack(fill="x", padx=20, pady=20)
+        _label(header, "Mission Control Analytics", size=24, weight="bold").pack(side="left")
+        
+        # Load Data
+        history_path = os.path.join(WORKSPACE_DIR, "run_history.json")
+        data = load_json(history_path, [])
+        
+        total_runs = len(data)
+        success_count = sum(1 for x in data if x.get("success", False))
+        success_rate = (success_count / total_runs * 100) if total_runs > 0 else 0
+        avg_duration = (sum(x.get("duration_sec", 0) for x in data) / total_runs) if total_runs > 0 else 0
+        
+        # Stats Frame
+        stats_f = ctk.CTkFrame(dlg, fg_color="transparent")
+        stats_f.pack(fill="x", padx=20, pady=(0, 20))
+        
+        def _stat_card(parent, title, value, color):
+            f = ctk.CTkFrame(parent, fg_color=T["surface"], corner_radius=8)
+            f.pack(side="left", expand=True, fill="both", padx=5)
+            _label(f, title, size=12, colour=T["dim"]).pack(pady=(15, 0))
+            _label(f, value, size=28, weight="bold", colour=color).pack(pady=(5, 15))
+        
+        _stat_card(stats_f, "Total Runs", str(total_runs), T["text"])
+        _stat_card(stats_f, "Success Rate", f"{success_rate:.1f}%", T["ok"] if success_rate >= 90 else (T["warn"] if success_rate >= 70 else T["err"]))
+        _stat_card(stats_f, "Avg Duration", f"{avg_duration:.1f}s", T["text"])
+        
+        # Log Header
+        _label(dlg, "Recent Executions (Last 50)", size=14, weight="bold", colour=T["dim"]).pack(anchor="w", padx=20, pady=(10, 5))
+        
+        # Log List
+        scroll = ctk.CTkScrollableFrame(dlg, fg_color=T["surface"], corner_radius=8)
+        scroll.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        
+        for run in reversed(data[-50:]):
+            item_f = ctk.CTkFrame(scroll, fg_color="transparent")
+            item_f.pack(fill="x", pady=2)
+            
+            is_success = run.get("success", False)
+            status_color = T["ok"] if is_success else T["err"]
+            status_text = "SUCCESS" if is_success else "FAILED"
+            
+            _label(item_f, run.get("timestamp", "")[:16], size=11, colour=T["dim"]).pack(side="left", padx=(5, 15))
+            status_lbl = ctk.CTkLabel(item_f, text=status_text, text_color=status_color, font=ctk.CTkFont("SF Pro Text", 11, "bold"), width=60, anchor="w")
+            status_lbl.pack(side="left")
+            
+            wf_name = run.get("workflow", "Unknown")
+            if len(wf_name) > 30: wf_name = wf_name[:27] + "..."
+            _label(item_f, wf_name, size=12, weight="bold").pack(side="left", padx=15)
+            
+            _label(item_f, f"{run.get('duration_sec', 0):.1f}s", size=11, colour=T["dim"]).pack(side="right", padx=5)
+            
+            if not is_success and run.get("error"):
+                err = run.get("error")
+                if len(err) > 40: err = err[:37] + "..."
+                _label(item_f, err, size=11, colour=T["err"]).pack(side="right", padx=15)
