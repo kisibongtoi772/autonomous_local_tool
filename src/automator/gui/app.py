@@ -1210,19 +1210,42 @@ class AutomatorGUI(ctk.CTk):
             
         enabled = action.get("enabled", True)
         
-        # PRE-FLIGHT HEALTH CHECK: Check if template image exists
+        # PRE-FLIGHT HEALTH CHECK: Live Linter
+        lint_warnings = []
         tmpl_file = action.get("template") or action.get("template_image")
         is_missing = False
         if tmpl_file:
             from ..core.config import TEMPLATES_DIR
             if not os.path.exists(os.path.join(TEMPLATES_DIR, tmpl_file)):
                 is_missing = True
+                lint_warnings.append("⚠️ Ảnh mẫu không tồn tại (Template missing)")
+                
+        # Additional Syntax Checks
+        if atype in ("click", "assert_color", "if_color"):
+            if not tmpl_file and ("x" not in action or "y" not in action):
+                lint_warnings.append("⚠️ Thiếu Tọa độ (x, y) hoặc Ảnh mẫu")
+        elif atype == "type_text":
+            if not action.get("text") and not action.get("value"):
+                lint_warnings.append("⚠️ Thiếu nội dung văn bản (Text is empty)")
+        elif atype == "run_workflow":
+            wf_target = action.get("workflow_file") or action.get("workflow_name")
+            if not wf_target:
+                lint_warnings.append("⚠️ Thiếu tên File Kịch bản (Workflow file missing)")
+            elif not os.path.exists(os.path.join(WORKSPACE_DIR, wf_target)):
+                lint_warnings.append(f"⚠️ File kịch bản không tồn tại: {wf_target}")
+                
+        # Check if enabled
+        is_disabled = not action.get("enabled", True)
         
         bg_color = "#350a0a" if is_missing else T["raised"]
-        
+        if is_disabled:
+            bg_color = T["surface"]
+            
         row = ctk.CTkFrame(self._wf_list, fg_color=bg_color, corner_radius=6)
-        if is_missing:
-            row.configure(border_width=1, border_color=T["err"])
+        
+        if is_missing or lint_warnings:
+            row.configure(border_width=1, border_color=T["warn"] if not is_missing else T["err"])
+
         row.pack(fill="x", pady=2)
         row.grid_columnconfigure(2, weight=1)
         if hasattr(self, "_action_rows"):
@@ -1402,8 +1425,12 @@ class AutomatorGUI(ctk.CTk):
                 else:
                     _label(top_line, p, size=11, colour=sub_color).pack(side="left")
                     
-            if is_missing:
-                _label(top_line, " Warning: Ảnh mẫu không tồn tại", size=11, colour=T["err"], weight="bold").pack(side="left", padx=5)
+            if lint_warnings:
+                warning_frame = ctk.CTkFrame(summary_frame, fg_color="transparent")
+                warning_frame.pack(anchor="w", fill="x", pady=(2, 0))
+                for w_msg in lint_warnings:
+                    lbl_color = T["err"] if "tồn tại" in w_msg and "mẫu" in w_msg else T["warn"]
+                    _label(warning_frame, w_msg, size=11, colour=lbl_color, weight="bold").pack(anchor="w", pady=1)
                 
             retry = action.get("retry_count", 0)
             if retry > 0:
