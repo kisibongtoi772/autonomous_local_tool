@@ -31,13 +31,13 @@ class RecorderHUD(ctk.CTkToplevel):
         main_frame.pack(fill="both", expand=True, padx=20, pady=20)
         
         self.status_label = ctk.CTkLabel(
-            main_frame, text="🔴 Recording actions...", 
+            main_frame, text="Record Recording actions...", 
             font=ctk.CTkFont("SF Pro Display", 16, "bold"), text_color=T["err"]
         )
         self.status_label.pack(pady=(0, 10))
         
         self.stop_btn = ctk.CTkButton(
-            main_frame, text="⏹ Stop & Save", width=140,
+            main_frame, text="Stop Stop & Save", width=140,
             fg_color=T["surface"], border_width=1, border_color=T["border"],
             text_color=T["text"], hover_color=T["hover"],
             command=self._stop_recording

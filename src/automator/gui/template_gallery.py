@@ -127,7 +127,7 @@ class TemplateGallery(ctk.CTkToplevel):
         
         if not used_in:
             ctk.CTkLabel(
-                info, text="⚠️ Unused", font=ctk.CTkFont("SF Pro Text", 12), text_color="#F59E0B"
+                info, text="Warning: Unused", font=ctk.CTkFont("SF Pro Text", 12), text_color="#F59E0B"
             ).pack(anchor="w")
         else:
             ctk.CTkLabel(
@@ -148,7 +148,7 @@ class TemplateGallery(ctk.CTkToplevel):
                 
         if not used_in:
             ctk.CTkButton(
-                acts, text="🗑 Delete", width=80, fg_color="#7F1D1D", hover_color="#991B1B",
+                acts, text="Delete", width=80, fg_color="#7F1D1D", hover_color="#991B1B",
                 text_color="#FECACA", command=_delete
             ).pack(pady=4)
         else:

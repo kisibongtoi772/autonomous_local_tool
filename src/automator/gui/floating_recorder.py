@@ -24,7 +24,7 @@ class FloatingRecorder(ctk.CTkToplevel):
         self.main_frame.pack(fill="both", expand=True)
         
         # Blinking dot
-        self.dot_label = ctk.CTkLabel(self.main_frame, text="🔴", font=ctk.CTkFont("SF Pro Text", 14), text_color="#FF3B30")
+        self.dot_label = ctk.CTkLabel(self.main_frame, text="Record", font=ctk.CTkFont("SF Pro Text", 14), text_color="#FF3B30")
         self.dot_label.pack(side="left", padx=(15, 5))
         
         # Status text
@@ -43,7 +43,7 @@ class FloatingRecorder(ctk.CTkToplevel):
         
         # Stop Button
         self.stop_btn = ctk.CTkButton(
-            self.main_frame, text="⏹ STOP", width=60, height=28,
+            self.main_frame, text="Stop STOP", width=60, height=28,
             fg_color="#FF3B30", hover_color="#D70015",
             text_color="white", font=ctk.CTkFont("SF Pro Text", 11, "bold"),
             corner_radius=4, command=self._handle_stop

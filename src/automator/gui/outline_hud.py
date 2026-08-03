@@ -57,7 +57,7 @@ class OutlineHUD(ctk.CTkToplevel):
                 count += 1
             elif atype == "group":
                 label = action.get("label", "Group")
-                self._add_node(f"📦 {label}", i, is_header=False)
+                self._add_node(f"Group {label}", i, is_header=False)
                 count += 1
                 
         if count == 0:
