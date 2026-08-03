@@ -104,7 +104,15 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
             dlg.withdraw()
             ConfidenceTuner(app, tmpl, float(conf_ent.get()), cb, lambda: dlg.deiconify())
             
+        def on_locate():
+            tmpl = tpl_ent.get().strip()
+            if not tmpl: return
+            from .pickers import ScreenLocator
+            dlg.withdraw()
+            ScreenLocator(app, tmpl, float(conf_ent.get()), lambda: dlg.deiconify())
+            
         ctk.CTkButton(row, text="🎛 Tune", width=50, command=on_tune, fg_color=T["accent"], text_color=T["text"]).pack(side="left", padx=4)
+        ctk.CTkButton(row, text="🎯 Locate", width=60, command=on_locate, fg_color="#EF4444", hover_color="#B91C1C", text_color="white").pack(side="left")
 
         
         if atype == "wait_for_template":
@@ -174,8 +182,17 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
             dlg.withdraw()
             ConfidenceTuner(app, tmpl, float(conf_ent.get() if 'conf_ent' in locals() else action.get("condition_confidence", 0.8)), cb, lambda: dlg.deiconify())
             
+        def on_locate():
+            tmpl = tpl_ent.get().strip()
+            if not tmpl: return
+            from .pickers import ScreenLocator
+            dlg.withdraw()
+            ScreenLocator(app, tmpl, float(conf_ent.get() if 'conf_ent' in locals() else action.get("condition_confidence", 0.8)), lambda: dlg.deiconify())
+            
         ctk.CTkButton(row, text="🖼 Pick", width=50, command=on_pick, fg_color=T["raised"]).pack(side="left", padx=4)
         ctk.CTkButton(row, text="✂ Snip", width=50, command=on_snip, fg_color=T["raised"]).pack(side="left")
+        ctk.CTkButton(row, text="🎛", width=30, command=on_tune, fg_color=T["accent"], text_color=T["text"]).pack(side="left", padx=4)
+        ctk.CTkButton(row, text="🎯", width=30, command=on_locate, fg_color="#EF4444", hover_color="#B91C1C", text_color="white").pack(side="left")
         ctk.CTkButton(row, text="🎛 Tune", width=50, command=on_tune, fg_color=T["accent"], text_color=T["text"]).pack(side="left", padx=4)
         
         _lbl("Fixed Iteration Count (if Condition is 'none')")
@@ -365,8 +382,17 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
             dlg.withdraw()
             ConfidenceTuner(app, tmpl, float(conf_ent.get() if 'conf_ent' in locals() else action.get("condition_confidence", 0.8)), cb, lambda: dlg.deiconify())
             
+        def on_locate():
+            tmpl = tpl_ent.get().strip()
+            if not tmpl: return
+            from .pickers import ScreenLocator
+            dlg.withdraw()
+            ScreenLocator(app, tmpl, float(conf_ent.get() if 'conf_ent' in locals() else action.get("condition_confidence", 0.8)), lambda: dlg.deiconify())
+            
         ctk.CTkButton(row, text="🖼 Pick", width=50, command=on_pick, fg_color=T["raised"]).pack(side="left", padx=4)
         ctk.CTkButton(row, text="✂ Snip", width=50, command=on_snip, fg_color=T["raised"]).pack(side="left")
+        ctk.CTkButton(row, text="🎛", width=30, command=on_tune, fg_color=T["accent"], text_color=T["text"]).pack(side="left", padx=4)
+        ctk.CTkButton(row, text="🎯", width=30, command=on_locate, fg_color="#EF4444", hover_color="#B91C1C", text_color="white").pack(side="left")
         ctk.CTkButton(row, text="🎛 Tune", width=50, command=on_tune, fg_color=T["accent"], text_color=T["text"]).pack(side="left", padx=4)
         
         _lbl("Fixed Iteration Count (if Condition is 'none')")

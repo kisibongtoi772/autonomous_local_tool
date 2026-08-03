@@ -164,3 +164,75 @@ class ConfidenceTuner(ctk.CTkToplevel):
     def _cancel(self):
         self.destroy()
         self.on_cancel()
+
+class ScreenLocator(ctk.CTkToplevel):
+    """
+    Live X-Ray Screen Locator.
+    Takes a template and confidence, searches the screen, and draws a red box at the exact location
+    directly over the screen (transparent window) for 2 seconds.
+    """
+    def __init__(self, app, template_name: str, confidence: float, on_close):
+        super().__init__(app)
+        self.app = app
+        self.on_close = on_close
+        
+        # Hide window initially
+        self.withdraw()
+        
+        import threading
+        threading.Thread(target=self._locate, args=(template_name, confidence), daemon=True).start()
+        
+    def _locate(self, template_name, confidence):
+        try:
+            import os
+            from ..utils.config import TEMPLATES_DIR
+            from ..core.vision import locate_template
+            
+            tpl_path = os.path.join(TEMPLATES_DIR, template_name)
+            if not os.path.exists(tpl_path):
+                self.after(0, self._fail, "Template not found")
+                return
+                
+            x, y, w, h, val = locate_template(tpl_path, confidence)
+            if x is not None:
+                self.after(0, self._show_highlight, x, y, w, h, val)
+            else:
+                self.after(0, self._fail, f"Not found at {confidence:.2f} confidence")
+                
+        except Exception as e:
+            self.after(0, self._fail, str(e))
+            
+    def _fail(self, msg):
+        self.app.show_toast(f"❌ {msg}", "#EF4444")
+        self.on_close()
+        self.destroy()
+        
+    def _show_highlight(self, x, y, w, h, val):
+        self.title("X-Ray")
+        self.geometry(f"{w+8}x{h+8}+{x-4}+{y-4}")
+        self.overrideredirect(True)
+        self.attributes("-topmost", True)
+        
+        import platform
+        if platform.system() == "Windows":
+            self.attributes("-transparentcolor", "black")
+            self.configure(fg_color="black")
+            canvas = tk.Canvas(self, bg="black", highlightthickness=0)
+            canvas.pack(fill="both", expand=True)
+            canvas.create_rectangle(2, 2, w+6, h+6, outline="#EF4444", width=4)
+        else: # Mac/Linux
+            self.attributes("-transparent", True)
+            self.configure(fg_color="systemTransparent")
+            canvas = tk.Canvas(self, bg="systemTransparent", highlightthickness=0)
+            canvas.pack(fill="both", expand=True)
+            canvas.create_rectangle(2, 2, w+6, h+6, outline="#EF4444", width=4)
+            
+        self.app.show_toast(f"🎯 Found at ({x}, {y}) [Conf: {val:.2f}]", "#10B981")
+        self.deiconify()
+        
+        # Destroy after 2 seconds
+        self.after(2000, self._close)
+        
+    def _close(self):
+        self.on_close()
+        self.destroy()
