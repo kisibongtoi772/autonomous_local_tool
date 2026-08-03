@@ -779,7 +779,7 @@ class AutomatorGUI(ctk.CTk):
         ctrl_hdr = ctk.CTkFrame(ctrl, fg_color="transparent")
         ctrl_hdr.grid(row=0, column=0, sticky="ew", padx=16, pady=(12, 8))
         _label(ctrl_hdr, "Controls", size=11, colour=T["dim"]).pack(side="left")
-        _label(ctrl_hdr, "F9  Record   F10  Stop   F11  Playback",
+        _label(ctrl_hdr, "F6 👆  F7 🖼️  |  F9 ⏺  F10 ⏹  F11 ▶",
                size=10, colour=T["border"]).pack(side="right")
 
         btn_row = ctk.CTkFrame(ctrl, fg_color="transparent")
@@ -5670,6 +5670,31 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         except Exception:
             pass
 
+    def _magic_capture_click(self):
+        if not self.data.get("actions") is not None:
+            self.data["actions"] = []
+        import pyautogui
+        x, y = pyautogui.position()
+        def mut(lst):
+            lst.append({"type": "click", "x": int(x), "y": int(y), "clicks": 1})
+        self._modify_workflow(mut)
+        self.show_toast(f"📍 Added Click ({int(x)}, {int(y)})", T["ok"])
+        self.after(100, lambda: self._wf_list._parent_canvas.yview_moveto(1.0))
+
+    def _magic_capture_image(self):
+        if not self.data.get("actions") is not None:
+            self.data["actions"] = []
+        from .snipping_tool import SnippingTool
+        import time
+        def on_snip(fname):
+            if fname:
+                def mut(lst):
+                    lst.append({"type": "assert_template", "template": fname})
+                self._modify_workflow(mut)
+                self.show_toast(f"🖼 Added Image: {fname}", T["ok"])
+                self.after(100, lambda: self._wf_list._parent_canvas.yview_moveto(1.0))
+        SnippingTool(self, on_snip, force_filename=f"snip_{int(time.time())}.png")
+
     def _start_listeners(self):
         def on_press(key):
             try:
@@ -5678,6 +5703,8 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                     self.after(0, self.stop_recording)
                     self.after(0, self._stop_playback)
                 elif key == keyboard.Key.f11: self.after(0, self.playback)
+                elif key == keyboard.Key.f6:  self.after(0, self._magic_capture_click)
+                elif key == keyboard.Key.f7:  self.after(0, self._magic_capture_image)
                 elif self.recording and self.recorder:
                     self.recorder.on_press(key)
             except Exception:
