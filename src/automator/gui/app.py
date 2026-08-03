@@ -3390,9 +3390,14 @@ class AutomatorGUI(ctk.CTk):
                 self._player.resume()
         def _on_view_vars():
             if not hasattr(self, "_player") or not self._player: return
-            vars_dict = self._player.var_manager.get_all()
             
-            dlg = ctk.CTkToplevel(self)
+            # Singleton pattern
+            if hasattr(self, "_vars_dlg") and self._vars_dlg.winfo_exists():
+                self._vars_dlg.focus()
+                return
+                
+            self._vars_dlg = ctk.CTkToplevel(self)
+            dlg = self._vars_dlg
             dlg.title("Live Variables Monitor")
             dlg.geometry("400x500")
             dlg.attributes("-topmost", True)
@@ -3400,22 +3405,46 @@ class AutomatorGUI(ctk.CTk):
             frame = ctk.CTkScrollableFrame(dlg, fg_color="transparent")
             frame.pack(fill="both", expand=True, padx=20, pady=20)
             
-            ctk.CTkLabel(frame, text="In-Memory Variables", font=ctk.CTkFont("SF Pro Text", 16, "bold")).pack(anchor="w", pady=(0, 10))
+            ctk.CTkLabel(frame, text="Live Variables HUD", font=ctk.CTkFont("SF Pro Text", 16, "bold")).pack(anchor="w", pady=(0, 10))
             
-            if not vars_dict:
-                ctk.CTkLabel(frame, text="No variables set.", text_color=T["dim"]).pack(anchor="w")
-            else:
-                for k, v in vars_dict.items():
-                    row = ctk.CTkFrame(frame, fg_color=T["raised"], corner_radius=6)
-                    row.pack(fill="x", pady=4)
+            vars_container = ctk.CTkFrame(frame, fg_color="transparent")
+            vars_container.pack(fill="both", expand=True)
+            
+            self._last_vars_state = {}
+            
+            def render_vars():
+                if not hasattr(self, "_player") or not self._player or not dlg.winfo_exists(): return
+                
+                current_vars = self._player.var_manager.get_all()
+                if current_vars == self._last_vars_state:
+                    dlg.after(500, render_vars)
+                    return
+                
+                # Clear container
+                for widget in vars_container.winfo_children():
+                    widget.destroy()
                     
-                    # Key
-                    ctk.CTkLabel(row, text=k, font=ctk.CTkFont("SF Pro Text", 12, "bold"), text_color=T["accent"]).pack(anchor="w", padx=10, pady=(10, 0))
-                    
-                    # Value
-                    val_str = str(v)
-                    if len(val_str) > 100: val_str = val_str[:97] + "..."
-                    ctk.CTkLabel(row, text=val_str, font=ctk.CTkFont("SF Pro Text", 12), text_color=T["text"], justify="left", wraplength=340).pack(anchor="w", padx=10, pady=(2, 10))
+                if not current_vars:
+                    ctk.CTkLabel(vars_container, text="No variables set.", text_color=T["dim"]).pack(anchor="w")
+                else:
+                    for k, v in current_vars.items():
+                        # Highlight if value changed
+                        is_new = (k not in self._last_vars_state) or (self._last_vars_state[k] != v)
+                        bg_color = "#064e3b" if is_new else T["raised"]
+                        
+                        row = ctk.CTkFrame(vars_container, fg_color=bg_color, corner_radius=6)
+                        row.pack(fill="x", pady=4)
+                        
+                        ctk.CTkLabel(row, text=k, font=ctk.CTkFont("SF Pro Text", 12, "bold"), text_color=T["accent"]).pack(anchor="w", padx=10, pady=(10, 0))
+                        
+                        val_str = str(v)
+                        if len(val_str) > 100: val_str = val_str[:97] + "..."
+                        ctk.CTkLabel(row, text=val_str, font=ctk.CTkFont("SF Pro Text", 12), text_color=T["text"], justify="left", wraplength=340).pack(anchor="w", padx=10, pady=(2, 10))
+                
+                self._last_vars_state = dict(current_vars)
+                dlg.after(500, render_vars)
+                
+            render_vars()
             
             ctk.CTkButton(dlg, text="Close", command=dlg.destroy, width=100).pack(pady=10)
 
