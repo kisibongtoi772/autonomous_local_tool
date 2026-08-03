@@ -3506,17 +3506,44 @@ class AutomatorGUI(ctk.CTk):
 
     def _test_template_match(self, action: dict):
         tmpl = action.get("template") or action.get("template_image")
-        conf = action.get("confidence", 0.8)
+        target_conf = action.get("confidence", 0.8)
         
         from ..core.vision import locate_template
-        loc = locate_template(tmpl, confidence=conf)
         
+        best_loc = None
+        best_conf = target_conf
+        found_target = False
+        
+        # 1. Try at target confidence
+        loc = locate_template(tmpl, confidence=target_conf)
         if loc:
-            x, y, w, h = loc
+            best_loc = loc
+            found_target = True
+        else:
+            # 2. Fuzzy fallback: lower confidence by 0.05 steps down to 0.4
+            current_conf = target_conf - 0.05
+            while current_conf >= 0.4:
+                loc = locate_template(tmpl, confidence=current_conf)
+                if loc:
+                    best_loc = loc
+                    best_conf = current_conf
+                    break
+                current_conf -= 0.05
+        
+        if best_loc:
+            x, y, w, h = best_loc
             
             # Show glowing bounding box overlay
             from .bounding_box_overlay import BoundingBoxOverlay
-            BoundingBoxOverlay(self, x, y, w, h)
+            
+            if found_target:
+                BoundingBoxOverlay(self, x, y, w, h, color="#ff3333", alt_color="#ff9999") # Standard Red
+                status_text = f"Template found at ({x}, {y}) [w:{w}, h:{h}]"
+                status_color = T["ok"]
+            else:
+                BoundingBoxOverlay(self, x, y, w, h, color="#ff9500", alt_color="#ffb340") # Warning Orange
+                status_text = f"⚠️ Partial Match (Conf ~{best_conf:.2f}). Target was {target_conf}. Consider lowering confidence or recapturing."
+                status_color = T["warn"]
             
             if action.get("type") == "click":
                 # For click actions, calculate the center plus offsets
@@ -3529,11 +3556,12 @@ class AutomatorGUI(ctk.CTk):
                 from .click_ripple import ClickRipple
                 ClickRipple(self, click_x, click_y)
                 
-                self._set_status(f"Template found at ({x}, {y}). Clicking ({click_x}, {click_y})", T["ok"])
-            else:
-                self._set_status(f"Template found at ({x}, {y}) [w:{w}, h:{h}]", T["ok"])
+                if found_target:
+                    status_text = f"Template found at ({x}, {y}). Clicking ({click_x}, {click_y})"
+                
+            self._set_status(status_text, status_color)
         else:
-            self._set_status("Template not found on screen!", T["err"])
+            self._set_status("❌ Template absolutely not found on screen (even at 0.4 confidence).", T["err"])
 
     def _bind_canvas_mousewheel(self):
         # Implementation for canvas mousewheel binding

@@ -3,9 +3,11 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 class BoundingBoxOverlay(ctk.CTkToplevel):
-    def __init__(self, parent, x: int, y: int, w: int, h: int, duration_ms: int = 1500, on_complete: Optional[Callable[[], None]] = None):
+    def __init__(self, parent, x: int, y: int, w: int, h: int, duration_ms: int = 1500, on_complete: Optional[Callable[[], None]] = None, color: str = "#ff3333", alt_color: str = "#ff9999"):
         super().__init__(parent)
         self.on_complete = on_complete
+        self.color = color
+        self.alt_color = alt_color
         
         # Add a bit of padding for the border
         pad = 6
@@ -29,22 +31,22 @@ class BoundingBoxOverlay(ctk.CTkToplevel):
         # Draw a thick glowing red box
         self.box = self.canvas.create_rectangle(
             pad, pad, w + pad, h + pad,
-            outline="#ff3333", width=4, dash=(10, 5)
+            outline=self.color, width=4, dash=(10, 5)
         )
         
         # Draw corners
         c_len = max(5, min(15, w//4, h//4))
-        self.canvas.create_line(pad, pad, pad + c_len, pad, fill="#ff3333", width=6)
-        self.canvas.create_line(pad, pad, pad, pad + c_len, fill="#ff3333", width=6)
+        self.canvas.create_line(pad, pad, pad + c_len, pad, fill=self.color, width=6)
+        self.canvas.create_line(pad, pad, pad, pad + c_len, fill=self.color, width=6)
         
-        self.canvas.create_line(w + pad, pad, w + pad - c_len, pad, fill="#ff3333", width=6)
-        self.canvas.create_line(w + pad, pad, w + pad, pad + c_len, fill="#ff3333", width=6)
+        self.canvas.create_line(w + pad, pad, w + pad - c_len, pad, fill=self.color, width=6)
+        self.canvas.create_line(w + pad, pad, w + pad, pad + c_len, fill=self.color, width=6)
         
-        self.canvas.create_line(pad, h + pad, pad + c_len, h + pad, fill="#ff3333", width=6)
-        self.canvas.create_line(pad, h + pad, pad, h + pad - c_len, fill="#ff3333", width=6)
+        self.canvas.create_line(pad, h + pad, pad + c_len, h + pad, fill=self.color, width=6)
+        self.canvas.create_line(pad, h + pad, pad, h + pad - c_len, fill=self.color, width=6)
         
-        self.canvas.create_line(w + pad, h + pad, w + pad - c_len, h + pad, fill="#ff3333", width=6)
-        self.canvas.create_line(w + pad, h + pad, w + pad, h + pad - c_len, fill="#ff3333", width=6)
+        self.canvas.create_line(w + pad, h + pad, w + pad - c_len, h + pad, fill=self.color, width=6)
+        self.canvas.create_line(w + pad, h + pad, w + pad, h + pad - c_len, fill=self.color, width=6)
         
         # Flash animation state
         self.flash_state = True
@@ -56,7 +58,7 @@ class BoundingBoxOverlay(ctk.CTkToplevel):
     def _animate(self):
         if not self.winfo_exists(): return
         self.flash_state = not self.flash_state
-        color = "#ff3333" if self.flash_state else "#ff9999"
+        color = self.color if self.flash_state else self.alt_color
         self.canvas.itemconfig(self.box, outline=color)
         self.after(150, self._animate)
         
