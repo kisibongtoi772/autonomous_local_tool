@@ -475,6 +475,13 @@ class AutomatorGUI(ctk.CTk):
              border_width=1, border_color=T["border"],
              text_color=T["accent"],
              hover_color=T["hover"]
+             ).pack(pady=(2, 2), fill="x")
+
+        _btn(sel, "🚀 Create Shortcut", self._create_desktop_shortcut, width=166,
+             fg_color="transparent",
+             border_width=1, border_color=T["border"],
+             text_color=T["accent"],
+             hover_color=T["hover"]
              ).pack(pady=(2, 6), fill="x")
 
         wf_mgmt_row = ctk.CTkFrame(sel, fg_color="transparent")
@@ -1272,7 +1279,17 @@ class AutomatorGUI(ctk.CTk):
                         cached_img = self._thumbnail_cache.get(tmpl_path)
                         if cached_img:
                             thumb_label = ctk.CTkLabel(top_line, image=cached_img, text="", corner_radius=2, fg_color=T["border"], cursor="hand2")
-                            thumb_label.pack(side="left", padx=(0, 10))
+                            thumb_label.pack(side="left", padx=(0, 5))
+                            
+                            def _on_test_locate(path=tmpl_path, conf=action.get("confidence", 0.8)):
+                                self._test_locate_image(path, conf)
+                                
+                            test_btn = ctk.CTkButton(
+                                top_line, text="🎯", width=24, height=24, 
+                                fg_color="transparent", hover_color=T["hover"],
+                                command=_on_test_locate
+                            )
+                            test_btn.pack(side="left", padx=(0, 10))
                             
                             def on_enter_thumb(e, path=tmpl_path):
                                 self._show_image_peek(e, path)
@@ -2040,6 +2057,43 @@ class AutomatorGUI(ctk.CTk):
 
 
 
+
+    def _create_desktop_shortcut(self):
+        from tkinter import filedialog
+        
+        current_file = self.file_var.get()
+        if not current_file:
+            self.show_toast("❌ No workflow selected", T["err"])
+            return
+            
+        desktop_dir = os.path.join(os.path.expanduser("~"), "Desktop")
+        base_name = current_file.replace('.json', '')
+        suggested_name = f"Run {base_name}.command"
+        
+        save_path = filedialog.asksaveasfilename(
+            title="Create Desktop Shortcut",
+            initialdir=desktop_dir,
+            initialfile=suggested_name,
+            defaultextension=".command",
+            filetypes=[("Mac Command", "*.command")]
+        )
+        if not save_path: return
+        
+        script = f'''#!/bin/bash
+cd "{os.path.abspath(WORKSPACE_DIR).replace('/workflows', '')}"
+source venv/bin/activate
+python3 -m src.automator.cli run {current_file}
+'''
+        try:
+            with open(save_path, 'w') as f:
+                f.write(script)
+            # Make executable
+            os.chmod(save_path, 0o755)
+            self.show_toast(f"🚀 Shortcut created: {suggested_name}", T["ok"])
+        except Exception as e:
+            logger.error(f"Failed to create shortcut: {e}")
+            self.show_toast("❌ Failed to create shortcut", T["err"])
+
     def _export_project(self):
         from tkinter import filedialog
         import zipfile
@@ -2104,6 +2158,32 @@ class AutomatorGUI(ctk.CTk):
         except Exception as e:
             logger.error(f"Export failed: {e}")
             self.show_toast("❌ Export failed!", T["err"])
+
+
+    def _test_locate_image(self, path: str, confidence: float):
+        if not os.path.exists(path):
+            self.show_toast("❌ Image file not found!", T["err"])
+            return
+            
+        self.iconify()
+        self.update()
+        
+        def _do_locate():
+            from src.automator.core.vision import locate_template
+            loc = locate_template(path, confidence=confidence)
+            if loc:
+                x, y, w, h = loc
+                from src.automator.gui.box_highlight import BoxHighlight
+                def restore():
+                    self.deiconify()
+                    self.show_toast("✅ Image found and highlighted!", T["ok"])
+                BoxHighlight(self, x, y, w, h, on_complete=restore)
+            else:
+                self.deiconify()
+                self.show_toast("❌ Image NOT found on screen!", T["err"])
+                
+        # Give OS time to hide the window
+        self.after(500, _do_locate)
 
     def _open_variables_vault(self):
         dlg = ctk.CTkToplevel(self)
