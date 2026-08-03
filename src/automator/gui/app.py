@@ -1194,15 +1194,25 @@ class AutomatorGUI(ctk.CTk):
             
             _label(qa_row, "Quick Add:", size=11, colour=T["dim"]).pack(side="left", padx=(0, 8))
             
-            def qa(atype):
-                self._open_add_dialog(insert_idx=len(actions), default_type=atype)
+            def instant_qa(atype):
+                def mut(lst):
+                    new_act = {"type": atype}
+                    if atype == "sleep": new_act["duration"] = 1.0
+                    elif atype == "click": new_act["x"] = 0; new_act["y"] = 0; new_act["clicks"] = 1
+                    elif atype == "type": new_act["key"] = ""
+                    elif atype == "assert_template": new_act["template"] = ""
+                    lst.append(new_act)
+                self._modify_workflow(mut)
+                self.after(100, lambda: self._wf_list._parent_canvas.yview_moveto(1.0))
                 
-            _btn(qa_row, "⏳ Sleep", lambda: qa("sleep"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
-            _btn(qa_row, "👆 Click", lambda: qa("click"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
-            _btn(qa_row, "⌨️ Type", lambda: qa("type"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
-            _btn(qa_row, "🖼 Image", lambda: qa("assert_template"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
+            _btn(qa_row, "⏳ Sleep", lambda: instant_qa("sleep"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
+            _btn(qa_row, "👆 Click", lambda: instant_qa("click"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
+            _btn(qa_row, "⌨️ Type", lambda: instant_qa("type"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
+            _btn(qa_row, "🖼 Image", lambda: instant_qa("assert_template"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
             
-            _btn(qa_row, "More...", lambda: qa("sleep"), fg_color="transparent", text_color=T["accent"]).pack(side="left", padx=8)
+            def qa_more():
+                self._open_add_dialog(insert_idx=len(actions), default_type="sleep")
+            _btn(qa_row, "More...", qa_more, fg_color="transparent", text_color=T["accent"]).pack(side="left", padx=8)
 
     def _enter_move_mode(self, source_idx: int):
         self._move_source_idx = source_idx
@@ -1748,6 +1758,8 @@ class AutomatorGUI(ctk.CTk):
         for widget in (row, type_label, summary_frame):
             widget.bind("<Button-2>", right_click_handler)
             widget.bind("<Button-3>", right_click_handler)
+            widget.bind("<Double-Button-1>", lambda e, idx=i, a=action: self._open_edit_dialog(idx, a))
+            widget.bind("<Shift-Button-1>", lambda e, idx=i: self._toggle_action_enable(idx))
 
     def _action_summary(self, atype: str, a: dict) -> str:
         def preview(actions):
