@@ -963,7 +963,12 @@ class AutomatorGUI(ctk.CTk):
             scrollbar_button_color=T["border"],
             scrollbar_button_hover_color=T["hover"]
         )
-        self._wf_list.grid(row=4, column=0, sticky="nsew", padx=24, pady=(0, 24))
+        self._wf_list.grid(row=4, column=0, sticky="nsew", padx=(24, 8), pady=(0, 24))
+        
+        # Minimap (Live Tracker)
+        import tkinter as tk
+        self._minimap = tk.Canvas(p, width=12, bg="#1E1E1E", highlightthickness=0)
+        self._minimap.grid(row=4, column=1, sticky="ns", padx=(0, 24), pady=(0, 24))
         self._wf_list.grid_columnconfigure(2, weight=1)
         p.grid_rowconfigure(4, weight=3)
         
@@ -4635,6 +4640,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
             
             self._action_rows[idx].configure(fg_color=T["accent"])
             self._current_highlight_idx = idx
+            self._update_minimap(active_idx=idx)
 
             # Intelligent Auto-Scroll to keep active item in center
             if hasattr(self, "_wf_list") and self._wf_list.winfo_exists():
@@ -5262,3 +5268,40 @@ def run_gui():
                 err = run.get("error")
                 if len(err) > 40: err = err[:37] + "..."
                 _label(item_f, err, size=11, colour=T["err"]).pack(side="right", padx=15)
+
+
+    def _update_minimap(self, active_idx=None):
+        if not hasattr(self, '_minimap') or not self._minimap.winfo_exists():
+            return
+            
+        self._minimap.delete("all")
+        self.update_idletasks()
+        h = self._minimap.winfo_height()
+        if h <= 10: h = 500
+        
+        try:
+            actions = self._get_current_actions()
+            total = len(actions)
+            if total == 0: return
+            
+            block_h = max(2, h / total)
+            
+            for i, a in enumerate(actions):
+                y = i * block_h
+                atype = a.get("type", "unknown")
+                color = "#444444" # Default gray
+                if atype in ("click", "type"): color = "#0A84FF"
+                elif atype == "sleep": color = "#FF9F0A"
+                elif atype == "group": color = "#30D158"
+                elif atype == "run_workflow": color = "#BF5AF2"
+                elif atype.startswith("assert") or atype.startswith("if_"): color = "#FF375F"
+                
+                # Active indicator
+                if active_idx is not None and i == active_idx:
+                    self._minimap.create_rectangle(1, y, 11, y + block_h, fill="#FFFFFF", outline="")
+                    # Add a glow effect
+                    self._minimap.create_rectangle(0, y-1, 12, y + block_h + 1, outline="#FFFFFF")
+                else:
+                    self._minimap.create_rectangle(2, y + 1, 10, y + block_h - 1, fill=color, outline="")
+        except Exception:
+            pass
