@@ -555,6 +555,13 @@ class AutomatorGUI(ctk.CTk):
              hover_color=T["hover"]
              ).pack(pady=(2, 2), fill="x")
 
+        _btn(sel, "Import Workflow (.zip)", self._import_workflow, width=166,
+             fg_color="transparent",
+             border_width=1, border_color=T["border"],
+             text_color=T["text"],
+             hover_color=T["hover"]
+             ).pack(pady=(6, 2), fill="x")
+
         _btn(sel, "🖼 Template Library", self._open_template_library, width=166,
              fg_color="transparent",
              border_width=1, border_color=T["border"],
