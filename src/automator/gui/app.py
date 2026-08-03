@@ -342,6 +342,19 @@ class AutomatorGUI(ctk.CTk):
         self._build_sidebar()
         self._build_main()
         self._nav_to("dashboard")
+        
+        # Start background polling
+        self._update_coords()
+        
+    def _update_coords(self):
+        try:
+            import pyautogui
+            x, y = pyautogui.position()
+            if hasattr(self, 'coord_label') and self.coord_label.winfo_exists():
+                self.coord_label.configure(text=f"⌖ {x}, {y}")
+        except Exception:
+            pass
+        self.after(50, self._update_coords)
 
     # ── Sidebar ───────────────────────────────────────────────────────────────
 
@@ -632,6 +645,9 @@ class AutomatorGUI(ctk.CTk):
 
         self.progress_label = _label(prog_row, "Ready", size=10, colour=T["dim"])
         self.progress_label.pack(side="right")
+        
+        self.coord_label = _label(prog_row, "⌖ 0, 0", size=10, colour=T["dim"])
+        self.coord_label.pack(side="right", padx=(0, 20))
 
         # Log console
         log_wrap = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
@@ -1155,7 +1171,14 @@ class AutomatorGUI(ctk.CTk):
                             thumb_label.bind("<Enter>", on_enter_thumb)
                             thumb_label.bind("<Leave>", on_leave_thumb)
             
-            _label(top_line, summary, size=11, colour=sub_color).pack(side="left")
+            import re
+            parts = re.split(r'(\{\{[a-zA-Z0-9_]+\}\})', summary)
+            for p in parts:
+                if not p: continue
+                if p.startswith('{{') and p.endswith('}}'):
+                    _label(top_line, p, size=11, colour=T["accent"], weight="bold").pack(side="left")
+                else:
+                    _label(top_line, p, size=11, colour=sub_color).pack(side="left")
                 
             retry = action.get("retry_count", 0)
             if retry > 0:
