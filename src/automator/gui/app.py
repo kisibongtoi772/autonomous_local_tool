@@ -813,6 +813,7 @@ class AutomatorGUI(ctk.CTk):
         
         _btn(tb, "Bulk Edit",  self._toggle_bulk_mode, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Export Group",  self._export_workflow, False).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "Flowchart",  self._generate_flowchart, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Import 📥",  self._import_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
@@ -2009,6 +2010,125 @@ class AutomatorGUI(ctk.CTk):
                 self._wf_list._parent_canvas.yview_moveto(fraction)
         except Exception as e:
             logger.error(f"Failed to scroll to action {idx}: {e}")
+
+
+    # --- FLOWCHART VISUALIZER ---
+    def _generate_flowchart(self):
+        import webbrowser
+        
+        actions = self.data.get("actions", [])
+        if not actions:
+            self.show_toast("Error: No actions to visualize", T["err"])
+            return
+            
+        mermaid_lines = ["graph TD", "    Start((Start))"]
+        
+        node_counter = 0
+        def get_id():
+            nonlocal node_counter
+            node_counter += 1
+            return f"N{node_counter}"
+            
+        def escape(s):
+            s = str(s).replace('"', "'").replace("\n", " ")
+            if len(s) > 30: s = s[:27] + "..."
+            return s
+
+        def traverse(action_list, prev_node):
+            current_prev = prev_node
+            for a in action_list:
+                nid = get_id()
+                atype = a.get("type", "unknown")
+                if atype == "click":
+                    label = f"Click {escape(a.get('template', a.get('template_image', 'coords')))}"
+                    mermaid_lines.append(f"    {current_prev} --> {nid}[{label}]")
+                    current_prev = nid
+                elif atype == "type":
+                    label = f"Type '{escape(a.get('text', ''))}'"
+                    mermaid_lines.append(f"    {current_prev} --> {nid}[{label}]")
+                    current_prev = nid
+                elif atype == "if_template":
+                    label = f"If '{escape(a.get('template', ''))}'"
+                    mermaid_lines.append(f"    {current_prev} --> {nid}{{{label}}}")
+                    
+                    then_actions = a.get("then_actions", [])
+                    if then_actions:
+                        then_start = get_id()
+                        mermaid_lines.append(f"    {nid} -->|Yes| {then_start}[Then]")
+                        traverse(then_actions, then_start)
+                        
+                    else_actions = a.get("else_actions", [])
+                    if else_actions:
+                        else_start = get_id()
+                        mermaid_lines.append(f"    {nid} -->|No| {else_start}[Else]")
+                        traverse(else_actions, else_start)
+                    
+                    current_prev = nid 
+                elif atype == "loop":
+                    label = f"Loop {a.get('count', 1)} times"
+                    mermaid_lines.append(f"    {current_prev} --> {nid}(({label}))")
+                    loop_actions = a.get("actions", [])
+                    if loop_actions:
+                        traverse(loop_actions, nid)
+                    current_prev = nid
+                elif atype == "run_workflow":
+                    label = f"Run '{escape(a.get('workflow_file', ''))}'"
+                    mermaid_lines.append(f"    {current_prev} --> {nid}[[{label}]]")
+                    current_prev = nid
+                elif atype == "wait_for_template":
+                    label = f"Wait '{escape(a.get('template', ''))}'"
+                    mermaid_lines.append(f"    {current_prev} --> {nid}({label})")
+                    current_prev = nid
+                elif atype == "group":
+                    label = f"Group '{escape(a.get('name', ''))}'"
+                    mermaid_lines.append(f"    {current_prev} --> {nid}[{label}]")
+                    group_actions = a.get("actions", [])
+                    if group_actions:
+                        traverse(group_actions, nid)
+                    current_prev = nid
+                else:
+                    label = f"{atype.capitalize()}"
+                    mermaid_lines.append(f"    {current_prev} --> {nid}[{label}]")
+                    current_prev = nid
+                    
+            return current_prev
+
+        end_node = traverse(actions, "Start")
+        mermaid_lines.append(f"    {end_node} --> End(((End)))")
+        
+        mermaid_code = "\n".join(mermaid_lines)
+        html_content = f'''<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Workflow Logic Map</title>
+    <style>
+        body {{ font-family: 'Inter', sans-serif; background-color: #121212; color: #fff; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; margin: 0; padding: 40px; }}
+        .mermaid {{ background: #1e1e1e; padding: 40px; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.6); min-width: 600px; display: flex; justify-content: center; }}
+        h2 {{ position: absolute; top: 10px; left: 30px; color: #aaa; font-weight: normal; }}
+    </style>
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+      mermaid.initialize({{ startOnLoad: true, theme: 'dark' }});
+    </script>
+</head>
+<body>
+    <h2>Desktop Automator - Logic Map</h2>
+    <pre class="mermaid">
+{mermaid_code}
+    </pre>
+</body>
+</html>'''
+
+        path = os.path.join(WORKSPACE_DIR, "workflow_map.html")
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(html_content)
+            webbrowser.open("file://" + os.path.abspath(path))
+            self.show_toast("📊 Flowchart generated and opened!", T["ok"])
+        except Exception as e:
+            logger.error(f"Error generating flowchart: {e}")
+            self.show_toast("Error generating flowchart", T["err"])
 
     def _clear_workflow(self):
         self._modify_workflow(lambda lst: lst.clear())
