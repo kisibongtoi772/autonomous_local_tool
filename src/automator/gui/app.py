@@ -790,7 +790,6 @@ class AutomatorGUI(ctk.CTk):
 
         self._tab_bar_container = ctk.CTkScrollableFrame(p, height=45, orientation="horizontal", fg_color="transparent", corner_radius=0)
         self._tab_bar_container.grid(row=0, column=0, sticky="ew", padx=20, pady=(15, 0))
-        self._tab_bar_container.grid_propagate(False)
 
         # Toolbar
         tb = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
