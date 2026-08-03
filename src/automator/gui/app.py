@@ -548,6 +548,13 @@ class AutomatorGUI(ctk.CTk):
              hover_color=T["hover"]
              ).pack(pady=(2, 2), fill="x")
 
+        _btn(sel, "Clean Workspace", self._clean_workspace, width=166,
+             fg_color="transparent",
+             border_width=1, border_color=T["border"],
+             text_color=T["warn"],
+             hover_color=T["hover"]
+             ).pack(pady=(2, 2), fill="x")
+
         _btn(sel, "🖼 Template Library", self._open_template_library, width=166,
              fg_color="transparent",
              border_width=1, border_color=T["border"],
@@ -2900,6 +2907,31 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                 _label(card, "Unused", size=10, colour=T["err"]).pack(pady=(0, 12))
             else:
                 _label(card, f"{uses} uses", size=10, colour=T["ok"]).pack(pady=(0, 12))
+
+    def _clean_workspace(self):
+        from ..core.cleanup import get_orphan_templates, perform_cleanup
+        orphans = get_orphan_templates()
+        if not orphans:
+            self.show_toast("Workspace is clean! No orphaned images found.", T["ok"])
+            return
+            
+        total_size = sum(os.path.getsize(p) for p in orphans)
+        mb = total_size / (1024 * 1024)
+        
+        dlg = self._dialog("Clean Workspace", "360x220")
+        _label(dlg, f"Found {len(orphans)} unused image(s) ({mb:.2f} MB).", size=14, colour=T["text"], weight="bold").pack(pady=(24, 8))
+        _label(dlg, "These images are not referenced by any workflow.\nDo you want to delete them permanently?", size=12, colour=T["dim"]).pack(pady=(0, 24))
+        
+        btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=40)
+        
+        def _do_clean():
+            count, freed = perform_cleanup()
+            dlg.destroy()
+            self.show_toast(f"🧹 Cleaned {count} images ({freed/(1024*1024):.2f} MB)", T["ok"])
+            
+        _btn(btn_frame, "Cancel", dlg.destroy).pack(side="left", expand=True, fill="x", padx=(0, 8))
+        _btn(btn_frame, "Delete All", _do_clean, primary=True).pack(side="left", expand=True, fill="x")
 
     def _open_global_search(self):
         dlg = ctk.CTkToplevel(self)
