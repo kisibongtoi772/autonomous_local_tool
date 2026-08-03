@@ -456,6 +456,13 @@ class AutomatorGUI(ctk.CTk):
              hover_color=T["hover"]
              ).pack(pady=(2, 2), fill="x")
 
+        _btn(sel, "🖼 Template Library", self._open_template_library, width=166,
+             fg_color="transparent",
+             border_width=1, border_color=T["border"],
+             text_color=T["accent"],
+             hover_color=T["hover"]
+             ).pack(pady=(2, 6), fill="x")
+
         wf_mgmt_row = ctk.CTkFrame(sel, fg_color="transparent")
         wf_mgmt_row.pack(fill="x", pady=(2, 0))
         wf_mgmt_row.grid_columnconfigure((0, 1, 2), weight=1)
@@ -2013,6 +2020,100 @@ class AutomatorGUI(ctk.CTk):
             dlg.destroy()
             
         _btn(dlg, "Replace All", on_replace, primary=True).pack(pady=24)
+
+
+    def _open_template_library(self):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Template Library (Asset Manager)")
+        dlg.geometry("750x650")
+        dlg.attributes("-topmost", True)
+        
+        # Scrape all usage
+        usage_map = {}
+        for file in os.listdir(WORKSPACE_DIR):
+            if not file.endswith(".json"): continue
+            if file == "run_history.json": continue
+            
+            data = load_json(os.path.join(WORKSPACE_DIR, file), {})
+            
+            def scan_actions(actions):
+                for a in actions:
+                    t = a.get("template") or a.get("template_image")
+                    if t:
+                        usage_map[t] = usage_map.get(t, 0) + 1
+                    if "actions" in a:
+                        scan_actions(a["actions"])
+                    if "then_actions" in a:
+                        scan_actions(a["then_actions"])
+                    if "else_actions" in a:
+                        scan_actions(a["else_actions"])
+                        
+            scan_actions(data.get("actions", []))
+            
+        # Top toolbar
+        toolbar = ctk.CTkFrame(dlg, fg_color="transparent")
+        toolbar.pack(fill="x", padx=20, pady=16)
+        
+        _label(toolbar, "Template Library", size=20, weight="bold").pack(side="left")
+        
+        if not os.path.exists(TEMPLATES_DIR):
+            os.makedirs(TEMPLATES_DIR, exist_ok=True)
+            
+        all_templates = [f for f in os.listdir(TEMPLATES_DIR) if f.endswith(".png")]
+        unused_count = sum(1 for t in all_templates if usage_map.get(t, 0) == 0)
+        
+        def delete_all_unused():
+            for t in all_templates:
+                if usage_map.get(t, 0) == 0:
+                    try: os.remove(os.path.join(TEMPLATES_DIR, t))
+                    except Exception as e: logger.error(f"Failed to delete {t}: {e}")
+            dlg.destroy()
+            self.after(100, self._open_template_library)
+            
+        if unused_count > 0:
+            _btn(toolbar, f"🧹 Clean {unused_count} Unused", delete_all_unused, fg_color=T["err"], hover_color="#991B1B").pack(side="right")
+        
+        # Scrollable Frame
+        scroll = ctk.CTkScrollableFrame(dlg, fg_color=T["surface"], corner_radius=8)
+        scroll.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        
+        if not all_templates:
+            _label(scroll, "No templates found in workspace.", colour=T["dim"]).pack(pady=40)
+            return
+            
+        # Grid variables
+        columns = 4
+        
+        for i, t in enumerate(sorted(all_templates)):
+            uses = usage_map.get(t, 0)
+            is_unused = (uses == 0)
+            
+            card = ctk.CTkFrame(
+                scroll, fg_color="transparent", 
+                border_width=1, border_color=T["err"] if is_unused else T["border"], 
+                corner_radius=6
+            )
+            card.grid(row=i // columns, column=i % columns, padx=8, pady=8, sticky="nsew")
+            
+            # Make columns expand evenly
+            scroll.grid_columnconfigure(i % columns, weight=1)
+            
+            try:
+                img = Image.open(os.path.join(TEMPLATES_DIR, t))
+                # Resize keeping aspect ratio
+                img.thumbnail((120, 120))
+                ctk_img = ctk.CTkImage(light_image=img, dark_image=img, size=img.size)
+                img_lbl = ctk.CTkLabel(card, image=ctk_img, text="")
+                img_lbl.pack(pady=12, padx=12)
+            except Exception:
+                _label(card, "[Image Error]", colour=T["err"]).pack(pady=30)
+                
+            _label(card, t, size=11, weight="bold").pack(pady=(0, 4))
+            
+            if is_unused:
+                _label(card, "Unused", size=10, colour=T["err"]).pack(pady=(0, 12))
+            else:
+                _label(card, f"{uses} uses", size=10, colour=T["ok"]).pack(pady=(0, 12))
 
     def _open_global_search(self):
         dlg = ctk.CTkToplevel(self)
