@@ -283,6 +283,8 @@ class AutomatorGUI(ctk.CTk):
         
         self.bind("<Command-k>", self._safe_open_command_palette)
         self.bind("<Control-k>", self._safe_open_command_palette)
+        self.bind("<Command-m>", lambda e: self._toggle_mini_mode())
+        self.bind("<Control-m>", lambda e: self._toggle_mini_mode())
         
         # Stop playback on Escape
 
@@ -826,6 +828,16 @@ class AutomatorGUI(ctk.CTk):
             corner_radius=6, state="disabled", command=self._stop_playback
         )
         self.stop_play_btn.pack(side="left")
+        
+        # Mini Mode btn
+        self.mini_btn = ctk.CTkButton(
+            btn_row, text="🗕 Mini (Cmd+M)", height=36, width=120,
+            fg_color="transparent", hover_color=T["hover"],
+            text_color=T["accent"], font=ctk.CTkFont(*FONT_BODY),
+            border_width=1, border_color=T["border"],
+            corner_radius=6, command=self._toggle_mini_mode
+        )
+        self.mini_btn.pack(side="right", padx=(0, 0))
 
         # ── Playback options row ─────────────────────────────────────────────
         opt_row = ctk.CTkFrame(ctrl, fg_color="transparent")
@@ -5173,6 +5185,67 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
             self._set_status(status_text, status_color)
         else:
             self._set_status("Error: Template absolutely not found on screen (even at 0.4 confidence).", T["err"])
+
+    def _toggle_mini_mode(self):
+        if hasattr(self, "_mini_hud") and self._mini_hud.winfo_exists():
+            self._mini_hud.destroy()
+            self.deiconify()
+            return
+            
+        self.withdraw() # Hide main window
+        
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Automator Mini")
+        dlg.geometry("340x54")
+        dlg.overrideredirect(True)
+        dlg.attributes("-topmost", True)
+        dlg.configure(fg_color=T["surface"])
+        
+        # Border
+        border = ctk.CTkFrame(dlg, fg_color=T["border"], corner_radius=12)
+        border.pack(fill="both", expand=True, padx=1, pady=1)
+        inner = ctk.CTkFrame(border, fg_color=T["surface"], corner_radius=11)
+        inner.pack(fill="both", expand=True, padx=1, pady=1)
+        
+        # Position Center Bottom
+        sw = dlg.winfo_screenwidth()
+        sh = dlg.winfo_screenheight()
+        x = (sw - 340) // 2
+        y = sh - 150
+        dlg.geometry(f"+{x}+{y}")
+        
+        # Drag Handle
+        drag_handle = ctk.CTkFrame(inner, width=20, fg_color="transparent")
+        drag_handle.pack(side="left", fill="y", padx=4)
+        from .components import _label
+        _label(drag_handle, "⣿", size=16, colour=T["dim"]).pack(expand=True)
+        
+        def on_press(e): dlg._drag_data = {"x": e.x, "y": e.y}
+        def on_drag(e):
+            nx = dlg.winfo_x() - dlg._drag_data["x"] + e.x
+            ny = dlg.winfo_y() - dlg._drag_data["y"] + e.y
+            dlg.geometry(f"+{nx}+{ny}")
+            
+        drag_handle.bind("<ButtonPress-1>", on_press)
+        drag_handle.bind("<B1-Motion>", on_drag)
+        
+        # Controls
+        row = ctk.CTkFrame(inner, fg_color="transparent")
+        row.pack(side="left", fill="both", expand=True, padx=4, pady=6)
+        
+        btn_file = ctk.CTkButton(row, text="📂 File", width=60, fg_color=T["raised"], hover_color=T["hover"], text_color=T["text"], command=self._open_file_switcher)
+        btn_file.pack(side="left", padx=4)
+        
+        btn_play = ctk.CTkButton(row, text="▶ Run", width=70, fg_color=T["ok"], hover_color="#14532D", command=self.playback)
+        btn_play.pack(side="left", padx=4)
+        
+        btn_stop = ctk.CTkButton(row, text="⏹ Stop", width=70, fg_color=T["err"], hover_color="#7F1D1D", command=self._stop_playback)
+        btn_stop.pack(side="left", padx=4)
+        
+        btn_max = ctk.CTkButton(row, text="🗖", width=36, fg_color="transparent", text_color=T["dim"], hover_color=T["hover"], command=self._toggle_mini_mode)
+        btn_max.pack(side="right", padx=4)
+        
+        self._mini_hud = dlg
 
     def _bind_canvas_mousewheel(self):
         # Implementation for canvas mousewheel binding
