@@ -1960,6 +1960,54 @@ class AutomatorGUI(ctk.CTk):
             
         from .recorder_hud import RecorderHUD
         self._recorder_hud = RecorderHUD(self, on_stop=on_stop)
+    def _get_known_variables(self) -> list:
+        import re
+        vars_set = set()
+        
+        try:
+            from ..core.variable_manager import VariableManager
+            for k in VariableManager().list_all().keys():
+                vars_set.add(k)
+        except Exception:
+            pass
+            
+        def scan(actions):
+            for a in actions:
+                for k, v in a.items():
+                    if k == "save_to_variable" and v:
+                        vars_set.add(v)
+                    elif isinstance(v, str):
+                        for m in re.findall(r'\{\{([a-zA-Z0-9_]+)\}\}', v):
+                            vars_set.add(m)
+                if "actions" in a: scan(a["actions"])
+                if "then_actions" in a: scan(a["then_actions"])
+                if "else_actions" in a: scan(a["else_actions"])
+                
+        scan(self._actions)
+        return sorted(list(vars_set))
+
+    def _build_var_pills(self, parent_frame, entry_widget):
+        vars_list = self._get_known_variables()
+        if not vars_list: return
+        
+        pill_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
+        pill_frame.pack(fill="x", pady=(4, 0))
+        
+        lbl = ctk.CTkLabel(pill_frame, text="Variables:", font=ctk.CTkFont(*FONT_BODY, size=10), text_color=T["dim"])
+        lbl.pack(side="left", padx=(0, 5))
+        
+        for v in vars_list[:7]: # Max 7 pills
+            def _insert(var=v):
+                entry_widget.insert("insert", f"{{{{{var}}}}}")
+                
+            btn = ctk.CTkButton(
+                pill_frame, text=f"{{{v}}}", width=20, height=20,
+                fg_color=T["raised"], text_color=T["accent"],
+                hover_color=T["hover"], font=ctk.CTkFont(*FONT_BODY, size=10),
+                corner_radius=4, command=_insert
+            )
+            btn.pack(side="left", padx=2)
+
 
     def _open_add_dialog(self, insert_idx: int = None, default_type: str = "sleep"):
         dlg = self._dialog("Add Action" if insert_idx is None else "Insert Action", "400x470")
@@ -1984,6 +2032,11 @@ class AutomatorGUI(ctk.CTk):
             text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6
         )
         entry.pack(side="left", fill="x", expand=True)
+
+        # Insert Smart Variable Pills
+        var_pill_container = ctk.CTkFrame(dlg, fg_color="transparent")
+        var_pill_container.pack(padx=20, fill="x")
+        self._build_var_pills(var_pill_container, entry)
 
         def open_snipping():
             from .snipping_tool import SnippingTool
@@ -2289,6 +2342,11 @@ class AutomatorGUI(ctk.CTk):
             text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6
         )
         entry.pack(side="left", fill="x", expand=True)
+        
+        # Insert Smart Variable Pills
+        var_pill_container = ctk.CTkFrame(dlg, fg_color="transparent")
+        var_pill_container.pack(padx=20, fill="x")
+        self._build_var_pills(var_pill_container, entry)
 
         def open_snipping():
             from .snipping_tool import SnippingTool
