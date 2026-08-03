@@ -3107,6 +3107,84 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         var_pill_container = ctk.CTkFrame(dlg, fg_color="transparent")
         var_pill_container.pack(padx=20, fill="x")
         self._build_var_pills(var_pill_container, entry)
+        
+        # --- Smart Inline Variable Autocomplete ---
+        autocomplete_win = None
+        
+        def check_autocomplete(event):
+            nonlocal autocomplete_win
+            if event.keysym in ("Up", "Down", "Return", "Escape"): return # Handled elsewhere or ignore
+            
+            val = val_var.get()
+            cursor_pos = entry.index("insert")
+            text_before = val[:cursor_pos]
+            
+            import re
+            match = re.search(r'\{\{([a-zA-Z0-9_]*)$', text_before)
+            
+            if match:
+                query = match.group(1).lower()
+                known_vars = self._get_known_variables()
+                magic = ["CLIPBOARD", "TIME", "DATE", "DATETIME"]
+                all_vars = sorted(list(set(known_vars + magic)))
+                
+                matches = [v for v in all_vars if query in v.lower()]
+                
+                if not matches:
+                    if autocomplete_win:
+                        autocomplete_win.destroy()
+                        autocomplete_win = None
+                    return
+                
+                if not autocomplete_win or not autocomplete_win.winfo_exists():
+                    autocomplete_win = ctk.CTkToplevel(dlg)
+                    autocomplete_win.overrideredirect(True)
+                    autocomplete_win.attributes("-topmost", True)
+                    # Position below entry
+                    x = entry.winfo_rootx()
+                    y = entry.winfo_rooty() + entry.winfo_height()
+                    autocomplete_win.geometry(f"{entry.winfo_width()}x120+{x}+{y}")
+                    
+                    sf = ctk.CTkScrollableFrame(autocomplete_win, fg_color="#18181B", corner_radius=0)
+                    sf.pack(fill="both", expand=True)
+                    autocomplete_win.sf = sf
+                else:
+                    sf = autocomplete_win.sf
+                    for w in sf.winfo_children():
+                        w.destroy()
+                        
+                for m in matches:
+                    def _select(var=m):
+                        nonlocal autocomplete_win
+                        start = match.start()
+                        new_val = val[:start] + f"{{{{{var}}}}}" + val[cursor_pos:]
+                        val_var.set(new_val)
+                        entry.icursor(start + len(var) + 4)
+                        if autocomplete_win:
+                            autocomplete_win.destroy()
+                            autocomplete_win = None
+                            
+                    prefix = "✨ " if m in magic else ""
+                    btn = ctk.CTkButton(sf, text=f"{prefix}{{{{{m}}}}}", fg_color="transparent", 
+                                        text_color=T["accent"] if m in magic else "#D4D4D8", 
+                                        anchor="w", height=24, command=_select)
+                    btn.pack(fill="x", padx=2, pady=1)
+            else:
+                if autocomplete_win:
+                    autocomplete_win.destroy()
+                    autocomplete_win = None
+                    
+        entry.bind("<KeyRelease>", check_autocomplete)
+        
+        # Ensure cleanup
+        def _on_dlg_close():
+            nonlocal autocomplete_win
+            if autocomplete_win:
+                try: autocomplete_win.destroy()
+                except: pass
+            dlg.destroy()
+            
+        dlg.protocol("WM_DELETE_WINDOW", _on_dlg_close)
 
         def open_snipping():
             from .snipping_tool import SnippingTool
@@ -3417,6 +3495,84 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         var_pill_container = ctk.CTkFrame(dlg, fg_color="transparent")
         var_pill_container.pack(padx=20, fill="x")
         self._build_var_pills(var_pill_container, entry)
+        
+        # --- Smart Inline Variable Autocomplete ---
+        autocomplete_win = None
+        
+        def check_autocomplete(event):
+            nonlocal autocomplete_win
+            if event.keysym in ("Up", "Down", "Return", "Escape"): return # Handled elsewhere or ignore
+            
+            val = val_var.get()
+            cursor_pos = entry.index("insert")
+            text_before = val[:cursor_pos]
+            
+            import re
+            match = re.search(r'\{\{([a-zA-Z0-9_]*)$', text_before)
+            
+            if match:
+                query = match.group(1).lower()
+                known_vars = self._get_known_variables()
+                magic = ["CLIPBOARD", "TIME", "DATE", "DATETIME"]
+                all_vars = sorted(list(set(known_vars + magic)))
+                
+                matches = [v for v in all_vars if query in v.lower()]
+                
+                if not matches:
+                    if autocomplete_win:
+                        autocomplete_win.destroy()
+                        autocomplete_win = None
+                    return
+                
+                if not autocomplete_win or not autocomplete_win.winfo_exists():
+                    autocomplete_win = ctk.CTkToplevel(dlg)
+                    autocomplete_win.overrideredirect(True)
+                    autocomplete_win.attributes("-topmost", True)
+                    # Position below entry
+                    x = entry.winfo_rootx()
+                    y = entry.winfo_rooty() + entry.winfo_height()
+                    autocomplete_win.geometry(f"{entry.winfo_width()}x120+{x}+{y}")
+                    
+                    sf = ctk.CTkScrollableFrame(autocomplete_win, fg_color="#18181B", corner_radius=0)
+                    sf.pack(fill="both", expand=True)
+                    autocomplete_win.sf = sf
+                else:
+                    sf = autocomplete_win.sf
+                    for w in sf.winfo_children():
+                        w.destroy()
+                        
+                for m in matches:
+                    def _select(var=m):
+                        nonlocal autocomplete_win
+                        start = match.start()
+                        new_val = val[:start] + f"{{{{{var}}}}}" + val[cursor_pos:]
+                        val_var.set(new_val)
+                        entry.icursor(start + len(var) + 4)
+                        if autocomplete_win:
+                            autocomplete_win.destroy()
+                            autocomplete_win = None
+                            
+                    prefix = "✨ " if m in magic else ""
+                    btn = ctk.CTkButton(sf, text=f"{prefix}{{{{{m}}}}}", fg_color="transparent", 
+                                        text_color=T["accent"] if m in magic else "#D4D4D8", 
+                                        anchor="w", height=24, command=_select)
+                    btn.pack(fill="x", padx=2, pady=1)
+            else:
+                if autocomplete_win:
+                    autocomplete_win.destroy()
+                    autocomplete_win = None
+                    
+        entry.bind("<KeyRelease>", check_autocomplete)
+        
+        # Ensure cleanup
+        def _on_dlg_close():
+            nonlocal autocomplete_win
+            if autocomplete_win:
+                try: autocomplete_win.destroy()
+                except: pass
+            dlg.destroy()
+            
+        dlg.protocol("WM_DELETE_WINDOW", _on_dlg_close)
 
         def open_snipping():
             from .snipping_tool import SnippingTool
