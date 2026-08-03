@@ -299,6 +299,44 @@ class AutomatorGUI(ctk.CTk):
     def _safe_redo(self, event):
         if self._is_typing(): return
         self._redo()
+
+    def _show_cheatsheet(self):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Keyboard Shortcuts & Cheatsheet")
+        dlg.geometry("450x550")
+        dlg.attributes("-topmost", True)
+        
+        scroll = ctk.CTkScrollableFrame(dlg, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        _label(scroll, "Keyboard Shortcuts", size=16, weight="bold").pack(anchor="w", pady=(0, 10))
+        
+        shortcuts = [
+            ("Cmd + S", "Save Workflow"),
+            ("Cmd + P", "Quick Switch Workflow"),
+            ("Cmd + Z", "Undo"),
+            ("Cmd + Shift + Z", "Redo"),
+            ("Cmd + R", "Run Workflow"),
+            ("Escape", "Panic Stop (Abort Execution)"),
+        ]
+        
+        for k, v in shortcuts:
+            row = ctk.CTkFrame(scroll, fg_color="transparent")
+            row.pack(fill="x", pady=4)
+            _label(row, k, size=12, colour=T["accent"], weight="bold").pack(side="left")
+            _label(row, v, size=12, colour=T["text"]).pack(side="right")
+            
+        _label(scroll, "Pro Tips", size=16, weight="bold").pack(anchor="w", pady=(20, 10))
+        tips = [
+            "• Use '{{var_name}}' syntax to inject variables dynamically.",
+            "• Hover over the Image icon in the list to peek the template.",
+            "• Click 📸 to instantly recapture a broken image template.",
+            "• Turn on '👁 X-Ray' to see what variables will evaluate to.",
+            "• Check the bottom-right HUD for live mouse coordinates."
+        ]
+        for t in tips:
+            _label(scroll, t, size=11, colour=T["dim"]).pack(anchor="w", pady=2)
+            
         
     def _safe_play(self, event):
         if self._is_typing(): return
@@ -744,6 +782,7 @@ class AutomatorGUI(ctk.CTk):
         _btn(tb, "Import 📥",  self._import_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "❓ Help",    self._show_cheatsheet, False).pack(side="right", padx=16, pady=8)
         
         self._console_visible = False
         def toggle_console():
@@ -3598,13 +3637,19 @@ class AutomatorGUI(ctk.CTk):
             
             self._action_rows[idx].configure(fg_color=T["accent"])
             self._current_highlight_idx = idx
+
+            # Intelligent Auto-Scroll to keep active item in center
+            if hasattr(self, "_wf_list") and self._wf_list.winfo_exists():
+                try:
+                    total_items = len(self._action_rows)
+                    if total_items > 5:
+                        target_idx = max(0, idx - 2)
+                        pct = target_idx / total_items
+                        self._wf_list._parent_canvas.yview_moveto(pct)
+                except Exception:
+                    pass
             
-            # Auto-scroll if total is large enough
-            if total > 5:
-                # yview_moveto takes fraction from 0.0 to 1.0
-                # Subtracting a small offset so the item isn't glued to the very top
-                scroll_fraction = max(0.0, (idx / total) - 0.1)
-                self._wf_list._parent_canvas.yview_moveto(scroll_fraction)
+
 
     def _test_template_match(self, action: dict):
         tmpl = action.get("template") or action.get("template_image")
