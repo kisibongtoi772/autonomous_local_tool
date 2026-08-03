@@ -3892,7 +3892,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
     def _build_scheduler(self, p: ctk.CTkFrame):
         p.grid_columnconfigure(0, weight=1)
         p.grid_rowconfigure(1, weight=1)
-        self._page_header(p, "Scheduler", row=0)
+        self._page_header(p, "Triggers", row=0)
 
         form = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
         form.grid(row=0, column=0, sticky="ew", padx=24, pady=(56, 8))
@@ -3917,7 +3917,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         self._sched_type = ctk.StringVar(value="minutes")
         ctk.CTkOptionMenu(
             form, variable=self._sched_type,
-            values=["minutes", "hours", "daily_at"],
+            values=["hotkey", "minutes", "hours", "daily_at"],
             fg_color=T["raised"], button_color=T["border"],
             text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
             width=130, corner_radius=6

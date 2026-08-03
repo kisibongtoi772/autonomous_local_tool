@@ -8,6 +8,7 @@ import threading
 import time
 from typing import Callable, List, Dict, Any
 import schedule as sched
+from pynput import keyboard
 
 from ..utils.config import SCHEDULES_FILE
 from ..utils.logger import get_logger
@@ -23,6 +24,7 @@ class WorkflowScheduler:
         self._running = False
         self._jobs: List[Dict[str, Any]] = []
         self._play_callback: Callable | None = None
+        self._hotkey_listener = None
         self.load()
 
     def set_play_callback(self, callback: Callable):
@@ -72,6 +74,7 @@ class WorkflowScheduler:
         self._jobs.append(job)
         self.save()
         self._register_job(job)
+        self._rebuild_hotkeys()
         logger.info(f"Scheduled: {job['label']}")
         return job
 
@@ -84,6 +87,7 @@ class WorkflowScheduler:
         for job in self._jobs:
             if job.get("enabled"):
                 self._register_job(job)
+        self._rebuild_hotkeys()
         logger.info(f"Removed schedule id={job_id}")
 
     def _register_job(self, job: Dict):
@@ -103,12 +107,51 @@ class WorkflowScheduler:
 
         iv = job["interval_type"]
         val = job["interval_value"]
-        if iv == "minutes":
+        if iv == "hotkey":
+            pass  # handled by _rebuild_hotkeys
+        elif iv == "minutes":
             sched.every(int(val)).minutes.do(task)
         elif iv == "hours":
             sched.every(int(val)).hours.do(task)
         elif iv == "daily_at":
             sched.every().day.at(str(val)).do(task)
+
+    def _rebuild_hotkeys(self):
+        if self._hotkey_listener:
+            self._hotkey_listener.stop()
+            self._hotkey_listener = None
+            
+        mapping = {}
+        for job in self._jobs:
+            if job.get("enabled") and job.get("interval_type") == "hotkey":
+                # Create closure
+                def make_task(j=job):
+                    def t():
+                        logger.info(f"Hotkey triggered: '{j['label']}'")
+                        j["run_count"] = j.get("run_count", 0) + 1
+                        j["last_run"] = time.strftime("%Y-%m-%d %H:%M:%S")
+                        self.save()
+                        if self._play_callback:
+                            # Run in new thread so we don't block the hotkey listener
+                            threading.Thread(target=self._play_callback, args=(j["workflow_file"],), daemon=True).start()
+                    return t
+                
+                hk = job["interval_value"]
+                # Convert our format cmd,shift,f to pynput format <cmd>+<shift>+f
+                parts = [p.strip().lower() for p in hk.split(",")]
+                mapped_parts = []
+                for p in parts:
+                    if p in ("ctrl", "cmd", "shift", "alt"):
+                        mapped_parts.append(f"<{p}>")
+                    else:
+                        mapped_parts.append(p)
+                pynput_hk = "+".join(mapped_parts)
+                mapping[pynput_hk] = make_task(job)
+                
+        if mapping and self._running:
+            self._hotkey_listener = keyboard.GlobalHotKeys(mapping)
+            self._hotkey_listener.start()
+            logger.info(f"Registered {len(mapping)} global hotkey(s).")
 
     def start(self):
         """Start the background scheduler thread."""
@@ -122,11 +165,15 @@ class WorkflowScheduler:
         self._running = True
         self._thread = threading.Thread(target=self._run_loop, daemon=True, name="SchedulerThread")
         self._thread.start()
+        self._rebuild_hotkeys()
         logger.info("Scheduler started.")
 
     def stop(self):
         self._running = False
         sched.clear()
+        if self._hotkey_listener:
+            self._hotkey_listener.stop()
+            self._hotkey_listener = None
         logger.info("Scheduler stopped.")
 
     def _run_loop(self):
