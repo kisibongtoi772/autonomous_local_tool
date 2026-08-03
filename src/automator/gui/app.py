@@ -1235,16 +1235,36 @@ class AutomatorGUI(ctk.CTk):
             
             _label(qa_row, "Quick Add:", size=11, colour=T["dim"]).pack(side="left", padx=(0, 8))
             
-            def instant_qa(atype):
+            def instant_qa(atype, extra=None):
                 def mut(lst):
                     new_act = {"type": atype}
-                    if atype == "sleep": new_act["duration"] = 1.0
+                    if extra:
+                        new_act.update(extra)
+                    elif atype == "sleep": new_act["duration"] = 1.0
                     elif atype == "click": new_act["x"] = 0; new_act["y"] = 0; new_act["clicks"] = 1
                     elif atype == "type": new_act["key"] = ""
                     elif atype == "assert_template": new_act["template"] = ""
                     lst.append(new_act)
                 self._modify_workflow(mut)
                 self.after(100, lambda: self._wf_list._parent_canvas.yview_moveto(1.0))
+                
+            if actions:
+                last_type = actions[-1].get("type")
+                suggestion = None
+                if last_type == "app_focus":
+                    suggestion = ("sleep", {"duration": 1.0}, "✨ Sleep 1s")
+                elif last_type in ("wait_for_template", "assert_template"):
+                    suggestion = ("click", {"x": 0, "y": 0, "clicks": 1}, "✨ Click Image")
+                elif last_type == "click":
+                    suggestion = ("sleep", {"duration": 0.5}, "✨ Sleep 0.5s")
+                elif last_type == "type":
+                    suggestion = ("hotkey", {"key": "enter"}, "✨ Press Enter")
+                elif last_type == "hotkey":
+                    suggestion = ("sleep", {"duration": 0.5}, "✨ Sleep 0.5s")
+                
+                if suggestion:
+                    stype, sextra, slabel = suggestion
+                    _btn(qa_row, slabel, lambda t=stype, e=sextra: instant_qa(t, e), fg_color="transparent", border_width=1, border_color="#FFD700", text_color="#FFD700").pack(side="left", padx=(2, 6))
                 
             _btn(qa_row, "⏳ Sleep", lambda: instant_qa("sleep"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
             _btn(qa_row, "👆 Click", lambda: instant_qa("click"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
