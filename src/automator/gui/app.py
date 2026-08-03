@@ -4711,6 +4711,11 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
 
     def playback(self, start_idx: int = 0, end_idx: int = None):
         if self.recording: return
+        if getattr(self, "_player", None) is not None:
+            if hasattr(self, "_debugger_hud") and self._debugger_hud.winfo_exists():
+                if hasattr(self._debugger_hud, "on_run"):
+                    self._debugger_hud.on_run()
+            return
         self.resume_btn.pack_forget()
         self._last_failed_idx = None
         
@@ -4845,6 +4850,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
             self._player.stop()
             logger.info("Stop signal sent to player.")
         self.stop_play_btn.configure(state="disabled", text_color=T["dim"])
+        self.after(0, getattr(self, "_cleanup_debugger", lambda: None))
 
     def _on_speed_change(self, val):
         self._speed_label.configure(text=f"{round(val, 2)}x")
@@ -4985,6 +4991,10 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         _btn(btn_frame, "OK", on_ok, primary=True).pack(side="right", padx=20)
         _btn(btn_frame, "Cancel", on_cancel).pack(side="right")
 
+    def _cleanup_debugger(self):
+        if hasattr(self, "_debugger_hud") and getattr(self._debugger_hud, "winfo_exists", lambda: False)():
+            self._debugger_hud.destroy()
+            
     def _make_step_callback(self) -> Callable:
         """Return a blocking step callback that shows a confirmation dialog."""
         import queue
@@ -5001,33 +5011,67 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         atype   = action_dict.get("type", "?")
         label   = ACTION_LABELS.get(atype, atype)
         summary = self._action_summary(atype, action_dict)
-
-        dlg = ctk.CTkToplevel(self)
-        dlg.title("Step Confirm")
-        dlg.geometry("360x160")
-        dlg.transient(self)
-        dlg.configure(fg_color=T["surface"])
-        dlg.attributes("-topmost", True)
-        dlg.resizable(False, False)
-
-        _label(dlg, f"Next:  {label}", size=12, colour=T["label"]).pack(
-            padx=20, pady=(16, 2), anchor="w")
-        _label(dlg, summary[:80] or "—", size=11, colour=T["text"]).pack(
-            padx=20, pady=(0, 14), anchor="w")
-
-        row = ctk.CTkFrame(dlg, fg_color="transparent")
-        row.pack(padx=20)
-
+        
+        if not hasattr(self, "_debugger_hud") or not self._debugger_hud.winfo_exists():
+            dlg = ctk.CTkToplevel(self)
+            dlg.title("Debugger HUD")
+            dlg.geometry("380x110")
+            dlg.overrideredirect(True)
+            dlg.attributes("-topmost", True)
+            dlg.configure(fg_color=T["surface"])
+            
+            # Draw border
+            border = ctk.CTkFrame(dlg, fg_color=T["border"], corner_radius=8)
+            border.pack(fill="both", expand=True, padx=1, pady=1)
+            inner = ctk.CTkFrame(border, fg_color=T["surface"], corner_radius=7)
+            inner.pack(fill="both", expand=True, padx=1, pady=1)
+            
+            # Position Top Right
+            sw = dlg.winfo_screenwidth()
+            x = sw - 400
+            dlg.geometry(f"+{x}+40")
+            
+            dlg.lbl_title = ctk.CTkLabel(inner, text="", font=ctk.CTkFont("SF Pro Text", 12, "bold"), text_color=T["label"])
+            dlg.lbl_title.pack(padx=20, pady=(12, 2), anchor="w")
+            
+            dlg.lbl_desc = ctk.CTkLabel(inner, text="", font=ctk.CTkFont("SF Pro Text", 11), text_color=T["text"])
+            dlg.lbl_desc.pack(padx=20, pady=(0, 10), anchor="w")
+            
+            row = ctk.CTkFrame(inner, fg_color="transparent")
+            row.pack(padx=20, fill="x", pady=(0, 12))
+            
+            dlg.btn_run = ctk.CTkButton(row, text="▶ Run (F11)", width=90, fg_color=T["ok"], hover_color="#14532D")
+            dlg.btn_run.pack(side="left", padx=(0, 6))
+            
+            dlg.btn_skip = ctk.CTkButton(row, text="⏭ Skip", width=80, fg_color=T["raised"])
+            dlg.btn_skip.pack(side="left", padx=(0, 6))
+            
+            dlg.btn_stop = ctk.CTkButton(row, text="⏹ Stop (F10)", width=90, fg_color=T["err"], hover_color="#7F1D1D")
+            dlg.btn_stop.pack(side="right")
+            
+            # Make HUD draggable
+            def on_press(e):
+                dlg._drag_data = {"x": e.x, "y": e.y}
+            def on_drag(e):
+                x = dlg.winfo_x() - dlg._drag_data["x"] + e.x
+                y = dlg.winfo_y() - dlg._drag_data["y"] + e.y
+                dlg.geometry(f"+{x}+{y}")
+            inner.bind("<ButtonPress-1>", on_press)
+            inner.bind("<B1-Motion>", on_drag)
+            
+            self._debugger_hud = dlg
+            
+        dlg = self._debugger_hud
+        dlg.lbl_title.configure(text=f"Next: {label}")
+        dlg.lbl_desc.configure(text=(summary[:80] or "—"))
+        
         def choose(val: str):
-            dlg.destroy()
             q.put(val)
-
-        _btn(row, "Run",  lambda: choose("run"),  primary=True, width=90).pack(side="left", padx=(0, 6))
-        _btn(row, "Skip", lambda: choose("skip"), width=90).pack(side="left", padx=(0, 6))
-        _btn(row, "Stop", lambda: choose("stop"), danger=True, width=90).pack(side="left")
-
-        # If dialog is closed by X, treat as stop
-        dlg.protocol("WM_DELETE_WINDOW", lambda: choose("stop"))
+            
+        dlg.on_run = lambda: choose("run")
+        dlg.btn_run.configure(command=dlg.on_run)
+        dlg.btn_skip.configure(command=lambda: choose("skip"))
+        dlg.btn_stop.configure(command=lambda: choose("stop"))
 
     def _on_progress_update(self, step: int, total: int, action_dict: dict, depth: int = 0):
         self.after(0, self._update_progress_ui, step, total, action_dict, depth)
@@ -5150,6 +5194,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         self._file_switcher = FileSwitcher(self, files, current, on_select)
 
     def _on_done(self, success: bool, error: str = None, snapshot: str = None, profiler_data: list = None):
+        self.after(0, getattr(self, "_cleanup_debugger", lambda: None))
         self._last_profiler_data = profiler_data
         self._set_status("Idle", T["ok"])
         self.play_btn.configure(state="normal")
