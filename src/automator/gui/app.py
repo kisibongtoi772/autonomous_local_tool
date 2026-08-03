@@ -1292,6 +1292,7 @@ class AutomatorGUI(ctk.CTk):
         if tmpl_file:
             _ctrl_btn(ctrl, "Img", lambda t=tmpl_file: self._show_template_preview_dialog(t)).pack(side="left", padx=1)
             _ctrl_btn(ctrl, "Find", lambda a=action: self._test_template_match(a)).pack(side="left", padx=1)
+            _ctrl_btn(ctrl, "📸 Retake", lambda t=tmpl_file: self._quick_recapture(t), text_color=T["accent"]).pack(side="left", padx=1)
             
         if atype in ("click", "assert_color", "if_color") and "x" in action and "y" in action:
             from .click_ripple import ClickRipple
@@ -1754,6 +1755,26 @@ class AutomatorGUI(ctk.CTk):
     def _duplicate_action(self, idx: int):
         def m(lst): lst.insert(idx + 1, copy.deepcopy(lst[idx]))
         self._modify_workflow(m)
+
+    def _quick_recapture(self, filename: str):
+        from .snipping_tool import SnippingTool
+        self.withdraw()
+        
+        def on_capture(fname):
+            self.deiconify()
+            # Clear thumbnail cache so UI updates immediately
+            if hasattr(self, "_thumbnail_cache") and fname in self._thumbnail_cache:
+                del self._thumbnail_cache[fname]
+            self._refresh_workflow()
+            from tkinter import messagebox
+            # Show a brief, non-blocking toast would be better, but we don't have a toast component easily available.
+            # Wait, let's just refresh the workflow. The visual update is obvious enough.
+            pass
+            
+        def on_cancel():
+            self.deiconify()
+            
+        SnippingTool(self, on_capture, on_cancel, force_filename=filename)
 
     def _move_up(self, idx: int):
         if idx <= 0: return
