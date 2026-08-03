@@ -1950,6 +1950,82 @@ class AutomatorGUI(ctk.CTk):
         save_json(path, data)
         self._refresh_workflow()
 
+    def _setup_inputs_form(self):
+        filename = self.file_var.get()
+        if not filename: return
+        path = os.path.join(WORKSPACE_DIR, filename)
+        data = load_json(path, {})
+        inputs = data.get("inputs", [])
+        
+        dlg = self._dialog(f"Input Form Builder - {filename}", "500x500")
+        
+        _label(dlg, "Pre-Run Input Fields", size=18, weight="bold").pack(pady=(20, 4))
+        _label(dlg, "Define variables that the user must fill before the macro starts.", size=12, colour=T["dim"]).pack(pady=(0, 16))
+        
+        sf = ctk.CTkScrollableFrame(dlg, fg_color="transparent")
+        sf.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        entries = []
+        
+        def _render():
+            for w in sf.winfo_children(): w.destroy()
+            entries.clear()
+            for i, inp in enumerate(inputs):
+                row = ctk.CTkFrame(sf, fg_color=T["surface"], corner_radius=6)
+                row.pack(fill="x", pady=4, padx=4)
+                
+                # Top row
+                r1 = ctk.CTkFrame(row, fg_color="transparent")
+                r1.pack(fill="x", padx=8, pady=(8, 4))
+                _label(r1, "Variable:", size=11, colour=T["dim"]).pack(side="left")
+                v_var = ctk.CTkEntry(r1, width=120, height=24, fg_color=T["raised"], border_color=T["border"])
+                v_var.pack(side="left", padx=4)
+                v_var.insert(0, inp.get("name", ""))
+                
+                def _del(idx=i):
+                    inputs.pop(idx); _render()
+                _btn(r1, "❌", _del, width=24, height=24, fg_color="transparent").pack(side="right")
+                
+                # Bottom row
+                r2 = ctk.CTkFrame(row, fg_color="transparent")
+                r2.pack(fill="x", padx=8, pady=(0, 8))
+                _label(r2, "Label:", size=11, colour=T["dim"]).pack(side="left")
+                l_var = ctk.CTkEntry(r2, height=24, fg_color=T["raised"], border_color=T["border"])
+                l_var.pack(side="left", fill="x", expand=True, padx=(4, 8))
+                l_var.insert(0, inp.get("label", ""))
+                
+                _label(r2, "Default:", size=11, colour=T["dim"]).pack(side="left")
+                d_var = ctk.CTkEntry(r2, width=80, height=24, fg_color=T["raised"], border_color=T["border"])
+                d_var.pack(side="left", padx=4)
+                d_var.insert(0, inp.get("default", ""))
+                
+                entries.append((v_var, l_var, d_var))
+                
+        _render()
+        
+        def _add():
+            inputs.append({"name": "new_var", "label": "Nhập giá trị", "default": ""})
+            _render()
+            
+        def _save():
+            new_inputs = []
+            for v, l, d in entries:
+                if v.get().strip():
+                    new_inputs.append({
+                        "name": v.get().strip(),
+                        "label": l.get().strip(),
+                        "default": d.get().strip()
+                    })
+            data["inputs"] = new_inputs
+            save_json(path, data)
+            dlg.destroy()
+            self.show_toast("✅ Form inputs saved!", T["ok"])
+            
+        bf = ctk.CTkFrame(dlg, fg_color="transparent")
+        bf.pack(fill="x", padx=20, pady=20)
+        _btn(bf, "+ Add Field", _add, width=100, fg_color="transparent", border_width=1, border_color=T["border"]).pack(side="left")
+        _btn(bf, "Save Setup", _save, primary=True, width=100).pack(side="right")
+
     def _export_workflow(self):
         wf_name = self.file_var.get()
         wf_path = os.path.join(WORKSPACE_DIR, wf_name)
@@ -3139,6 +3215,42 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         scan(actions)
         return list(required)
 
+    def _prompt_interactive_form(self, inputs, on_complete):
+        dlg = self._dialog(f"Run Setup - {self.file_var.get()}", "400x500")
+        dlg.attributes("-topmost", True)
+        
+        _label(dlg, "Pre-Run Inputs Required", size=18, weight="bold").pack(pady=(20, 4))
+        _label(dlg, "Please provide the following information to continue.", size=12, colour=T["dim"]).pack(pady=(0, 16))
+        
+        sf = ctk.CTkScrollableFrame(dlg, fg_color="transparent")
+        sf.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        entry_widgets = []
+        for inp in inputs:
+            f = ctk.CTkFrame(sf, fg_color="transparent")
+            f.pack(fill="x", pady=8)
+            _label(f, inp.get("label", inp.get("name")), size=13, weight="bold").pack(anchor="w", pady=(0, 4))
+            
+            e = ctk.CTkEntry(f, height=36, fg_color=T["surface"], border_color=T["border"])
+            e.pack(fill="x")
+            
+            # Use current variable value if exists, else default
+            current_val = self.var_manager.get(inp["name"]) or inp.get("default", "")
+            e.insert(0, str(current_val))
+            
+            entry_widgets.append((inp["name"], e))
+            
+        def _submit():
+            for name, e in entry_widgets:
+                self.var_manager.set_var(name, e.get().strip())
+            dlg.destroy()
+            on_complete()
+            
+        bf = ctk.CTkFrame(dlg, fg_color="transparent")
+        bf.pack(fill="x", padx=20, pady=20)
+        _btn(bf, "Cancel", dlg.destroy, width=100, fg_color="transparent").pack(side="left")
+        _btn(bf, "▶ Start Run", _submit, primary=True, width=120).pack(side="right")
+
     def _prompt_variable_wizard(self, missing_vars, on_complete):
         dlg = ctk.CTkToplevel(self)
         dlg.title("Pre-Run Variable Wizard")
@@ -4057,8 +4169,23 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         self._refresh_scheduler()
 
     def _run_scheduled(self, wf_path: str):
-        Player(workflow_path=wf_path).play()
-        self.after(0, self._refresh_stats)
+        def _do_run():
+            data = load_json(wf_path, {})
+            inputs = data.get("inputs", [])
+            
+            def _launch_thread():
+                import threading
+                threading.Thread(target=lambda: (Player(workflow_path=wf_path).play(), self.after(0, self._refresh_stats)), daemon=True).start()
+                
+            if inputs:
+                # Need to update self.file_var temporarily for the title
+                old_file = self.file_var.get()
+                self.file_var.set(os.path.basename(wf_path))
+                self._prompt_interactive_form(inputs, lambda: (self.file_var.set(old_file), _launch_thread()))
+            else:
+                _launch_thread()
+                
+        self.after(0, _do_run)
 
     # ── PANEL: Variables ──────────────────────────────────────────────────────
 
@@ -4436,7 +4563,14 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         self.resume_btn.pack_forget()
         self._last_failed_idx = None
         
-        # VARIABLE WIZARD CHECK
+        # INTERACTIVE FORM CHECK
+        if start_idx == 0 and getattr(self, "data", None) and self.data.get("inputs"):
+            self._prompt_interactive_form(self.data["inputs"], lambda: self._check_wizard_and_play(start_idx, end_idx))
+            return
+            
+        self._check_wizard_and_play(start_idx, end_idx)
+        
+    def _check_wizard_and_play(self, start_idx, end_idx):
         if start_idx == 0:
             ext_vars = self._get_external_variables(self.data.get("actions", []))
             missing_vars = [v for v in ext_vars if not self.var_manager.get(v)]
