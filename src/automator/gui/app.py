@@ -1283,9 +1283,20 @@ class AutomatorGUI(ctk.CTk):
                     # Visually highlight the row border
                     row.configure(border_width=1, border_color="#7F1D1D")
 
+        # --- PROFILER BADGE ---
+        if getattr(self, "_last_profiler_data", None):
+            prof_dict = {p.get("step"): p for p in self._last_profiler_data if isinstance(p, dict)}
+            if (idx_1_based := i + 1) in prof_dict:
+                dur = prof_dict[idx_1_based].get("duration", 0)
+                dur_color = T["err"] if dur > 2.0 else T["warn"] if dur > 0.5 else T["dim"]
+                # Create a small badge frame
+                badge_f = ctk.CTkFrame(row, fg_color="transparent")
+                badge_f.grid(row=0, column=4, padx=8, pady=4)
+                _label(badge_f, f"⏱ {dur:.2f}s", size=10, colour=dur_color, weight="bold").pack(side="right")
+        
         # Controls — plain text buttons only
         ctrl = ctk.CTkFrame(row, fg_color="transparent")
-        ctrl.grid(row=0, column=3, padx=8, pady=4)
+        ctrl.grid(row=0, column=5, padx=8, pady=4)
 
         if getattr(self, "_move_source_idx", None) is not None:
             move_src = self._move_source_idx
@@ -3610,8 +3621,9 @@ class AutomatorGUI(ctk.CTk):
             finally:
                 err_msg = self._player.last_error if getattr(self, "_player", None) else None
                 snapshot = getattr(self._player, "_last_snapshot", None) if getattr(self, "_player", None) else None
+                profiler_data = getattr(self._player, "profiler_data", []) if getattr(self, "_player", None) else []
                 self._player = None
-                self.after(0, self._on_done, success, err_msg, snapshot)
+                self.after(0, self._on_done, success, err_msg, snapshot, profiler_data)
 
         threading.Thread(target=run, daemon=True).start()
 
@@ -3895,7 +3907,8 @@ class AutomatorGUI(ctk.CTk):
             
         self._file_switcher = FileSwitcher(self, files, current, on_select)
 
-    def _on_done(self, success: bool, error: str = None, snapshot: str = None):
+    def _on_done(self, success: bool, error: str = None, snapshot: str = None, profiler_data: list = None):
+        self._last_profiler_data = profiler_data
         self._set_status("Idle", T["ok"])
         self.play_btn.configure(state="normal")
         self.stop_play_btn.configure(state="disabled", text_color=T["dim"])
