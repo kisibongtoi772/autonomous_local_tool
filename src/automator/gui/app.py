@@ -461,6 +461,13 @@ class AutomatorGUI(ctk.CTk):
              border_width=1, border_color=T["border"],
              text_color=T["accent"],
              hover_color=T["hover"]
+             ).pack(pady=(2, 2), fill="x")
+
+        _btn(sel, "🔐 Variables Vault", self._open_variables_vault, width=166,
+             fg_color="transparent",
+             border_width=1, border_color=T["border"],
+             text_color=T["accent"],
+             hover_color=T["hover"]
              ).pack(pady=(2, 6), fill="x")
 
         wf_mgmt_row = ctk.CTkFrame(sel, fg_color="transparent")
@@ -2021,6 +2028,128 @@ class AutomatorGUI(ctk.CTk):
             
         _btn(dlg, "Replace All", on_replace, primary=True).pack(pady=24)
 
+
+
+    def _open_variables_vault(self):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Smart Environment Vault (.env Manager)")
+        dlg.geometry("550x650")
+        dlg.attributes("-topmost", True)
+        
+        from ..core.variable_manager import VariableManager
+        var_mgr = VariableManager()
+        
+        # Toolbar
+        toolbar = ctk.CTkFrame(dlg, fg_color="transparent")
+        toolbar.pack(fill="x", padx=20, pady=16)
+        
+        _label(toolbar, "Variables Vault", size=20, weight="bold").pack(side="left")
+        
+        def add_new():
+            add_dlg = ctk.CTkToplevel(dlg)
+            add_dlg.title("Add Variable")
+            add_dlg.geometry("350x250")
+            add_dlg.attributes("-topmost", True)
+            
+            _label(add_dlg, "Variable Key:", weight="bold").pack(anchor="w", padx=20, pady=(20, 5))
+            key_entry = ctk.CTkEntry(add_dlg, width=310, fg_color=T["raised"], border_color=T["border"])
+            key_entry.pack(padx=20)
+            
+            _label(add_dlg, "Value:", weight="bold").pack(anchor="w", padx=20, pady=(15, 5))
+            val_entry = ctk.CTkEntry(add_dlg, width=310, fg_color=T["raised"], border_color=T["border"])
+            val_entry.pack(padx=20)
+            
+            def save_new():
+                k = key_entry.get().strip()
+                v = val_entry.get().strip()
+                if k:
+                    var_mgr.set(k, v)
+                    add_dlg.destroy()
+                    refresh_list()
+                    
+            _btn(add_dlg, "Save", save_new, primary=True).pack(pady=20)
+            
+        _btn(toolbar, "+ Add Variable", add_new, primary=True).pack(side="right")
+        
+        scroll = ctk.CTkScrollableFrame(dlg, fg_color=T["surface"], corner_radius=8)
+        scroll.pack(fill="both", expand=True, padx=20, pady=(0, 20))
+        
+        def refresh_list():
+            for w in scroll.winfo_children():
+                w.destroy()
+                
+            var_mgr.load()
+            all_vars = var_mgr.get_all()
+            
+            if not all_vars:
+                _label(scroll, "No variables found. Add one!", colour=T["dim"]).pack(pady=40)
+                return
+                
+            for k, v in all_vars.items():
+                row = ctk.CTkFrame(scroll, fg_color=T["raised"], corner_radius=6, border_width=1, border_color=T["border"])
+                row.pack(fill="x", pady=4, padx=4)
+                
+                # Key
+                _label(row, k, size=13, weight="bold", colour=T["accent"]).pack(side="left", padx=12, pady=12)
+                
+                # Controls right
+                ctrl = ctk.CTkFrame(row, fg_color="transparent")
+                ctrl.pack(side="right", padx=12)
+                
+                # Visibility state
+                val_frame = ctk.CTkFrame(row, fg_color="transparent")
+                val_frame.pack(side="left", fill="x", expand=True, padx=(10, 0))
+                
+                val_lbl = _label(val_frame, "••••••••", size=12, colour=T["text"])
+                val_lbl.pack(side="left")
+                
+                is_visible = [False]
+                def toggle_vis(lbl=val_lbl, state=is_visible, real_val=v):
+                    state[0] = not state[0]
+                    lbl.configure(text=real_val if state[0] else "••••••••")
+                
+                def del_var(key=k):
+                    var_mgr.delete(key)
+                    refresh_list()
+                    
+                def edit_var(key=k, curr_val=v):
+                    edit_dlg = ctk.CTkToplevel(dlg)
+                    edit_dlg.title("Edit Variable")
+                    edit_dlg.geometry("350x200")
+                    edit_dlg.attributes("-topmost", True)
+                    
+                    _label(edit_dlg, f"Edit '{key}':", weight="bold").pack(anchor="w", padx=20, pady=(20, 5))
+                    val_entry = ctk.CTkEntry(edit_dlg, width=310, fg_color=T["raised"], border_color=T["border"])
+                    val_entry.insert(0, curr_val)
+                    val_entry.pack(padx=20)
+                    
+                    def save_edit():
+                        new_v = val_entry.get().strip()
+                        var_mgr.set(key, new_v)
+                        edit_dlg.destroy()
+                        refresh_list()
+                        
+                    _btn(edit_dlg, "Save", save_edit, primary=True).pack(pady=20)
+                
+                ctk.CTkButton(
+                    ctrl, text="👁", width=30, height=30, fg_color="transparent", 
+                    hover_color=T["hover"], text_color=T["text"],
+                    command=toggle_vis
+                ).pack(side="left", padx=2)
+                
+                ctk.CTkButton(
+                    ctrl, text="✏️", width=30, height=30, fg_color="transparent", 
+                    hover_color=T["hover"], text_color=T["text"],
+                    command=edit_var
+                ).pack(side="left", padx=2)
+                
+                ctk.CTkButton(
+                    ctrl, text="🗑", width=30, height=30, fg_color="transparent", 
+                    hover_color="#991B1B", text_color="#FF3B30",
+                    command=del_var
+                ).pack(side="left", padx=2)
+                
+        refresh_list()
 
     def _open_template_library(self):
         dlg = ctk.CTkToplevel(self)
