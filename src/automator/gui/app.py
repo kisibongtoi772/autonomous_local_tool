@@ -2402,6 +2402,41 @@ class AutomatorGUI(ctk.CTk):
             if hasattr(self, '_zen_btn') and self._zen_btn.winfo_exists():
                 self._zen_btn.configure(text="Zen Mode", fg_color="transparent", text_color=T["text"])
 
+    def _show_versions_dialog(self):
+        filename = self.file_var.get()
+        if not filename: return
+        
+        from ..core.version_control import get_versions, rollback_version
+        versions = get_versions(filename)
+        
+        dlg = self._dialog(f"Versions - {filename}", "400x400")
+        _label(dlg, "Timeline (Auto-Versions)", size=16, weight="bold").pack(pady=(20, 4))
+        _label(dlg, "Every save creates a snapshot. Rollback to any past version.", size=12, colour=T["dim"]).pack(pady=(0, 16))
+        
+        if not versions:
+            _label(dlg, "No versions recorded yet.", colour=T["dim"]).pack(pady=40)
+            return
+            
+        sf = ctk.CTkScrollableFrame(dlg, fg_color="transparent")
+        sf.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        def _do_rollback(vpath):
+            path = os.path.join(WORKSPACE_DIR, filename)
+            rollback_version(path, vpath)
+            dlg.destroy()
+            self._refresh_workflow()
+            self.show_toast(f"⏪ Rolled back successfully!", T["ok"])
+            
+        for i, v in enumerate(versions):
+            row = ctk.CTkFrame(sf, fg_color=T["surface"], corner_radius=6)
+            row.pack(fill="x", pady=2)
+            
+            _label(row, v["time"], size=13, weight="bold" if i==0 else "normal", colour=T["text"] if i==0 else T["dim"]).pack(side="left", padx=12, pady=12)
+            if i == 0:
+                _label(row, "(Latest)", size=11, colour=T["ok"]).pack(side="left", padx=4)
+                
+            _btn(row, "⏪ Restore", lambda vp=v["path"]: _do_rollback(vp), width=60, fg_color=T["raised"], text_color=T["text"]).pack(side="right", padx=12)
+
     def _generate_flowchart(self):
         import webbrowser
         
