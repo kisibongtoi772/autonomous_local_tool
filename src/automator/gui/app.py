@@ -465,6 +465,7 @@ class AutomatorGUI(ctk.CTk):
 
         self._build_sidebar()
         self._build_main()
+        self._build_footer()
         self._nav_to("dashboard")
         
         # Start background polling
@@ -657,6 +658,29 @@ class AutomatorGUI(ctk.CTk):
             f.grid(row=0, column=0, sticky="nsew")
             self._panels[key] = f
             builder(f)
+
+    def _build_footer(self):
+        self.grid_rowconfigure(1, weight=0) # For footer
+        
+        footer = ctk.CTkFrame(self, height=28, fg_color="#18181B", corner_radius=0)
+        footer.grid(row=1, column=0, columnspan=2, sticky="ew")
+        footer.grid_propagate(False)
+        
+        # Sync indicator
+        self._footer_save_lbl = _label(footer, "● Ready", size=11, colour="#A1A1AA")
+        self._footer_save_lbl.pack(side="left", padx=16, pady=(4, 0))
+        
+        # Current File
+        self._footer_file_lbl = _label(footer, "workflow.json", size=11, weight="bold", colour="#D4D4D8")
+        self._footer_file_lbl.pack(side="right", padx=16, pady=(4, 0))
+        
+        # Linter Status
+        self._footer_linter_lbl = _label(footer, "✓ Linter OK", size=11, colour="#4ADE80")
+        self._footer_linter_lbl.pack(side="right", padx=16, pady=(4, 0))
+        
+        # Action Count
+        self._footer_stats_lbl = _label(footer, "Actions: 0", size=11, colour="#A1A1AA")
+        self._footer_stats_lbl.pack(side="right", padx=8, pady=(4, 0))
 
     def _nav_to(self, key: str):
         for k, b in self._nav_btns.items():
