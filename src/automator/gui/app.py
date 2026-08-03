@@ -956,9 +956,20 @@ class AutomatorGUI(ctk.CTk):
         if self._bulk_mode:
             self._build_bulk_toolbar(self._wf_list)
 
+        if not hasattr(self, "_collapsed_comments"):
+            self._collapsed_comments = set()
+            
+        is_hidden = False
         rendered_count = 0
         for i, action in enumerate(actions):
             atype = action.get("type", "").lower()
+            
+            # --- FOLDING LOGIC ---
+            if atype == "comment":
+                is_hidden = i in self._collapsed_comments
+            elif is_hidden:
+                continue
+                
             summary = self._action_summary(action.get("type", ""), action).lower()
             if query and query not in atype and query not in summary and query not in str(action).lower():
                 continue
@@ -1094,6 +1105,27 @@ class AutomatorGUI(ctk.CTk):
         
         if atype == "comment":
             row.configure(fg_color="#1F2937") # deep blue-grey for separator
+            
+            # --- TOGGLE BUTTON ---
+            is_collapsed = i in getattr(self, "_collapsed_comments", set())
+            toggle_icon = "▶" if is_collapsed else "▼"
+            
+            def toggle_collapse(idx=i, collapsed=is_collapsed):
+                if not hasattr(self, "_collapsed_comments"):
+                    self._collapsed_comments = set()
+                if collapsed:
+                    self._collapsed_comments.discard(idx)
+                else:
+                    self._collapsed_comments.add(idx)
+                self._refresh_workflow()
+
+            ctk.CTkButton(
+                idx_frame, text=toggle_icon, width=20, height=20,
+                fg_color="transparent", hover_color=T["hover"],
+                text_color=T["accent"], font=ctk.CTkFont("SF Pro Text", 10),
+                command=toggle_collapse
+            ).pack(side="left", padx=(0, 4))
+            
             _label(idx_frame, "💬", size=14).pack(side="left")
             
             summary_frame = ctk.CTkFrame(row, fg_color="transparent")
@@ -1511,6 +1543,8 @@ class AutomatorGUI(ctk.CTk):
                 self._redo_btn.configure(state="disabled", text_color=T["dim"])
 
     def _modify_workflow(self, mutator):
+        self._last_profiler_data = None
+        self._collapsed_comments = set()
         path = os.path.join(WORKSPACE_DIR, self.file_var.get())
         data = load_json(path, {"workflow_name": "workflow", "created_at": "", "actions": []})
         
