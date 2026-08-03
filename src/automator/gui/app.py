@@ -1247,13 +1247,32 @@ class AutomatorGUI(ctk.CTk):
             row.configure(border_width=1, border_color=T["warn"] if not is_missing else T["err"])
 
         row.pack(fill="x", pady=2)
-        row.grid_columnconfigure(2, weight=1)
+        row.grid_columnconfigure(3, weight=1)
         if hasattr(self, "_action_rows"):
             self._action_rows.append(row)
 
+        # Color Bar
+        CAT_COLORS = {
+            "logic": "#9333EA",
+            "interaction": "#3B82F6",
+            "system": "#10B981",
+            "assert": "#F59E0B",
+            "wait": "#6B7280"
+        }
+        TYPE_MAP = {
+            "loop": "logic", "group": "logic", "if_template": "logic", "if_color": "logic",
+            "click": "interaction", "type_text": "interaction", "hotkey": "interaction", "open_url": "interaction",
+            "run_command": "system", "run_script": "system", "run_workflow": "system",
+            "assert_color": "assert", "assert_template": "assert",
+            "sleep": "wait", "comment": "wait"
+        }
+        cat_color = CAT_COLORS.get(TYPE_MAP.get(atype, "wait"), "#6B7280")
+        color_bar = ctk.CTkFrame(row, width=4, fg_color=cat_color, corner_radius=0)
+        color_bar.grid(row=0, column=0, sticky="ns", padx=(0, 4))
+        
         # Index & Toggle
         idx_frame = ctk.CTkFrame(row, fg_color="transparent")
-        idx_frame.grid(row=0, column=0, padx=8, pady=8)
+        idx_frame.grid(row=0, column=1, padx=4, pady=8)
         
         if atype == "comment":
             row.configure(fg_color="#1F2937") # deep blue-grey for separator
@@ -1281,7 +1300,7 @@ class AutomatorGUI(ctk.CTk):
             _label(idx_frame, "💬", size=14).pack(side="left")
             
             summary_frame = ctk.CTkFrame(row, fg_color="transparent")
-            summary_frame.grid(row=0, column=1, columnspan=2, padx=12, pady=8, sticky="ew")
+            summary_frame.grid(row=0, column=2, columnspan=2, padx=12, pady=8, sticky="ew")
             _label(summary_frame, f"--- {action.get('text', '')} ---", size=11, colour=T["accent"], weight="bold").pack(side="left")
         else:
             if self._bulk_mode:
@@ -1347,14 +1366,14 @@ class AutomatorGUI(ctk.CTk):
                 badge_bg = tag_colors.get(color_tag, badge_bg)
                 
             badge = ctk.CTkFrame(row, fg_color=badge_bg, corner_radius=4)
-            badge.grid(row=0, column=1, padx=8, pady=8)
+            badge.grid(row=0, column=2, padx=8, pady=8)
             badge_color = T["text"] if enabled else T["dim"]
             type_label = _label(badge, display_type, size=10, colour=badge_color, weight="bold")
             type_label.pack(padx=8, pady=3)
 
             # Summary & Note & Warnings
             summary_frame = ctk.CTkFrame(row, fg_color="transparent")
-            summary_frame.grid(row=0, column=2, padx=4, pady=8, sticky="ew")
+            summary_frame.grid(row=0, column=3, padx=4, pady=8, sticky="ew")
             
             # --- Workflow Linter / Validation ---
             warnings = []
@@ -1489,7 +1508,7 @@ class AutomatorGUI(ctk.CTk):
                 dur_color = T["err"] if dur > 2.0 else T["warn"] if dur > 0.5 else T["dim"]
                 # Create a small badge frame
                 badge_f = ctk.CTkFrame(row, fg_color="transparent")
-                badge_f.grid(row=0, column=4, padx=8, pady=4)
+                badge_f.grid(row=0, column=5, padx=8, pady=4)
                 _label(badge_f, f"⏱ {dur:.2f}s", size=10, colour=dur_color, weight="bold").pack(side="right")
         
 
@@ -1507,12 +1526,12 @@ class AutomatorGUI(ctk.CTk):
         if lint_err:
             row.configure(border_width=1, border_color=T["err"])
             err_f = ctk.CTkFrame(row, fg_color="transparent")
-            err_f.grid(row=0, column=3, padx=8, pady=4, sticky="e")
+            err_f.grid(row=0, column=4, padx=8, pady=4, sticky="e")
             _label(err_f, lint_err, size=11, colour=T["err"], weight="bold").pack(side="right")
 
         # Controls — plain text buttons only
         ctrl = ctk.CTkFrame(row, fg_color="transparent")
-        ctrl.grid(row=0, column=5, padx=8, pady=4)
+        ctrl.grid(row=0, column=6, padx=8, pady=4)
 
         if getattr(self, "_move_source_idx", None) is not None:
             move_src = self._move_source_idx
@@ -4852,7 +4871,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                 else:
                     self._action_rows[old_idx].configure(fg_color="#7f1d1d") # Red
                     if error:
-                        _label(self._action_rows[old_idx], f"Error: {error}", colour="#FCA5A5", weight="bold").grid(row=1, column=0, columnspan=4, sticky="w", padx=10, pady=(0, 6))
+                        _label(self._action_rows[old_idx], f"Error: {error}", colour="#FCA5A5", weight="bold").grid(row=1, column=1, columnspan=5, sticky="w", padx=10, pady=(0, 6))
                     
                     self._last_failed_idx = old_idx
                     self.resume_btn.configure(text=f"▶ Resume (Step {old_idx + 1})")
