@@ -583,7 +583,7 @@ class AutomatorGUI(ctk.CTk):
 
         self._stat_wf   = self._stat_card(top, "Workflows",  0)
         self._stat_acts = self._stat_card(top, "Actions",    1)
-        self._stat_runs = self._stat_card(top, "Total Runs", 2)
+        self._stat_runs = self._stat_card(top, "Total Runs", 2, command=self._show_run_history)
 
         # Controls card
         ctrl = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
@@ -726,14 +726,19 @@ class AutomatorGUI(ctk.CTk):
         logger.info("Desktop Automator ready.")
         self._refresh_stats()
 
-    def _stat_card(self, parent, label: str, col: int) -> ctk.CTkLabel:
-        card = ctk.CTkFrame(parent, fg_color=T["surface"], corner_radius=8)
+    def _stat_card(self, parent, label: str, col: int, command=None) -> ctk.CTkLabel:
+        cursor = "hand2" if command else ""
+        card = ctk.CTkFrame(parent, fg_color=T["surface"], corner_radius=8, cursor=cursor)
         card.grid(row=0, column=col, padx=(0 if col == 0 else 8, 0), pady=(0, 12), sticky="ew")
         _label(card, label, size=10, colour=T["dim"]).pack(padx=14, pady=(12, 2), anchor="w")
         val = ctk.CTkLabel(card, text="0",
                            font=ctk.CTkFont("SF Pro Display", 26, "bold"),
-                           text_color=T["text"])
+                           text_color=T["text"], cursor=cursor)
         val.pack(padx=14, pady=(0, 12), anchor="w")
+        if command:
+            card.bind("<Button-1>", lambda e: command())
+            for child in card.winfo_children():
+                child.bind("<Button-1>", lambda e: command())
         return val
 
     def _refresh_stats(self):
@@ -3433,6 +3438,67 @@ class AutomatorGUI(ctk.CTk):
             pb = ctk.CTkProgressBar(row, height=6, fg_color=T["bg"], progress_color=color)
             pb.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
             pb.set(pct)
+
+
+    def _show_run_history(self):
+        history = load_json(RUN_HISTORY_FILE, [])
+        if not history:
+            return
+            
+        win = ctk.CTkToplevel(self)
+        win.title("Mission Control - Run History")
+        win.geometry("700x500")
+        win.transient(self)
+        win.grab_set()
+        
+        sf = ctk.CTkScrollableFrame(win, fg_color="transparent")
+        sf.pack(fill="both", expand=True, padx=16, pady=16)
+        
+        _label(sf, "Mission Control", size=20, weight="bold").pack(anchor="w", pady=(0, 4))
+        _label(sf, "Recent 100 runs. Click on 'Snapshot' to investigate failures.", size=12, colour=T["dim"]).pack(anchor="w", pady=(0, 16))
+        
+        for idx, entry in enumerate(history):
+            row = ctk.CTkFrame(sf, fg_color=T["surface"], corner_radius=6)
+            row.pack(fill="x", pady=4)
+            
+            success = entry.get("success", False)
+            color = T["ok"] if success else T["err"]
+            icon = "✅" if success else "❌"
+            status = "Success" if success else "Failed"
+            
+            # Left: Status
+            status_frame = ctk.CTkFrame(row, fg_color="transparent")
+            status_frame.pack(side="left", padx=12, pady=12)
+            _label(status_frame, icon, size=18).pack()
+            _label(status_frame, status, size=10, colour=color, weight="bold").pack()
+            
+            # Middle: Details
+            detail_frame = ctk.CTkFrame(row, fg_color="transparent")
+            detail_frame.pack(side="left", padx=12, pady=12, fill="both", expand=True)
+            
+            wf_name = entry.get("workflow", "Unknown")
+            ts = entry.get("timestamp", "")
+            if "T" in ts: ts = ts.replace("T", " ")[:19]
+            
+            _label(detail_frame, f"{wf_name}", size=14, weight="bold").pack(anchor="w")
+            info = f"Actions: {entry.get('actions_run', 0)}  |  Time: {ts}  |  Duration: {entry.get('duration_sec', 0):.2f}s"
+            _label(detail_frame, info, size=11, colour=T["dim"]).pack(anchor="w", pady=(2, 0))
+            
+            error_msg = entry.get("error", "")
+            if error_msg:
+                _label(detail_frame, error_msg, size=11, colour=T["err"]).pack(anchor="w", pady=(4, 0))
+                
+            # Right: Actions (Snapshot)
+            snapshot = entry.get("snapshot")
+            if not success and snapshot:
+                btn_frame = ctk.CTkFrame(row, fg_color="transparent")
+                btn_frame.pack(side="right", padx=12, pady=12)
+                
+                ctk.CTkButton(
+                    btn_frame, text="📸 Snapshot", width=80, height=28,
+                    fg_color="#374151", hover_color="#4B5563",
+                    command=lambda s=snapshot: self._show_snapshot_dialog(s)
+                ).pack()
 
     def _show_snapshot_dialog(self, filename: str):
         path = os.path.join(SNAPSHOTS_DIR, filename)
