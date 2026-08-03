@@ -330,7 +330,7 @@ class AutomatorGUI(ctk.CTk):
         tips = [
             "• Use '{{var_name}}' syntax to inject variables dynamically.",
             "• Hover over the Image icon in the list to peek the template.",
-            "• Click 📸 to instantly recapture a broken image template.",
+            "• Click to instantly recapture a broken image template.",
             "• Turn on '👁 X-Ray' to see what variables will evaluate to.",
             "• Check the bottom-right HUD for live mouse coordinates."
         ]
@@ -449,7 +449,7 @@ class AutomatorGUI(ctk.CTk):
              hover_color=T["hover"]
              ).pack(pady=(6, 2), fill="x")
 
-        _btn(sel, "🔍 Search Project", self._open_global_search, width=166,
+        _btn(sel, "Search Project", self._open_global_search, width=166,
              fg_color="transparent",
              border_width=1, border_color=T["border"],
              text_color=T["accent"],
@@ -463,21 +463,21 @@ class AutomatorGUI(ctk.CTk):
              hover_color=T["hover"]
              ).pack(pady=(2, 2), fill="x")
 
-        _btn(sel, "🔐 Variables Vault", self._open_variables_vault, width=166,
+        _btn(sel, "Variables Vault", self._open_variables_vault, width=166,
              fg_color="transparent",
              border_width=1, border_color=T["border"],
              text_color=T["accent"],
              hover_color=T["hover"]
              ).pack(pady=(2, 2), fill="x")
 
-        _btn(sel, "📦 Export Project", self._export_project, width=166,
+        _btn(sel, "Export Project", self._export_project, width=166,
              fg_color="transparent",
              border_width=1, border_color=T["border"],
              text_color=T["accent"],
              hover_color=T["hover"]
              ).pack(pady=(2, 2), fill="x")
 
-        _btn(sel, "🚀 Create Shortcut", self._create_desktop_shortcut, width=166,
+        _btn(sel, "Create Shortcut", self._create_desktop_shortcut, width=166,
              fg_color="transparent",
              border_width=1, border_color=T["border"],
              text_color=T["accent"],
@@ -543,7 +543,7 @@ class AutomatorGUI(ctk.CTk):
         self._status_row.pack(side="bottom", fill="x", padx=14, pady=10)
 
         self._status_dot = ctk.CTkLabel(
-            self._status_row, text="●", width=14,
+            self._status_row, text="-", width=14,
             font=ctk.CTkFont("SF Pro Text", 10),
             text_color=T["ok"]
         )
@@ -798,22 +798,22 @@ class AutomatorGUI(ctk.CTk):
 
         _btn(tb, "Refresh",    self._refresh_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         
-        self._undo_btn = _btn(tb, "↶ Undo", self._undo, False)
+        self._undo_btn = _btn(tb, "Undo: Undo", self._undo, False)
         self._undo_btn.pack(side="left", padx=(8, 0), pady=8)
         
-        self._redo_btn = _btn(tb, "↷ Redo", self._redo, False)
+        self._redo_btn = _btn(tb, "Redo: Redo", self._redo, False)
         self._redo_btn.pack(side="left", padx=(8, 0), pady=8)
         
         _btn(tb, "Add Action", self._open_add_dialog,  True).pack(side="left", padx=(8, 0), pady=8)
         
-        _btn(tb, "⏺ Record", self._open_recorder, True).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "Record", self._open_recorder, True).pack(side="left", padx=(8, 0), pady=8)
         
-        self._paste_btn = _btn(tb, "📋 Paste", self._paste_action, False)
+        self._paste_btn = _btn(tb, "Paste", self._paste_action, False)
         self._paste_btn.pack(side="left", padx=(8, 0), pady=8)
         self._update_paste_btn()
         
         _btn(tb, "Bulk Edit",  self._toggle_bulk_mode, False).pack(side="left", padx=(8, 0), pady=8)
-        _btn(tb, "Export 📦",  self._export_workflow, False).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "Export Group",  self._export_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Import 📥",  self._import_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
@@ -1037,7 +1037,7 @@ class AutomatorGUI(ctk.CTk):
             _btn(qa_row, "⌨️ Type", lambda: qa("type"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
             _btn(qa_row, "🖼 Image", lambda: qa("assert_template"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
             
-            _btn(qa_row, "➕ More...", lambda: qa("sleep"), fg_color="transparent", text_color=T["accent"]).pack(side="left", padx=8)
+            _btn(qa_row, "More...", lambda: qa("sleep"), fg_color="transparent", text_color=T["accent"]).pack(side="left", padx=8)
 
     def _enter_move_mode(self, source_idx: int):
         self._move_source_idx = source_idx
@@ -1181,7 +1181,7 @@ class AutomatorGUI(ctk.CTk):
                     command=lambda i=i, v=chk_var: on_check(i, v)
                 ).pack(side="left")
             else:
-                toggle_text = "●" if enabled else "○"
+                toggle_text = "-" if enabled else "○"
                 toggle_color = T["ok"] if enabled else T["dim"]
                 
                 toggle_color = T["ok"] if enabled else T["dim"]
@@ -1285,7 +1285,7 @@ class AutomatorGUI(ctk.CTk):
                                 self._test_locate_image(path, conf)
                                 
                             test_btn = ctk.CTkButton(
-                                top_line, text="🎯", width=24, height=24, 
+                                top_line, text="Locate", width=24, height=24, 
                                 fg_color="transparent", hover_color=T["hover"],
                                 command=_on_test_locate
                             )
@@ -1309,11 +1309,11 @@ class AutomatorGUI(ctk.CTk):
                     _label(top_line, p, size=11, colour=sub_color).pack(side="left")
                     
             if is_missing:
-                _label(top_line, " ⚠️ Ảnh mẫu không tồn tại", size=11, colour=T["err"], weight="bold").pack(side="left", padx=5)
+                _label(top_line, " Warning: Ảnh mẫu không tồn tại", size=11, colour=T["err"], weight="bold").pack(side="left", padx=5)
                 
             retry = action.get("retry_count", 0)
             if retry > 0:
-                _label(top_line, f"[↺ {retry}x]", size=11, colour=T["warn"]).pack(side="left", padx=(8, 0))
+                _label(top_line, f"[{retry}x]", size=11, colour=T["warn"]).pack(side="left", padx=(8, 0))
                 
             # Render Rich Note (DocString)
             if note:
@@ -1324,7 +1324,7 @@ class AutomatorGUI(ctk.CTk):
                 
                 # Create a pseudo-docstring UI: slightly dimmed text, maybe with a left border
                 doc_lbl = ctk.CTkLabel(
-                    note_frame, text=f"📝 {note}",
+                    note_frame, text=f"Note: {note}",
                     text_color=T["dim"], font=ctk.CTkFont("SF Pro Text", 11, "italic"),
                     justify="left"
                 )
@@ -1335,7 +1335,7 @@ class AutomatorGUI(ctk.CTk):
                 warn_line = ctk.CTkFrame(summary_frame, fg_color="transparent")
                 warn_line.pack(anchor="w", fill="x", pady=(2, 0))
                 for w in warnings:
-                    _label(warn_line, f"⚠️ {w}", size=11, colour="#FCA5A5", weight="bold").pack(side="left", padx=(0, 10))
+                    _label(warn_line, f"Warning: {w}", size=11, colour="#FCA5A5", weight="bold").pack(side="left", padx=(0, 10))
                     
                     if w.startswith("Image '") and w.endswith("' not found"):
                         tmpl_name = w.split("'")[1]
@@ -1383,7 +1383,7 @@ class AutomatorGUI(ctk.CTk):
                 row.configure(border_width=2, border_color="#D97706") # Gold border
                 if move_src != "bulk" or i == getattr(self, "_bulk_move_indices", [i])[0]:
                     ctk.CTkButton(
-                        ctrl, text="❌ Cancel Move", width=100, height=26,
+                        ctrl, text="Error: Cancel Move", width=100, height=26,
                         fg_color="#7F1D1D", hover_color="#991B1B",
                         text_color="white", font=ctk.CTkFont("SF Pro Text", 11, "bold"),
                         command=self._cancel_move
@@ -1411,15 +1411,15 @@ class AutomatorGUI(ctk.CTk):
             )
 
         if atype == "loop":
-            _ctrl_btn(ctrl, "📂 Mở", lambda idx=i: [self._nav_stack.append((idx, "actions", f"Loop {idx+1}")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=2)
+            _ctrl_btn(ctrl, "Mở", lambda idx=i: [self._nav_stack.append((idx, "actions", f"Loop {idx+1}")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=2)
         elif atype == "group":
-            _ctrl_btn(ctrl, "📂 Mở", lambda idx=i: [self._nav_stack.append((idx, "actions", f"Group: {action.get('name', 'Group')}")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=2)
+            _ctrl_btn(ctrl, "Mở", lambda idx=i: [self._nav_stack.append((idx, "actions", f"Group: {action.get('name', 'Group')}")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=2)
         elif atype == "if_template":
-            _ctrl_btn(ctrl, "📂 Then", lambda idx=i: [self._nav_stack.append((idx, "then_actions", f"If {idx+1} (Then)")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=1)
-            _ctrl_btn(ctrl, "📂 Else", lambda idx=i: [self._nav_stack.append((idx, "else_actions", f"If {idx+1} (Else)")), self._refresh_workflow()], text_color=T["warn"]).pack(side="left", padx=1)
+            _ctrl_btn(ctrl, "Then", lambda idx=i: [self._nav_stack.append((idx, "then_actions", f"If {idx+1} (Then)")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=1)
+            _ctrl_btn(ctrl, "Else", lambda idx=i: [self._nav_stack.append((idx, "else_actions", f"If {idx+1} (Else)")), self._refresh_workflow()], text_color=T["warn"]).pack(side="left", padx=1)
         elif atype == "if_color":
-            _ctrl_btn(ctrl, "📂 Then", lambda idx=i: [self._nav_stack.append((idx, "then_actions", f"IfColor {idx+1} (Then)")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=1)
-            _ctrl_btn(ctrl, "📂 Else", lambda idx=i: [self._nav_stack.append((idx, "else_actions", f"IfColor {idx+1} (Else)")), self._refresh_workflow()], text_color=T["warn"]).pack(side="left", padx=1)
+            _ctrl_btn(ctrl, "Then", lambda idx=i: [self._nav_stack.append((idx, "then_actions", f"IfColor {idx+1} (Then)")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=1)
+            _ctrl_btn(ctrl, "Else", lambda idx=i: [self._nav_stack.append((idx, "else_actions", f"IfColor {idx+1} (Else)")), self._refresh_workflow()], text_color=T["warn"]).pack(side="left", padx=1)
         elif atype == "run_workflow":
             wf_file = action.get("workflow_file")
             if wf_file:
@@ -1436,14 +1436,14 @@ class AutomatorGUI(ctk.CTk):
                 _ctrl_btn(ctrl, "Img", lambda t=tmpl_file: self._show_template_preview_dialog(t)).pack(side="left", padx=1)
                 _ctrl_btn(ctrl, "Find", lambda a=action: self._test_template_match(a)).pack(side="left", padx=1)
             
-            _ctrl_btn(ctrl, "📸 Retake", lambda t=tmpl_file: self._quick_recapture(t), text_color=T["err"] if is_missing else T["accent"]).pack(side="left", padx=1)
+            _ctrl_btn(ctrl, "Retake", lambda t=tmpl_file: self._quick_recapture(t), text_color=T["err"] if is_missing else T["accent"]).pack(side="left", padx=1)
             
         if atype in ("click", "assert_color", "if_color") and "x" in action and "y" in action:
             from .click_ripple import ClickRipple
-            _ctrl_btn(ctrl, "🎯 Loc", lambda x=action["x"], y=action["y"]: ClickRipple(self, x, y)).pack(side="left", padx=1)
+            _ctrl_btn(ctrl, "Locate Loc", lambda x=action["x"], y=action["y"]: ClickRipple(self, x, y)).pack(side="left", padx=1)
 
         _ctrl_btn(ctrl, "Edit", lambda idx=i, a=action: self._open_edit_dialog(idx, a)).pack(side="left", padx=1)
-        _ctrl_btn(ctrl, "⧉ Clone", lambda idx=i: self._duplicate_action(idx)).pack(side="left", padx=1)
+        _ctrl_btn(ctrl, "Clone", lambda idx=i: self._duplicate_action(idx)).pack(side="left", padx=1)
         
         if not self._nav_stack:
             _ctrl_btn(ctrl, "▶ Run", lambda idx=i: self.playback(start_idx=idx), text_color=T["accent"]).pack(side="left", padx=1)
@@ -1470,45 +1470,45 @@ class AutomatorGUI(ctk.CTk):
                 menu.add_command(label="▶🛑  Play Until Here", command=lambda: self.playback(start_idx=0, end_idx=i))
             menu.add_separator()
             if enabled:
-                menu.add_command(label="🔴  Disable Action", command=lambda: self._toggle_action_enable(i))
+                menu.add_command(label="Record  Disable Action", command=lambda: self._toggle_action_enable(i))
             else:
-                menu.add_command(label="🟢  Enable Action", command=lambda: self._toggle_action_enable(i))
-            menu.add_command(label="🔀  Move Action...", command=lambda: self._enter_move_mode(i))
+                menu.add_command(label=" Enable Action", command=lambda: self._toggle_action_enable(i))
+            menu.add_command(label=" Move Action...", command=lambda: self._enter_move_mode(i))
             menu.add_separator()
-            menu.add_command(label="📋  Copy Action", command=lambda: self._copy_action(action))
-            menu.add_command(label="📑  Duplicate", command=lambda: self._duplicate_action(i))
-            menu.add_command(label="🏷  Rename / Label", command=lambda: self._rename_action(i))
-            menu.add_command(label="📝  Add/Edit Note", command=lambda: self._edit_action_note(i))
+            menu.add_command(label=" Copy Action", command=lambda: self._copy_action(action))
+            menu.add_command(label=" Duplicate", command=lambda: self._duplicate_action(i))
+            menu.add_command(label="Rename / Label", command=lambda: self._rename_action(i))
+            menu.add_command(label="Add/Edit Note", command=lambda: self._edit_action_note(i))
             
             # Color Tag Cascade
             color_menu = tk.Menu(menu, tearoff=0)
             colors = {"Red": "#7F1D1D", "Green": "#14532D", "Blue": "#1E3A8A", "Yellow": "#713F12", "Purple": "#581C87", "Orange": "#7C2D12"}
             for cname in colors.keys():
-                color_menu.add_command(label=f"● {cname}", command=lambda c=cname: self._set_color_tag(i, c))
+                color_menu.add_command(label=f"- {cname}", command=lambda c=cname: self._set_color_tag(i, c))
             color_menu.add_separator()
             color_menu.add_command(label="Reset Color", command=lambda: self._set_color_tag(i, None))
-            menu.add_cascade(label="🎨  Color Tag", menu=color_menu)
+            menu.add_cascade(label="Color Tag", menu=color_menu)
             
             # Template Cropper
             tmpl = action.get("template") or action.get("template_image")
             if tmpl:
                 menu.add_separator()
-                menu.add_command(label="✂️  Crop Template", command=lambda: self._crop_template(tmpl))
+                menu.add_command(label="Crop Template", command=lambda: self._crop_template(tmpl))
                 
             if atype == "group":
-                menu.add_command(label="💥  Ungroup", command=lambda: self._ungroup_action(i))
-            menu.add_command(label="➕  Insert Below", command=lambda: self._open_add_dialog(insert_idx=i + 1))
-            menu.add_command(label="🧩  Insert Snippet Below", command=lambda: self._insert_snippet(i + 1))
+                menu.add_command(label="Ungroup", command=lambda: self._ungroup_action(i))
+            menu.add_command(label="Insert Below", command=lambda: self._open_add_dialog(insert_idx=i + 1))
+            menu.add_command(label="Insert Snippet Below", command=lambda: self._insert_snippet(i + 1))
             menu.add_separator()
-            menu.add_command(label="💾  Save as Snippet", command=lambda: self._save_as_snippet([i]))
-            menu.add_command(label="⏺  Record & Insert Below", command=lambda: self.start_recording(insert_idx=i + 1))
+            menu.add_command(label="Save as Snippet", command=lambda: self._save_as_snippet([i]))
+            menu.add_command(label="Record & Insert Below", command=lambda: self.start_recording(insert_idx=i + 1))
             
             # Show menu at mouse position, or at button position if triggered by button
             x = event.x_root if event else more_btn.winfo_rootx()
             y = event.y_root if event else more_btn.winfo_rooty() + more_btn.winfo_height()
             menu.post(x, y)
             
-        more_btn = _ctrl_btn(ctrl, "⋮", show_action_menu, text_color=T["dim"])
+        more_btn = _ctrl_btn(ctrl, "Options", show_action_menu, text_color=T["dim"])
         more_btn.pack(side="left", padx=2)
         
         # Right-click anywhere on the row to show context menu
@@ -1758,7 +1758,7 @@ class AutomatorGUI(ctk.CTk):
         self._refresh_workflow()
         self._update_undo_redo_buttons()
         logger.info("Undo successful.")
-        self.show_toast("↶ Đã khôi phục trạng thái trước đó (Undo)", T["accent"])
+        self.show_toast("Undo: Đã khôi phục trạng thái trước đó (Undo)", T["accent"])
 
     def _redo(self):
         if not self._redo_stack: return
@@ -1772,7 +1772,7 @@ class AutomatorGUI(ctk.CTk):
         self._refresh_workflow()
         self._update_undo_redo_buttons()
         logger.info("Redo successful.")
-        self.show_toast("↷ Đã làm lại thao tác (Redo)", T["ok"])
+        self.show_toast("Redo: Đã làm lại thao tác (Redo)", T["ok"])
         self._refresh_stats()
 
     def _update_paste_btn(self):
@@ -1888,7 +1888,7 @@ class AutomatorGUI(ctk.CTk):
                 self._code_textbox.insert("0.0", raw_json)
                 self._wf_list.grid_remove()
                 self._code_frame.grid(row=4, column=0, sticky="nsew")
-                self._code_btn.configure(text="🎨 UI View", text_color=T["ok"])
+                self._code_btn.configure(text="UI View", text_color=T["ok"])
                 self._is_code_mode = True
             except Exception as e:
                 logger.error(f"Failed to switch to code mode: {e}")
@@ -2065,7 +2065,7 @@ class AutomatorGUI(ctk.CTk):
         
         current_file = self.file_var.get()
         if not current_file:
-            self.show_toast("❌ No workflow selected", T["err"])
+            self.show_toast("Error: No workflow selected", T["err"])
             return
             
         desktop_dir = os.path.join(os.path.expanduser("~"), "Desktop")
@@ -2091,10 +2091,10 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                 f.write(script)
             # Make executable
             os.chmod(save_path, 0o755)
-            self.show_toast(f"🚀 Shortcut created: {suggested_name}", T["ok"])
+            self.show_toast(f"Shortcut created: {suggested_name}", T["ok"])
         except Exception as e:
             logger.error(f"Failed to create shortcut: {e}")
-            self.show_toast("❌ Failed to create shortcut", T["err"])
+            self.show_toast("Error: Failed to create shortcut", T["err"])
 
     def _export_project(self):
         from tkinter import filedialog
@@ -2102,7 +2102,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         
         current_file = self.file_var.get()
         if not current_file:
-            self.show_toast("❌ No workflow selected", T["err"])
+            self.show_toast("Error: No workflow selected", T["err"])
             return
             
         suggested_name = current_file.replace('.json', '_export.zip')
@@ -2155,16 +2155,16 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                     if os.path.exists(t_path):
                         zipf.write(t_path, arcname=f"templates/{t}")
                         
-            self.show_toast(f"📦 Exported {len(required_workflows)} workflows & {len(required_templates)} assets!", T["ok"])
+            self.show_toast(f"Group Exported {len(required_workflows)} workflows & {len(required_templates)} assets!", T["ok"])
             logger.info(f"Project exported successfully to {save_path}")
         except Exception as e:
             logger.error(f"Export failed: {e}")
-            self.show_toast("❌ Export failed!", T["err"])
+            self.show_toast("Error: Export failed!", T["err"])
 
 
     def _test_locate_image(self, path: str, confidence: float):
         if not os.path.exists(path):
-            self.show_toast("❌ Image file not found!", T["err"])
+            self.show_toast("Error: Image file not found!", T["err"])
             return
             
         self.iconify()
@@ -2178,11 +2178,11 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                 from src.automator.gui.box_highlight import BoxHighlight
                 def restore():
                     self.deiconify()
-                    self.show_toast("✅ Image found and highlighted!", T["ok"])
+                    self.show_toast("Success: Image found and highlighted!", T["ok"])
                 BoxHighlight(self, x, y, w, h, on_complete=restore)
             else:
                 self.deiconify()
-                self.show_toast("❌ Image NOT found on screen!", T["err"])
+                self.show_toast("Error: Image NOT found on screen!", T["err"])
                 
         # Give OS time to hide the window
         self.after(500, _do_locate)
@@ -2753,7 +2753,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         tpl_btn = _btn(val_frame, "🖼", open_template_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         tpl_btn.pack(side="right", padx=(4, 0))
         
-        coord_btn = _btn(val_frame, "🎯", open_coord_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        coord_btn = _btn(val_frame, "Locate", open_coord_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         coord_btn.pack(side="right", padx=(4, 0))
 
         hotkey_btn = _btn(val_frame, "⌨️", open_hotkey_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
@@ -3063,7 +3063,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         tpl_btn = _btn(val_frame, "🖼", open_template_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         tpl_btn.pack(side="right", padx=(4, 0))
         
-        coord_btn = _btn(val_frame, "🎯", open_coord_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
+        coord_btn = _btn(val_frame, "Locate", open_coord_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
         coord_btn.pack(side="right", padx=(4, 0))
 
         hotkey_btn = _btn(val_frame, "⌨️", open_hotkey_picker, width=28, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"])
@@ -3289,15 +3289,15 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         _label(self._bulk_toolbar, "Bulk Edit Mode", colour=T["accent"], weight="bold").pack(side="left", padx=12)
         
         _btn(self._bulk_toolbar, "Cancel", self._toggle_bulk_mode).pack(side="right", padx=12, pady=6)
-        _btn(self._bulk_toolbar, "🗑 Delete", self._bulk_delete, danger=True).pack(side="right", padx=6, pady=6)
-        _btn(self._bulk_toolbar, "🔀 Move", self._bulk_move).pack(side="right", padx=6, pady=6)
-        _btn(self._bulk_toolbar, "▶ Play", self._bulk_play).pack(side="right", padx=6, pady=6)
-        _btn(self._bulk_toolbar, "Toggle 🟢", self._bulk_toggle).pack(side="right", padx=6, pady=6)
-        _btn(self._bulk_toolbar, "✂️ Extract", self._bulk_extract).pack(side="right", padx=6, pady=6)
-        _btn(self._bulk_toolbar, "📦 Group", self._bulk_group).pack(side="right", padx=6, pady=6)
-        _btn(self._bulk_toolbar, "💾 Save Snippet", self._bulk_save_snippet).pack(side="right", padx=6, pady=6)
-        _btn(self._bulk_toolbar, "📋 Copy", self._bulk_copy).pack(side="right", padx=6, pady=6)
-        _btn(self._bulk_toolbar, "⧉ Duplicate", self._bulk_duplicate).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "Delete", self._bulk_delete, danger=True).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "Move", self._bulk_move).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "Play", self._bulk_play).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "Toggle", self._bulk_toggle).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "Extract", self._bulk_extract).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "Group Group", self._bulk_group).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "Save Snippet", self._bulk_save_snippet).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "Copy", self._bulk_copy).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "Duplicate", self._bulk_duplicate).pack(side="right", padx=6, pady=6)
 
     def _bulk_play(self):
         if not self._selected_indices: return
@@ -3443,21 +3443,21 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         try:
             with open(path, "w", encoding="utf-8") as f:
                 json.dump(snippet_actions, f, indent=4, ensure_ascii=False)
-            self.show_toast(f"💾 Snippet saved: {name}", T["ok"])
+            self.show_toast(f"Snippet saved: {name}", T["ok"])
         except Exception as e:
             logger.error(f"Error saving snippet: {e}")
-            self.show_toast("❌ Error saving snippet", T["err"])
+            self.show_toast("Error: Error saving snippet", T["err"])
 
     def _insert_snippet(self, insert_idx: int):
         import json
         snip_dir = os.path.join(WORKSPACE_DIR, "snippets")
         if not os.path.exists(snip_dir):
-            self.show_toast("❌ No snippets found.", T["err"])
+            self.show_toast("Error: No snippets found.", T["err"])
             return
             
         snippets = [f for f in os.listdir(snip_dir) if f.endswith(".json")]
         if not snippets:
-            self.show_toast("❌ No snippets found.", T["err"])
+            self.show_toast("Error: No snippets found.", T["err"])
             return
             
         dlg = ctk.CTkToplevel(self)
@@ -3488,10 +3488,10 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                     
                 self._save_file()
                 self._refresh_workflow()
-                self.show_toast(f"🧩 Inserted snippet: {snip_name}", T["ok"])
+                self.show_toast(f"Inserted snippet: {snip_name}", T["ok"])
             except Exception as e:
                 logger.error(f"Error loading snippet: {e}")
-                self.show_toast("❌ Error loading snippet", T["err"])
+                self.show_toast("Error: Error loading snippet", T["err"])
             finally:
                 dlg.destroy()
                 
@@ -3597,7 +3597,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
             self._modify_workflow(mutator)
             self._selected_indices.clear()
             self._toggle_bulk_mode()
-        self.show_toast("✂️ Đã gom nhóm thành sub-workflow", T["accent"])
+        self.show_toast("Đã gom nhóm thành sub-workflow", T["accent"])
             
         _btn(dlg, "Extract", on_confirm, primary=True).pack(pady=10)
 
@@ -3932,7 +3932,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
             
             success = entry.get("success", False)
             color = T["ok"] if success else T["err"]
-            icon = "✅" if success else "❌"
+            icon = "Success:" if success else "Error:"
             status = "Success" if success else "Failed"
             
             # Left: Status
@@ -3964,7 +3964,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                 btn_frame.pack(side="right", padx=12, pady=12)
                 
                 ctk.CTkButton(
-                    btn_frame, text="📸 Snapshot", width=80, height=28,
+                    btn_frame, text="Snapshot", width=80, height=28,
                     fg_color="#374151", hover_color="#4B5563",
                     command=lambda s=snapshot: self._show_snapshot_dialog(s)
                 ).pack()
@@ -4228,7 +4228,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         
         atype = action_dict.get("type", "unknown")
         
-        ctk.CTkLabel(dlg, text="⚠️ Action Failed!", font=ctk.CTkFont(size=18, weight="bold"), text_color=T["err"]).pack(pady=(20, 10))
+        ctk.CTkLabel(dlg, text="Warning: Action Failed!", font=ctk.CTkFont(size=18, weight="bold"), text_color=T["err"]).pack(pady=(20, 10))
         
         msg_frame = ctk.CTkFrame(dlg, fg_color=T["raised"], corner_radius=6)
         msg_frame.pack(padx=20, fill="x", pady=5)
@@ -4263,7 +4263,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                         try:
                             path = os.path.join(TEMPLATES_DIR, img_target)
                             img.save(path)
-                            self.show_toast(f"✅ Healed: {img_target}", T["ok"])
+                            self.show_toast(f"Success: Healed: {img_target}", T["ok"])
                             choose("retry")
                         except Exception as e:
                             logger.error(f"Failed to save healed image: {e}")
@@ -4274,10 +4274,10 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                 # Short delay to let animations finish
                 self.after(200, lambda: SnippingTool(self, on_snip))
                 
-            _btn_local(btn_frame, "📸 Auto-Heal", _heal, primary=True).pack(side="left", padx=5)
-            _btn_local(btn_frame, "🔄 Retry", lambda: choose("retry")).pack(side="left", padx=5)
+            _btn_local(btn_frame, "Auto-Heal", _heal, primary=True).pack(side="left", padx=5)
+            _btn_local(btn_frame, "Retry", lambda: choose("retry")).pack(side="left", padx=5)
         else:
-            _btn_local(btn_frame, "🔄 Retry", lambda: choose("retry"), primary=True).pack(side="left", padx=5)
+            _btn_local(btn_frame, "Retry", lambda: choose("retry"), primary=True).pack(side="left", padx=5)
             
         _btn_local(btn_frame, "⏭️ Skip", lambda: choose("skip")).pack(side="left", padx=5)
         _btn_local(btn_frame, "🛑 Abort", lambda: choose("abort"), danger=True).pack(side="left", padx=5)
@@ -4465,7 +4465,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                 status_color = T["ok"]
             else:
                 BoundingBoxOverlay(self, x, y, w, h, color="#ff9500", alt_color="#ffb340") # Warning Orange
-                status_text = f"⚠️ Partial Match (Conf ~{best_conf:.2f}). Target was {target_conf}. Consider lowering confidence or recapturing."
+                status_text = f"Warning: Partial Match (Conf ~{best_conf:.2f}). Target was {target_conf}. Consider lowering confidence or recapturing."
                 status_color = T["warn"]
             
             if action.get("type") == "click":
@@ -4484,7 +4484,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                 
             self._set_status(status_text, status_color)
         else:
-            self._set_status("❌ Template absolutely not found on screen (even at 0.4 confidence).", T["err"])
+            self._set_status("Error: Template absolutely not found on screen (even at 0.4 confidence).", T["err"])
 
     def _bind_canvas_mousewheel(self):
         # Implementation for canvas mousewheel binding
@@ -4527,7 +4527,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                 else:
                     self._action_rows[old_idx].configure(fg_color="#7f1d1d") # Red
                     if error:
-                        _label(self._action_rows[old_idx], f"❌ {error}", colour="#FCA5A5", weight="bold").grid(row=1, column=0, columnspan=4, sticky="w", padx=10, pady=(0, 6))
+                        _label(self._action_rows[old_idx], f"Error: {error}", colour="#FCA5A5", weight="bold").grid(row=1, column=0, columnspan=4, sticky="w", padx=10, pady=(0, 6))
                     
                     self._last_failed_idx = old_idx
                     self.resume_btn.configure(text=f"▶ Resume (Step {old_idx + 1})")
@@ -4535,7 +4535,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                     
                     if snapshot:
                         if not hasattr(self, "snapshot_btn"):
-                            self.snapshot_btn = _btn(self._tb_playback, "📸 Snapshot", None, fg_color=T["raised"], text_color=T["text"])
+                            self.snapshot_btn = _btn(self._tb_playback, "Snapshot", None, fg_color=T["raised"], text_color=T["text"])
                         
                         import os
                         from ..utils.config import SNAPSHOTS_DIR
