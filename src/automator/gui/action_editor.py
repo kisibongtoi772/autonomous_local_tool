@@ -92,6 +92,21 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         ctk.CTkButton(row, text="🖼 Pick", width=50, command=on_pick, fg_color=T["raised"]).pack(side="left", padx=4)
         ctk.CTkButton(row, text="✂ Snip", width=50, command=on_snip, fg_color=T["raised"]).pack(side="left")
         
+        # New Tune Button
+        def on_tune():
+            tmpl = tpl_ent.get().strip()
+            if not tmpl:
+                return
+            def cb(new_conf):
+                conf_ent.delete(0, "end"); conf_ent.insert(0, str(new_conf))
+                dlg.deiconify()
+            from .pickers import ConfidenceTuner
+            dlg.withdraw()
+            ConfidenceTuner(app, tmpl, float(conf_ent.get()), cb, lambda: dlg.deiconify())
+            
+        ctk.CTkButton(row, text="🎛 Tune", width=50, command=on_tune, fg_color=T["accent"], text_color=T["text"]).pack(side="left", padx=4)
+
+        
         if atype == "wait_for_template":
             _lbl("Timeout (seconds)")
             timeout_ent = ctk.CTkEntry(form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
@@ -174,6 +189,15 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
     rd_ent.insert(0, str(action.get("retry_delay", 0.5)))
     fields["retry_delay"] = rd_ent
     
+    if atype in ("wait_for_template", "assert_template", "if_template", "click"):
+        conf_frame = ctk.CTkFrame(adv_row, fg_color="transparent")
+        conf_frame.pack(side="left", fill="x", expand=True, padx=(4, 0))
+        _label(conf_frame, "Confidence", size=10, colour=T["dim"]).pack(anchor="w", pady=(4, 2))
+        conf_ent = ctk.CTkEntry(conf_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        conf_ent.pack(fill="x")
+        conf_ent.insert(0, str(action.get("confidence", 0.8)))
+        fields["confidence"] = conf_ent
+    
     # --- Submit Logic ---
     def on_submit():
         upd = copy.deepcopy(action)
@@ -181,6 +205,9 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
             upd["retry_count"] = int(rc_ent.get())
             upd["retry_delay"] = float(rd_ent.get())
             
+            if "confidence" in fields:
+                upd["confidence"] = float(fields["confidence"].get())
+                
             if atype == "sleep":
                 upd["duration"] = float(fields["duration"].get())
             elif atype == "click":
