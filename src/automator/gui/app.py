@@ -272,6 +272,7 @@ class AutomatorGUI(ctk.CTk):
         self.bind("<Control-z>", self._safe_undo)
         self.bind("<Command-p>", self._open_file_switcher)
         self.bind("<Control-p>", self._open_file_switcher)
+        self.bind("<Control-Tab>", self._cycle_tabs)
         
         self.bind("<Command-Shift-Z>", self._safe_redo)
         self.bind("<Control-Shift-Z>", self._safe_redo)
@@ -5251,6 +5252,17 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         # Implementation for canvas mousewheel binding
         pass
 
+    def _cycle_tabs(self, event=None):
+        if not self._open_tabs: return
+        current = self.file_var.get()
+        if current in self._open_tabs:
+            idx = self._open_tabs.index(current)
+            next_idx = (idx + 1) % len(self._open_tabs)
+        else:
+            next_idx = 0
+        self._on_file_select(self._open_tabs[next_idx])
+        return "break"
+
     def _open_file_switcher(self, event=None):
         if hasattr(self, "_file_switcher") and self._file_switcher.winfo_exists():
             return
@@ -5339,9 +5351,57 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
 
     # ── Workflow file management ───────────────────────────────────────────────
 
+    def _render_tabs(self):
+        if not hasattr(self, "_tab_bar_container") or not self._tab_bar_container.winfo_exists():
+            return
+        
+        for w in self._tab_bar_container.winfo_children():
+            w.destroy()
+            
+        current = self.file_var.get()
+        
+        for tab_file in self._open_tabs:
+            is_active = (tab_file == current)
+            bg_color = T["surface"] if is_active else "transparent"
+            text_color = T["accent"] if is_active else T["dim"]
+            
+            tab_frame = ctk.CTkFrame(self._tab_bar_container, fg_color=bg_color, corner_radius=6)
+            tab_frame.pack(side="left", padx=2, pady=2, fill="y")
+            
+            btn = ctk.CTkButton(
+                tab_frame, text=tab_file, width=60, height=28,
+                fg_color="transparent", hover_color=T["hover"],
+                text_color=text_color, font=ctk.CTkFont(*FONT_BODY),
+                command=lambda f=tab_file: self._on_file_select(f)
+            )
+            btn.pack(side="left", padx=(4, 0))
+            
+            def close_tab(f=tab_file):
+                self._open_tabs.remove(f)
+                if current == f:
+                    if self._open_tabs:
+                        self._on_file_select(self._open_tabs[-1])
+                    else:
+                        self.data = {"actions": []}
+                        self.file_var.set("")
+                        self._refresh_workflow()
+                self._render_tabs()
+                
+            close_btn = ctk.CTkButton(
+                tab_frame, text="×", width=20, height=28,
+                fg_color="transparent", hover_color=T["err"],
+                text_color=T["dim"], font=ctk.CTkFont("SF Pro Text", 14),
+                command=close_tab
+            )
+            close_btn.pack(side="left", padx=(0, 4))
+            
     def _on_file_select(self, choice: str, record_history: bool = True):
+        if choice and choice not in self._open_tabs:
+            self._open_tabs.append(choice)
+            
         self.file_var.set(choice)
         logger.info(f"Workflow: {choice}")
+        self._render_tabs()
         
         if record_history:
             self._file_history = self._file_history[:self._file_ptr + 1]
