@@ -1047,6 +1047,47 @@ class AutomatorGUI(ctk.CTk):
         self._wf_list.grid_columnconfigure(2, weight=1)
         p.grid_rowconfigure(4, weight=3)
         
+        # --- Interactive Minimap Logic ---
+        self._minimap_viewport_id = None
+        
+        def _poll_viewport():
+            if not self.winfo_exists() or not self._minimap.winfo_exists(): return
+            try:
+                if self._minimap.winfo_ismapped():
+                    yv = self._wf_list._parent_canvas.yview()
+                    if len(yv) == 2:
+                        top, bottom = yv
+                        h = self._minimap.winfo_height()
+                        if self._minimap_viewport_id:
+                            self._minimap.delete(self._minimap_viewport_id)
+                        # Draw translucent viewport indicator
+                        self._minimap_viewport_id = self._minimap.create_rectangle(
+                            0, float(top) * h, 12, float(bottom) * h, 
+                            fill="#FFFFFF", stipple="gray50", outline=""
+                        )
+            except Exception: pass
+            self.after(50, _poll_viewport)
+            
+        self.after(500, _poll_viewport) # Start polling
+        
+        def _on_minimap_click(event):
+            h = self._minimap.winfo_height()
+            if h <= 0: return
+            fraction = event.y / h
+            try:
+                yv = self._wf_list._parent_canvas.yview()
+                if len(yv) == 2:
+                    top, bottom = yv
+                    visible_fraction = float(bottom) - float(top)
+                    self._wf_list._parent_canvas.yview_moveto(fraction - visible_fraction/2)
+            except: pass
+            
+        def _on_minimap_drag(event):
+            _on_minimap_click(event)
+
+        self._minimap.bind("<Button-1>", _on_minimap_click)
+        self._minimap.bind("<B1-Motion>", _on_minimap_drag)
+        
         # Code Editor Frame (hidden by default)
         self._code_frame = ctk.CTkFrame(p, fg_color="transparent")
         self._code_frame.grid_columnconfigure(0, weight=1)
