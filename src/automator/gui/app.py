@@ -781,11 +781,13 @@ class AutomatorGUI(ctk.CTk):
         p.grid_columnconfigure(0, weight=1)
         p.grid_rowconfigure(1, weight=1)
 
-        self._page_header(p, "Workflow Editor", row=0)
+        self._tab_bar_container = ctk.CTkScrollableFrame(p, height=45, orientation="horizontal", fg_color="transparent", corner_radius=0)
+        self._tab_bar_container.grid(row=0, column=0, sticky="ew", padx=20, pady=(15, 0))
+        self._tab_bar_container.grid_propagate(False)
 
         # Toolbar
         tb = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=8)
-        tb.grid(row=0, column=0, sticky="ew", padx=24, pady=(56, 8))
+        tb.grid(row=0, column=0, sticky="ew", padx=24, pady=(60, 8))
 
         _btn(tb, "Refresh",    self._refresh_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         
