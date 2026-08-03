@@ -1600,24 +1600,7 @@ class AutomatorGUI(ctk.CTk):
             from .click_ripple import ClickRipple
             _ctrl_btn(ctrl, "Locate Loc", lambda x=action["x"], y=action["y"]: ClickRipple(self, x, y)).pack(side="left", padx=1)
 
-        _ctrl_btn(ctrl, "Edit", lambda idx=i, a=action: self._open_edit_dialog(idx, a)).pack(side="left", padx=1)
-        _ctrl_btn(ctrl, "Clone", lambda idx=i: self._duplicate_action(idx)).pack(side="left", padx=1)
-        
-        if not self._nav_stack:
-            _ctrl_btn(ctrl, "▶ Run", lambda idx=i: self.playback(start_idx=idx), text_color=T["accent"]).pack(side="left", padx=1)
-        
-        if i > 0:
-            _ctrl_btn(ctrl, "▲", lambda idx=i: self._move_action_up(idx)).pack(side="left", padx=1)
-        if i < total - 1:
-            _ctrl_btn(ctrl, "▼", lambda idx=i: self._move_action_down(idx)).pack(side="left", padx=1)
-            
-        del_btn = ctk.CTkButton(
-            ctrl, text="Del", width=32, height=26,
-            fg_color="transparent", hover_color="#2A1515",
-            text_color=T["err"], font=ctk.CTkFont("SF Pro Text", 11),
-            corner_radius=4, command=lambda idx=i: self._delete_action(idx)
-        )
-        del_btn.pack(side="left", padx=1)
+        # Actions moved to Context Menu for cleaner UI
         
         # Action Context Menu
         def show_action_menu(event=None):
@@ -1632,11 +1615,25 @@ class AutomatorGUI(ctk.CTk):
             else:
                 menu.add_command(label=" Enable Action", command=lambda: self._toggle_action_enable(i))
             menu.add_command(label=" Move Action...", command=lambda: self._enter_move_mode(i))
+            if i > 0:
+                menu.add_command(label="▲ Move Up", command=lambda: self._move_action_up(i))
+            if i < total - 1:
+                menu.add_command(label="▼ Move Down", command=lambda: self._move_action_down(i))
             menu.add_separator()
+            menu.add_command(label="✏️ Edit", command=lambda: self._open_edit_dialog(i, action))
             menu.add_command(label=" Copy Action", command=lambda: self._copy_action(action))
-            menu.add_command(label=" Duplicate", command=lambda: self._duplicate_action(i))
+            menu.add_command(label="📑 Duplicate", command=lambda: self._duplicate_action(i))
             menu.add_command(label="Rename / Label", command=lambda: self._rename_action(i))
             menu.add_command(label="Add/Edit Note", command=lambda: self._edit_action_note(i))
+            
+            # Breakpoint Toggle
+            menu.add_separator()
+            bp_label = "❌ Clear Breakpoint" if action.get("breakpoint") else "🛑 Add Breakpoint"
+            def toggle_bp(idx=i, act=action):
+                act["breakpoint"] = not act.get("breakpoint", False)
+                self._save_file_direct()
+                self._refresh_workflow()
+            menu.add_command(label=bp_label, command=toggle_bp)
             
             # Color Tag Cascade
             color_menu = tk.Menu(menu, tearoff=0)
@@ -1660,13 +1657,16 @@ class AutomatorGUI(ctk.CTk):
             menu.add_separator()
             menu.add_command(label="Save as Snippet", command=lambda: self._save_as_snippet([i]))
             menu.add_command(label="Record & Insert Below", command=lambda: self.start_recording(insert_idx=i + 1))
+            menu.add_separator()
+            menu.add_command(label="🗑️ Delete", command=lambda: self._delete_action(i), foreground="red")
             
             # Show menu at mouse position, or at button position if triggered by button
             x = event.x_root if event else more_btn.winfo_rootx()
             y = event.y_root if event else more_btn.winfo_rooty() + more_btn.winfo_height()
             menu.post(x, y)
             
-        more_btn = _ctrl_btn(ctrl, "Options", show_action_menu, text_color=T["dim"])
+        more_btn = _ctrl_btn(ctrl, "⋮", show_action_menu, text_color=T["text"])
+        more_btn.configure(font=ctk.CTkFont("SF Pro Text", 16, "bold"))
         more_btn.pack(side="left", padx=2)
         
         # Right-click anywhere on the row to show context menu
