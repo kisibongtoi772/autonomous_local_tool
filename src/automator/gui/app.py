@@ -2114,11 +2114,17 @@ class AutomatorGUI(ctk.CTk):
 
         _label(dlg, "Type", size=10, colour=T["dim"]).pack(padx=20, pady=(16, 2), anchor="w")
         type_var = ctk.StringVar(value=default_type)
+        
+        # MAGIC PREDICTOR: Track if user manually sets type
+        self._type_manually_set = False
+        def on_type_select(val):
+            self._type_manually_set = True
+            
         ctk.CTkOptionMenu(
             dlg, variable=type_var, values=list(ACTION_LABELS.keys()),
             fg_color=T["raised"], button_color=T["border"],
             text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
-            width=360, corner_radius=6
+            width=360, corner_radius=6, command=on_type_select
         ).pack(padx=20)
 
         _label(dlg, "Value", size=10, colour=T["dim"]).pack(padx=20, pady=(12, 2), anchor="w")
@@ -2127,6 +2133,32 @@ class AutomatorGUI(ctk.CTk):
         val_frame.pack(padx=20, fill="x")
         
         val_var = ctk.StringVar()
+        
+        def on_val_change(*args):
+            if self._type_manually_set: return
+            val = val_var.get().strip()
+            if not val: return
+            import re
+            if val.startswith("http://") or val.startswith("https://"):
+                type_var.set("open_url")
+            elif val.endswith(".png") or val.endswith(".jpg"):
+                type_var.set("assert_template")
+            elif val.endswith(".json"):
+                type_var.set("run_workflow")
+            elif re.match(r"^\d+\.\d+$", val) or re.match(r"^\d+$", val):
+                type_var.set("sleep")
+            elif "+" in val and len(val.split("+")) > 1:
+                type_var.set("hotkey")
+            elif re.match(r"^\d+,\s*\d+(,\s*#?[0-9a-zA-Z]{6})?$", val):
+                if len(val.split(",")) >= 3:
+                    type_var.set("assert_color")
+                else:
+                    type_var.set("click")
+            elif val.startswith("{{") and val.endswith("}}"):
+                type_var.set("type_text")
+        
+        val_var.trace_add("write", on_val_change)
+        
         entry = ctk.CTkEntry(
             val_frame, textvariable=val_var, fg_color=T["raised"], border_color=T["border"],
             text_color=T["text"], font=ctk.CTkFont(*FONT_BODY), corner_radius=6
@@ -2155,7 +2187,7 @@ class AutomatorGUI(ctk.CTk):
             def on_pick(x, y, hex_col):
                 dlg.deiconify()
                 entry.delete(0, "end")
-                if atype.get() in ("assert_color", "if_color"):
+                if type_var.get() in ("assert_color", "if_color"):
                     entry.insert(0, f"{x},{y},{hex_col}")
                 else:
                     entry.insert(0, f"{x},{y}")
