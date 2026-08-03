@@ -2086,6 +2086,65 @@ class AutomatorGUI(ctk.CTk):
         scan(self._actions)
         return sorted(list(vars_set))
 
+
+    def _get_external_variables(self, actions) -> list:
+        import re
+        defined = set()
+        required = set()
+        
+        def scan(acts):
+            for a in acts:
+                # Check if used
+                for k, v in a.items():
+                    if k == "save_to_variable": continue
+                    if isinstance(v, str):
+                        for m in re.findall(r'\{\{([a-zA-Z0-9_]+)\}\}', v):
+                            if m not in defined:
+                                required.add(m)
+                # Check if defined
+                if a.get("save_to_variable"):
+                    defined.add(a.get("save_to_variable"))
+                
+                if "actions" in a: scan(a["actions"])
+                if "then_actions" in a: scan(a["then_actions"])
+                if "else_actions" in a: scan(a["else_actions"])
+                
+        scan(actions)
+        return list(required)
+
+    def _prompt_variable_wizard(self, missing_vars, on_complete):
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Pre-Run Variable Wizard")
+        dlg.geometry("400x500")
+        dlg.attributes("-topmost", True)
+        dlg.focus_force()
+        
+        frame = ctk.CTkScrollableFrame(dlg, fg_color="transparent")
+        frame.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        _label(frame, "Required Variables", size=16, weight="bold").pack(anchor="w", pady=(0, 5))
+        _label(frame, "This workflow needs the following variables before it can run:", size=11, colour=T["dim"]).pack(anchor="w", pady=(0, 20))
+        
+        entries = {}
+        for var in missing_vars:
+            _label(frame, var, size=12, weight="bold", colour=T["accent"]).pack(anchor="w", pady=(5, 2))
+            entry = ctk.CTkEntry(frame, fg_color=T["raised"], border_color=T["border"])
+            entry.pack(fill="x", pady=(0, 10))
+            entries[var] = entry
+            
+        def submit():
+            for var, entry in entries.items():
+                val = entry.get().strip()
+                if val:
+                    self.var_manager.set(var, val)
+            dlg.destroy()
+            on_complete()
+            
+        btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_frame.pack(fill="x", padx=20, pady=20)
+        _btn(btn_frame, "Cancel", dlg.destroy, width=100).pack(side="left")
+        _btn(btn_frame, "▶ Start Run", submit, True, width=100).pack(side="right")
+
     def _build_var_pills(self, parent_frame, entry_widget):
         vars_list = self._get_known_variables()
         if not vars_list: return
@@ -3413,6 +3472,17 @@ class AutomatorGUI(ctk.CTk):
         if self.recording: return
         self.resume_btn.pack_forget()
         self._last_failed_idx = None
+        
+        # VARIABLE WIZARD CHECK
+        if start_idx == 0:
+            ext_vars = self._get_external_variables(self.data.get("actions", []))
+            missing_vars = [v for v in ext_vars if not self.var_manager.get(v)]
+            if missing_vars:
+                self._prompt_variable_wizard(missing_vars, lambda: self._actual_playback(start_idx, end_idx))
+                return
+        self._actual_playback(start_idx, end_idx)
+        
+    def _actual_playback(self, start_idx: int = 0, end_idx: int = None):
         
         speed = round(self._speed_var.get(), 2)
         step  = self._step_mode.get()
