@@ -900,6 +900,7 @@ class AutomatorGUI(ctk.CTk):
         _btn(tb, "Bulk Edit",  self._toggle_bulk_mode, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Export Group",  self._export_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Flowchart",  self._generate_flowchart, False).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "Docs",  self._generate_markdown_docs, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Import",  self._import_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
@@ -2122,6 +2123,56 @@ class AutomatorGUI(ctk.CTk):
 
 
     # --- FLOWCHART VISUALIZER ---
+
+    def _generate_markdown_docs(self):
+        if not self._nav_stack:
+            return
+            
+        wf_name = self._nav_stack[-1]
+        actions = self._get_current_actions()
+        if not actions:
+            self.show_toast("Workflow is empty!", T["err"])
+            return
+            
+        md = []
+        md.append(f"# 🤖 Kịch bản: `{wf_name}`")
+        md.append(f"**Tổng số bước:** {len(actions)}\n")
+        
+        for i, a in enumerate(actions, 1):
+            atype = a.get("type", "unknown")
+            label = ACTION_LABELS.get(atype, atype)
+            md.append(f"## Bước {i}: {label}")
+            
+            # Print important params
+            for k, v in a.items():
+                if k in ("type", "time_offset", "id"): continue
+                
+                md.append(f"- **{k.capitalize()}**: `{v}`")
+                
+                # Check if it's an image template
+                if k == "template" and isinstance(v, str) and v:
+                    # Construct relative image path for markdown
+                    md.append(f"\n  ![{v}](templates/{v})\n")
+                    
+            md.append("")
+            
+        md_text = "\n".join(md)
+        
+        # Show in a dialog
+        dlg = self._dialog("Generated Markdown Docs", "600x500")
+        
+        textbox = ctk.CTkTextbox(dlg, font=ctk.CTkFont("SF Pro Text", 13), fg_color=T["bg"], text_color=T["text"], wrap="word")
+        textbox.pack(fill="both", expand=True, padx=16, pady=(16, 8))
+        textbox.insert("1.0", md_text)
+        textbox.configure(state="disabled")
+        
+        def _copy():
+            self.clipboard_clear()
+            self.clipboard_append(md_text)
+            self.show_toast("Đã copy Markdown!", T["ok"])
+            
+        _btn(dlg, "Copy to Clipboard", _copy, height=36).pack(pady=(0, 16), padx=16, fill="x")
+
     def _generate_flowchart(self):
         import webbrowser
         
