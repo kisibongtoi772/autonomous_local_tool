@@ -285,6 +285,18 @@ class AutomatorGUI(ctk.CTk):
         self.bind("<Control-k>", self._safe_open_command_palette)
         
         # Stop playback on Escape
+
+        self.bind("<Command-c>", self._safe_hotkey_copy)
+        self.bind("<Control-c>", self._safe_hotkey_copy)
+        self.bind("<Command-v>", self._safe_hotkey_paste)
+        self.bind("<Control-v>", self._safe_hotkey_paste)
+        self.bind("<Command-d>", self._safe_hotkey_duplicate)
+        self.bind("<Control-d>", self._safe_hotkey_duplicate)
+        self.bind("<BackSpace>", self._safe_hotkey_delete)
+        self.bind("<Delete>", self._safe_hotkey_delete)
+        self.bind("<Up>", self._safe_hotkey_up)
+        self.bind("<Down>", self._safe_hotkey_down)
+        
         self.bind("<Escape>", self._safe_stop)
 
     def _is_typing(self) -> bool:
@@ -299,6 +311,80 @@ class AutomatorGUI(ctk.CTk):
     def _safe_redo(self, event):
         if self._is_typing(): return
         self._redo()
+
+
+    # --- TRUE ROW SELECTION & STUDIO HOTKEYS ---
+    def _set_active_row(self, idx, row_frame):
+        if getattr(self, "_active_row_frame", None) and self._active_row_frame.winfo_exists():
+            self._active_row_frame.configure(fg_color=T["surface"], border_width=0)
+            
+        self._active_row_idx = idx
+        self._active_row_frame = row_frame
+        
+        if row_frame.winfo_exists():
+            row_frame.configure(fg_color="#262A33", border_width=1, border_color=T["accent"])
+            
+    def _safe_hotkey_copy(self, event):
+        if self._is_typing(): return
+        if getattr(self, "_active_row_idx", None) is not None:
+            idx = self._active_row_idx
+            actions = self.data.get("actions", [])
+            if 0 <= idx < len(actions):
+                self._clipboard = [copy.deepcopy(actions[idx])]
+                self._update_paste_btn()
+                self.show_toast(f"Copied action {idx+1}")
+                
+    def _safe_hotkey_paste(self, event):
+        if self._is_typing(): return
+        if getattr(self, "_active_row_idx", None) is not None:
+            self._paste_action(insert_idx=self._active_row_idx + 1)
+            
+    def _safe_hotkey_duplicate(self, event):
+        if self._is_typing(): return
+        if getattr(self, "_active_row_idx", None) is not None:
+            idx = self._active_row_idx
+            def m(lst):
+                if 0 <= idx < len(lst):
+                    lst.insert(idx + 1, copy.deepcopy(lst[idx]))
+            self._modify_workflow(m)
+            self._set_active_row(idx + 1, self._action_rows[idx + 1] if idx + 1 < len(self._action_rows) else None)
+            
+    def _safe_hotkey_delete(self, event):
+        if self._is_typing(): return
+        if getattr(self, "_active_row_idx", None) is not None:
+            idx = self._active_row_idx
+            def m(lst):
+                if 0 <= idx < len(lst):
+                    lst.pop(idx)
+            self._modify_workflow(m)
+            self._active_row_idx = None
+            self._active_row_frame = None
+
+    def _safe_hotkey_up(self, event):
+        if self._is_typing(): return
+        if getattr(self, "_active_row_idx", None) is not None:
+            idx = self._active_row_idx
+            if idx > 0:
+                def m(lst):
+                    if 0 <= idx < len(lst):
+                        lst[idx - 1], lst[idx] = lst[idx], lst[idx - 1]
+                self._modify_workflow(m)
+                self._active_row_idx = idx - 1
+                if self._active_row_idx < len(self._action_rows):
+                    self._set_active_row(self._active_row_idx, self._action_rows[self._active_row_idx])
+
+    def _safe_hotkey_down(self, event):
+        if self._is_typing(): return
+        if getattr(self, "_active_row_idx", None) is not None:
+            idx = self._active_row_idx
+            if idx < len(self.data.get("actions", [])) - 1:
+                def m(lst):
+                    if 0 <= idx < len(lst):
+                        lst[idx + 1], lst[idx] = lst[idx], lst[idx + 1]
+                self._modify_workflow(m)
+                self._active_row_idx = idx + 1
+                if self._active_row_idx < len(self._action_rows):
+                    self._set_active_row(self._active_row_idx, self._action_rows[self._active_row_idx])
 
     def _show_cheatsheet(self):
         dlg = ctk.CTkToplevel(self)
@@ -814,10 +900,10 @@ class AutomatorGUI(ctk.CTk):
         _btn(tb, "Bulk Edit",  self._toggle_bulk_mode, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Export Group",  self._export_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Flowchart",  self._generate_flowchart, False).pack(side="left", padx=(8, 0), pady=8)
-        _btn(tb, "Import 📥",  self._import_workflow, False).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "Import",  self._import_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
-        _btn(tb, "❓ Help",    self._show_cheatsheet, False).pack(side="right", padx=16, pady=8)
+        _btn(tb, "Help",    self._show_cheatsheet, False).pack(side="right", padx=16, pady=8)
         
         self._console_visible = False
         def toggle_console():
@@ -966,7 +1052,7 @@ class AutomatorGUI(ctk.CTk):
                 
         # Up one level button if not at root
         if self._nav_stack:
-            _btn(self._breadcrumb_bar, "⬅ Back", lambda: _nav_pop(len(self._nav_stack)-1), 
+            _btn(self._breadcrumb_bar, "Back", lambda: _nav_pop(len(self._nav_stack)-1), 
                  width=60, border_width=1, border_color=T["border"]).pack(side="right")
                  
         # X-Ray Toggle
@@ -1200,7 +1286,7 @@ class AutomatorGUI(ctk.CTk):
                 
                 is_bp = action.get("breakpoint", False)
                 bp_color = "#FF3B30" if is_bp else "#4B5563"
-                bp_text = "🛑" if is_bp else "⭕"
+                bp_text = "[BP]" if is_bp else "[ ]"
                 
                 def toggle_bp():
                     def m(lst):
@@ -1466,7 +1552,7 @@ class AutomatorGUI(ctk.CTk):
             menu.add_command(label="▶1  Play Single Action", command=lambda: self._test_action(i))
             if not self._nav_stack:
                 menu.add_command(label="▶▶  Play From Here", command=lambda: self.playback(start_idx=i))
-                menu.add_command(label="▶🛑  Play Until Here", command=lambda: self.playback(start_idx=0, end_idx=i))
+                menu.add_command(label="▶[BP]  Play Until Here", command=lambda: self.playback(start_idx=0, end_idx=i))
             menu.add_separator()
             if enabled:
                 menu.add_command(label="Record  Disable Action", command=lambda: self._toggle_action_enable(i))
@@ -1547,7 +1633,7 @@ class AutomatorGUI(ctk.CTk):
         if atype == "clipboard": return f"{a.get('action','set')}  {a.get('text','')[:40]}"
         if atype == "if_template":
             return (f"template={a.get('template','')}  "
-                    f"then×{len(a.get('then_actions',[]))}  else×{len(a.get('else_actions',[]))}")
+                    f"thenx{len(a.get('then_actions',[]))}  elsex{len(a.get('else_actions',[]))}")
         if atype == "loop":      return f"repeat={a.get('count',1)}  steps={len(a.get('actions',[]))}" + preview(a.get('actions', []))
         if atype == "wait_for_template":
             return f"template={a.get('template','')}  timeout={a.get('timeout',10)}s  on_timeout={a.get('on_timeout','error')}"
@@ -4398,7 +4484,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
             _btn_local(btn_frame, "Retry", lambda: choose("retry"), primary=True).pack(side="left", padx=5)
             
         _btn_local(btn_frame, "⏭️ Skip", lambda: choose("skip")).pack(side="left", padx=5)
-        _btn_local(btn_frame, "🛑 Abort", lambda: choose("abort"), danger=True).pack(side="left", padx=5)
+        _btn_local(btn_frame, "[BP] Abort", lambda: choose("abort"), danger=True).pack(side="left", padx=5)
         
         dlg.protocol("WM_DELETE_WINDOW", lambda: choose("abort"))
         
@@ -5000,7 +5086,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         try:
             pil_img = Image.open(path)
             w, h = pil_img.size
-            _label(dlg, f"File: {tmpl_filename}  ({w} × {h} px)", size=11, colour=T["dim"]).pack(padx=20, pady=(12, 6))
+            _label(dlg, f"File: {tmpl_filename}  ({w} x {h} px)", size=11, colour=T["dim"]).pack(padx=20, pady=(12, 6))
 
             max_size = (380, 240)
             pil_img.thumbnail(max_size)
@@ -5034,7 +5120,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                 preview.thumbnail((48, 48))
                 ctk_img = ctk.CTkImage(light_image=preview, dark_image=preview, size=preview.size)
                 ctk.CTkLabel(card, image=ctk_img, text="").grid(row=0, column=0, padx=8, pady=8)
-                _label(card, f"{fname}\n{w} × {h} px", size=11, colour=T["text"], anchor="w", justify="left").grid(row=0, column=1, padx=8, pady=8, sticky="ew")
+                _label(card, f"{fname}\n{w} x {h} px", size=11, colour=T["text"], anchor="w", justify="left").grid(row=0, column=1, padx=8, pady=8, sticky="ew")
             except Exception:
                 _label(card, fname, size=11, colour=T["text"], anchor="w").grid(row=0, column=1, padx=8, pady=8, sticky="ew")
 
