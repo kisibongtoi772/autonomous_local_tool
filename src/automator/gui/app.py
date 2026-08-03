@@ -4059,7 +4059,7 @@ class AutomatorGUI(ctk.CTk):
         return callback
 
     def _show_error_dialog(self, action_dict: dict, exception: Exception, q: "queue.Queue"):
-        dlg = self._dialog("Action Failed", "450x260")
+        dlg = self._dialog("Action Failed", "550x280")
         dlg.attributes("-topmost", True)
         
         atype = action_dict.get("type", "unknown")
@@ -4085,7 +4085,36 @@ class AutomatorGUI(ctk.CTk):
                 command=cmd
             )
             
-        _btn_local(btn_frame, "🔄 Retry", lambda: choose("retry"), primary=True).pack(side="left", padx=5)
+        img_target = action_dict.get("template") or action_dict.get("template_image")
+        
+        if img_target:
+            def _heal():
+                dlg.withdraw()
+                self.iconify()
+                
+                from .snipping_tool import SnippingTool
+                def on_snip(img):
+                    self.deiconify()
+                    if img:
+                        try:
+                            path = os.path.join(TEMPLATES_DIR, img_target)
+                            img.save(path)
+                            self.show_toast(f"✅ Healed: {img_target}", T["ok"])
+                            choose("retry")
+                        except Exception as e:
+                            logger.error(f"Failed to save healed image: {e}")
+                            dlg.deiconify()
+                    else:
+                        dlg.deiconify()
+                        
+                # Short delay to let animations finish
+                self.after(200, lambda: SnippingTool(self, on_snip))
+                
+            _btn_local(btn_frame, "📸 Auto-Heal", _heal, primary=True).pack(side="left", padx=5)
+            _btn_local(btn_frame, "🔄 Retry", lambda: choose("retry")).pack(side="left", padx=5)
+        else:
+            _btn_local(btn_frame, "🔄 Retry", lambda: choose("retry"), primary=True).pack(side="left", padx=5)
+            
         _btn_local(btn_frame, "⏭️ Skip", lambda: choose("skip")).pack(side="left", padx=5)
         _btn_local(btn_frame, "🛑 Abort", lambda: choose("abort"), danger=True).pack(side="left", padx=5)
         
