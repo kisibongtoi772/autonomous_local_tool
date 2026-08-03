@@ -286,6 +286,8 @@ class AutomatorGUI(ctk.CTk):
         
         # Stop playback on Escape
 
+        self.bind("<Command-Shift-C>", self._safe_copy_coordinates)
+        self.bind("<Control-Shift-c>", self._safe_copy_coordinates)
         self.bind("<Command-c>", self._safe_hotkey_copy)
         self.bind("<Control-c>", self._safe_hotkey_copy)
         self.bind("<Command-v>", self._safe_hotkey_paste)
@@ -669,6 +671,10 @@ class AutomatorGUI(ctk.CTk):
         # Sync indicator
         self._footer_save_lbl = _label(footer, "● Ready", size=11, colour="#A1A1AA")
         self._footer_save_lbl.pack(side="left", padx=16, pady=(4, 0))
+        
+        # Live Coordinate HUD
+        self._footer_coord_lbl = _label(footer, "📍 X: 0  Y: 0", size=11, colour="#38BDF8", weight="bold")
+        self._footer_coord_lbl.pack(side="left", padx=30, pady=(4, 0))
         
         # Current File
         self._footer_file_lbl = _label(footer, "workflow.json", size=11, weight="bold", colour="#D4D4D8")
@@ -5374,6 +5380,26 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
 
     # ── Input listeners ───────────────────────────────────────────────────────
 
+    def _update_live_coordinates(self):
+        try:
+            import pyautogui
+            x, y = pyautogui.position()
+            if hasattr(self, "_footer_coord_lbl") and self._footer_coord_lbl.winfo_exists():
+                self._footer_coord_lbl.configure(text=f"📍 X: {int(x)}  Y: {int(y)}")
+        except Exception:
+            pass
+        self.after(50, self._update_live_coordinates)
+        
+    def _safe_copy_coordinates(self, event=None):
+        try:
+            import pyautogui
+            x, y = pyautogui.position()
+            self.clipboard_clear()
+            self.clipboard_append(f"{int(x)},{int(y)}")
+            self.show_toast(f"Đã copy tọa độ: {int(x)}, {int(y)}", "#38BDF8")
+        except Exception:
+            pass
+
     def _start_listeners(self):
         def on_press(key):
             try:
@@ -5395,6 +5421,8 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                 pass
 
         self.keyboard_listener = keyboard.Listener(on_press=on_press)
+        
+        self.after(50, self._update_live_coordinates)
         self.keyboard_listener.start()
         self.mouse_listener = mouse.Listener(on_click=on_click)
         self.mouse_listener.start()
