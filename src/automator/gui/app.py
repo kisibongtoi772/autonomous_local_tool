@@ -1640,6 +1640,20 @@ class AutomatorGUI(ctk.CTk):
             import tkinter.messagebox as tkmb
             tkmb.showerror("Import Failed", str(e))
 
+    def show_toast(self, message: str, color: str = "#0A84FF"):
+        if hasattr(self, "_active_toast") and self._active_toast.winfo_exists():
+            self._active_toast.destroy()
+
+        toast = ctk.CTkFrame(self, fg_color=color, corner_radius=16)
+        self._active_toast = toast
+        
+        lbl = ctk.CTkLabel(toast, text=message, font=ctk.CTkFont(*FONT_BOLD, size=13), text_color="white")
+        lbl.pack(padx=24, pady=12)
+        
+        toast.place(relx=0.5, rely=0.92, anchor="s")
+        
+        self.after(3000, lambda: toast.destroy() if toast.winfo_exists() else None)
+
     def _undo(self):
         if not self._undo_stack: return
         path = os.path.join(WORKSPACE_DIR, self.file_var.get())
@@ -1652,6 +1666,7 @@ class AutomatorGUI(ctk.CTk):
         self._refresh_workflow()
         self._update_undo_redo_buttons()
         logger.info("Undo successful.")
+        self.show_toast("↶ Đã khôi phục trạng thái trước đó (Undo)", T["accent"])
 
     def _redo(self):
         if not self._redo_stack: return
@@ -1665,6 +1680,7 @@ class AutomatorGUI(ctk.CTk):
         self._refresh_workflow()
         self._update_undo_redo_buttons()
         logger.info("Redo successful.")
+        self.show_toast("↷ Đã làm lại thao tác (Redo)", T["ok"])
         self._refresh_stats()
 
     def _update_paste_btn(self):
@@ -2971,6 +2987,7 @@ class AutomatorGUI(ctk.CTk):
         self._modify_workflow(mutator)
         self._selected_indices.clear()
         self._toggle_bulk_mode()
+        self.show_toast("🗑 Đã xoá các lệnh được chọn", T["err"])
 
     def _bulk_duplicate(self):
         if not self._selected_indices: return
@@ -3061,6 +3078,7 @@ class AutomatorGUI(ctk.CTk):
             self._modify_workflow(mutator)
             self._selected_indices.clear()
             self._toggle_bulk_mode()
+        self.show_toast("✂️ Đã gom nhóm thành sub-workflow", T["accent"])
             
         _btn(dlg, "Extract", on_confirm, primary=True).pack(pady=10)
 
