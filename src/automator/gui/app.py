@@ -1070,7 +1070,19 @@ class AutomatorGUI(ctk.CTk):
             
         enabled = action.get("enabled", True)
         
-        row = ctk.CTkFrame(self._wf_list, fg_color=T["raised"], corner_radius=6)
+        # PRE-FLIGHT HEALTH CHECK: Check if template image exists
+        tmpl_file = action.get("template") or action.get("template_image")
+        is_missing = False
+        if tmpl_file:
+            from ..core.config import TEMPLATES_DIR
+            if not os.path.exists(os.path.join(TEMPLATES_DIR, tmpl_file)):
+                is_missing = True
+        
+        bg_color = "#350a0a" if is_missing else T["raised"]
+        
+        row = ctk.CTkFrame(self._wf_list, fg_color=bg_color, corner_radius=6)
+        if is_missing:
+            row.configure(border_width=1, border_color=T["err"])
         row.pack(fill="x", pady=2)
         row.grid_columnconfigure(2, weight=1)
         if hasattr(self, "_action_rows"):
@@ -1218,6 +1230,9 @@ class AutomatorGUI(ctk.CTk):
                     _label(top_line, p, size=11, colour=T["accent"], weight="bold").pack(side="left")
                 else:
                     _label(top_line, p, size=11, colour=sub_color).pack(side="left")
+                    
+            if is_missing:
+                _label(top_line, " ⚠️ Ảnh mẫu không tồn tại", size=11, colour=T["err"], weight="bold").pack(side="left", padx=5)
                 
             retry = action.get("retry_count", 0)
             if retry > 0:
@@ -1329,9 +1344,11 @@ class AutomatorGUI(ctk.CTk):
             
         tmpl_file = action.get("template") or action.get("template_image")
         if tmpl_file:
-            _ctrl_btn(ctrl, "Img", lambda t=tmpl_file: self._show_template_preview_dialog(t)).pack(side="left", padx=1)
-            _ctrl_btn(ctrl, "Find", lambda a=action: self._test_template_match(a)).pack(side="left", padx=1)
-            _ctrl_btn(ctrl, "📸 Retake", lambda t=tmpl_file: self._quick_recapture(t), text_color=T["accent"]).pack(side="left", padx=1)
+            if not is_missing:
+                _ctrl_btn(ctrl, "Img", lambda t=tmpl_file: self._show_template_preview_dialog(t)).pack(side="left", padx=1)
+                _ctrl_btn(ctrl, "Find", lambda a=action: self._test_template_match(a)).pack(side="left", padx=1)
+            
+            _ctrl_btn(ctrl, "📸 Retake", lambda t=tmpl_file: self._quick_recapture(t), text_color=T["err"] if is_missing else T["accent"]).pack(side="left", padx=1)
             
         if atype in ("click", "assert_color", "if_color") and "x" in action and "y" in action:
             from .click_ripple import ClickRipple
