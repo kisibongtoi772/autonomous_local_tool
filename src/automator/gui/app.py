@@ -2080,9 +2080,9 @@ class AutomatorGUI(ctk.CTk):
         if not save_path: return
         
         script = f'''#!/bin/bash
-cd "{os.path.abspath(WORKSPACE_DIR).replace('/workflows', '')}"
+cd "{os.getcwd()}"
 source venv/bin/activate
-python3 -m src.automator.cli run {current_file}
+python3 -c "from src.automator.core.player import Player; Player('{os.path.join(WORKSPACE_DIR, current_file)}').play()"
 '''
         try:
             with open(save_path, 'w') as f:
