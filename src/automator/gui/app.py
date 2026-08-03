@@ -661,16 +661,57 @@ class AutomatorGUI(ctk.CTk):
             self._panels[key] = f
             builder(f)
 
+    def _toggle_mini_console(self):
+        if self._mini_console_drawer.winfo_viewable():
+            self._mini_console_drawer.grid_remove()
+            self._footer_log_btn.configure(text=">_ Logs")
+        else:
+            self._mini_console_drawer.grid(row=1, column=0, columnspan=2, sticky="ew")
+            self._footer_log_btn.configure(text="v Logs")
+
     def _build_footer(self):
-        self.grid_rowconfigure(1, weight=0) # For footer
+        self.grid_rowconfigure(1, weight=0) # For mini console
+        self.grid_rowconfigure(2, weight=0) # For footer
         
+        # --- Mini Console Drawer ---
+        self._mini_console_drawer = ctk.CTkFrame(self, height=160, fg_color="#18181B", corner_radius=0)
+        self._mini_console_drawer.grid_propagate(False)
+        
+        self._mc_hdr = ctk.CTkFrame(self._mini_console_drawer, height=24, fg_color="#27272A", corner_radius=0)
+        self._mc_hdr.pack(fill="x")
+        self._mc_hdr.pack_propagate(False)
+        
+        _label(self._mc_hdr, " Terminal", size=11, colour="#A1A1AA", weight="bold").pack(side="left", padx=8)
+        
+        def _clear_mini_log():
+            self.mini_log_box.configure(state="normal")
+            self.mini_log_box.delete("0.0", "end")
+            self.mini_log_box.configure(state="disabled")
+            
+        _btn(self._mc_hdr, "Clear", _clear_mini_log, width=50, height=20, fg_color="transparent", text_color="#A1A1AA").pack(side="right", padx=8)
+        
+        self.mini_log_box = ctk.CTkTextbox(self._mini_console_drawer, fg_color="#09090B", text_color="#D4D4D8", font=ctk.CTkFont("Menlo", 11))
+        self.mini_log_box.pack(fill="both", expand=True, padx=0, pady=0)
+        
+        import logging
+        logging.getLogger().addHandler(LogHandler(self.mini_log_box))
+        
+        # --- Footer ---
         footer = ctk.CTkFrame(self, height=28, fg_color="#18181B", corner_radius=0)
-        footer.grid(row=1, column=0, columnspan=2, sticky="ew")
+        footer.grid(row=2, column=0, columnspan=2, sticky="ew")
         footer.grid_propagate(False)
+        
+        self._footer_log_btn = ctk.CTkButton(
+            footer, text=">_ Logs", width=60, height=20,
+            fg_color="transparent", hover_color="#27272A",
+            text_color="#A1A1AA", font=ctk.CTkFont("SF Pro Text", 11, "bold"),
+            command=self._toggle_mini_console
+        )
+        self._footer_log_btn.pack(side="left", padx=8, pady=(4, 0))
         
         # Sync indicator
         self._footer_save_lbl = _label(footer, "● Ready", size=11, colour="#A1A1AA")
-        self._footer_save_lbl.pack(side="left", padx=16, pady=(4, 0))
+        self._footer_save_lbl.pack(side="left", padx=8, pady=(4, 0))
         
         # Live Coordinate HUD
         self._footer_coord_lbl = _label(footer, "📍 X: 0  Y: 0", size=11, colour="#38BDF8", weight="bold")
