@@ -420,17 +420,56 @@ class Player:
             subprocess.Popen(cmd, shell=True)
 
     def _do_loop(self, a: LoopAction):
-        logger.info(f"Loop ×{a.count}  ({len(a.actions)} actions per iteration)")
-        for i in range(a.count):
-            if self._stop_requested:
-                return
+        condition_type = getattr(a, "condition_type", "none")
+        
+        if condition_type == "none":
+            logger.info(f"Loop ×{a.count}  ({len(a.actions)} actions per iteration)")
+            for i in range(a.count):
+                if self._stop_requested:
+                    return
+                self.var_manager.variables["loop_index"] = str(i + 1)
+                self.var_manager.variables[f"loop_index_{self._depth}"] = str(i + 1)
+                logger.info(f"  Iteration {i+1}/{a.count}")
+                self._play_actions(a.actions)
+            logger.info("Loop done.")
+            return
+
+        # Visual loop logic
+        tmpl = getattr(a, "condition_template", None)
+        conf = getattr(a, "condition_confidence", 0.8)
+        
+        if not tmpl:
+            logger.error("Loop condition specified but no template provided.")
+            return
             
-            # Expose loop index
+        path = os.path.join(TEMPLATES_DIR, tmpl)
+        logger.info(f"Loop {condition_type.replace('_', ' ').title()} '{tmpl}' ({len(a.actions)} actions)")
+        
+        i = 0
+        while not self._stop_requested:
+            loc = locate_template(path, confidence=conf)
+            is_found = loc is not None
+            
+            if condition_type == "while_found" and not is_found:
+                logger.info("Loop break: Image no longer found.")
+                break
+                
+            if condition_type == "until_found" and is_found:
+                logger.info("Loop break: Image found.")
+                break
+                
             self.var_manager.variables["loop_index"] = str(i + 1)
             self.var_manager.variables[f"loop_index_{self._depth}"] = str(i + 1)
             
-            logger.info(f"  Iteration {i+1}/{a.count}")
+            logger.info(f"  Iteration {i+1}")
             self._play_actions(a.actions)
+            i += 1
+            
+            # Failsafe
+            if i >= 10000:
+                logger.warning("Failsafe: Loop reached 10000 iterations. Breaking.")
+                break
+                
         logger.info("Loop done.")
 
     def _do_group(self, a: GroupAction):

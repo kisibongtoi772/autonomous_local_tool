@@ -42,6 +42,9 @@ class TypeAction(BaseAction):
 class LoopAction(BaseAction):
     type: Literal["loop"]
     count: int = Field(default=1, ge=1)
+    condition_type: Literal["none", "while_found", "until_found"] = "none"
+    condition_template: Optional[str] = None
+    condition_confidence: float = 0.8
     actions: List['ActionType']
 
 

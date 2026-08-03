@@ -114,6 +114,86 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
             timeout_ent.insert(0, str(action.get("timeout", 10.0)))
             fields["timeout"] = timeout_ent
             
+    elif atype == "group":
+        _lbl("Group Name")
+        grp_ent = ctk.CTkEntry(form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        grp_ent.pack(fill="x")
+        grp_ent.insert(0, action.get("name", "Group"))
+        fields["name"] = grp_ent
+        
+    elif atype == "loop":
+        _lbl("Condition Type")
+        cond_type = ctk.StringVar(value=action.get("condition_type", "none"))
+        ctk.CTkSegmentedButton(
+            form, variable=cond_type,
+            values=["none", "while_found", "until_found"],
+            selected_color=T["accent"], unselected_color=T["raised"]
+        ).pack(fill="x", pady=(0, 12))
+        fields["condition_type"] = cond_type
+        
+        cond_frame = ctk.CTkFrame(form, fg_color="transparent")
+        cond_frame.pack(fill="x")
+        
+        count_frame = ctk.CTkFrame(form, fg_color="transparent")
+        count_frame.pack(fill="x")
+        
+        # Template
+        _lbl("Condition Template (if while/until found)")
+        row = ctk.CTkFrame(cond_frame, fg_color="transparent")
+        row.pack(fill="x")
+        
+        tpl_ent = ctk.CTkEntry(row, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        tpl_ent.pack(side="left", fill="x", expand=True)
+        tpl_ent.insert(0, action.get("condition_template", ""))
+        fields["condition_template"] = tpl_ent
+        
+        def on_pick():
+            def cb(img):
+                tpl_ent.delete(0, "end"); tpl_ent.insert(0, img)
+                dlg.deiconify()
+            from .pickers import TemplatePicker
+            dlg.withdraw()
+            TemplatePicker(app, cb, lambda: dlg.deiconify())
+            
+        def on_snip():
+            def cb(img):
+                tpl_ent.delete(0, "end"); tpl_ent.insert(0, img)
+                dlg.deiconify()
+            from .pickers import SnippingTool
+            dlg.withdraw()
+            SnippingTool(app, cb, lambda: dlg.deiconify())
+            
+        def on_tune():
+            tmpl = tpl_ent.get().strip()
+            if not tmpl:
+                return
+            def cb(new_conf):
+                conf_ent.delete(0, "end"); conf_ent.insert(0, str(new_conf))
+                dlg.deiconify()
+            from .pickers import ConfidenceTuner
+            dlg.withdraw()
+            ConfidenceTuner(app, tmpl, float(conf_ent.get() if 'conf_ent' in locals() else action.get("condition_confidence", 0.8)), cb, lambda: dlg.deiconify())
+            
+        ctk.CTkButton(row, text="🖼 Pick", width=50, command=on_pick, fg_color=T["raised"]).pack(side="left", padx=4)
+        ctk.CTkButton(row, text="✂ Snip", width=50, command=on_snip, fg_color=T["raised"]).pack(side="left")
+        ctk.CTkButton(row, text="🎛 Tune", width=50, command=on_tune, fg_color=T["accent"], text_color=T["text"]).pack(side="left", padx=4)
+        
+        _lbl("Fixed Iteration Count (if Condition is 'none')")
+        count_ent = ctk.CTkEntry(count_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        count_ent.pack(fill="x")
+        count_ent.insert(0, str(action.get("count", 1)))
+        fields["count"] = count_ent
+        
+        def _update_cond_ui(*args):
+            if cond_type.get() == "none":
+                cond_frame.pack_forget()
+                count_frame.pack(fill="x")
+            else:
+                count_frame.pack_forget()
+                cond_frame.pack(fill="x")
+        cond_type.trace_add("write", _update_cond_ui)
+        _update_cond_ui()
+        
     elif atype == "hotkey":
         _lbl("Keys (comma separated, e.g. ctrl, c)")
         row = ctk.CTkFrame(form, fg_color="transparent")
@@ -167,8 +247,9 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         ctk.CTkButton(form, text="{x} Insert Variable", command=on_var, fg_color=T["raised"], text_color=T["dim"]).pack(pady=8, anchor="w")
 
     # --- Advanced Section ---
-    from .components import _label
-    _label(form, "Advanced", size=11, colour=T["text"], weight="bold").pack(anchor="w", pady=(24, 4))
+    if atype not in ("group", "loop"):
+        from .components import _label
+        _label(form, "Advanced", size=11, colour=T["text"], weight="bold").pack(anchor="w", pady=(24, 4))
     
     adv_row = ctk.CTkFrame(form, fg_color="transparent")
     adv_row.pack(fill="x")
@@ -208,6 +289,13 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
             if "confidence" in fields:
                 upd["confidence"] = float(fields["confidence"].get())
                 
+            if atype == "group":
+                upd["name"] = fields["name"].get().strip()
+            elif atype == "loop":
+                upd["condition_type"] = fields["condition_type"].get()
+                upd["count"] = int(fields["count"].get())
+                upd["condition_template"] = fields["condition_template"].get().strip()
+                
             if atype == "sleep":
                 upd["duration"] = float(fields["duration"].get())
             elif atype == "click":
@@ -217,7 +305,87 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
                 upd["template"] = fields["template"].get()
                 if atype == "wait_for_template":
                     upd["timeout"] = float(fields["timeout"].get())
-            elif atype == "hotkey":
+            elif atype == "group":
+        _lbl("Group Name")
+        grp_ent = ctk.CTkEntry(form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        grp_ent.pack(fill="x")
+        grp_ent.insert(0, action.get("name", "Group"))
+        fields["name"] = grp_ent
+        
+    elif atype == "loop":
+        _lbl("Condition Type")
+        cond_type = ctk.StringVar(value=action.get("condition_type", "none"))
+        ctk.CTkSegmentedButton(
+            form, variable=cond_type,
+            values=["none", "while_found", "until_found"],
+            selected_color=T["accent"], unselected_color=T["raised"]
+        ).pack(fill="x", pady=(0, 12))
+        fields["condition_type"] = cond_type
+        
+        cond_frame = ctk.CTkFrame(form, fg_color="transparent")
+        cond_frame.pack(fill="x")
+        
+        count_frame = ctk.CTkFrame(form, fg_color="transparent")
+        count_frame.pack(fill="x")
+        
+        # Template
+        _lbl("Condition Template (if while/until found)")
+        row = ctk.CTkFrame(cond_frame, fg_color="transparent")
+        row.pack(fill="x")
+        
+        tpl_ent = ctk.CTkEntry(row, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        tpl_ent.pack(side="left", fill="x", expand=True)
+        tpl_ent.insert(0, action.get("condition_template", ""))
+        fields["condition_template"] = tpl_ent
+        
+        def on_pick():
+            def cb(img):
+                tpl_ent.delete(0, "end"); tpl_ent.insert(0, img)
+                dlg.deiconify()
+            from .pickers import TemplatePicker
+            dlg.withdraw()
+            TemplatePicker(app, cb, lambda: dlg.deiconify())
+            
+        def on_snip():
+            def cb(img):
+                tpl_ent.delete(0, "end"); tpl_ent.insert(0, img)
+                dlg.deiconify()
+            from .pickers import SnippingTool
+            dlg.withdraw()
+            SnippingTool(app, cb, lambda: dlg.deiconify())
+            
+        def on_tune():
+            tmpl = tpl_ent.get().strip()
+            if not tmpl:
+                return
+            def cb(new_conf):
+                conf_ent.delete(0, "end"); conf_ent.insert(0, str(new_conf))
+                dlg.deiconify()
+            from .pickers import ConfidenceTuner
+            dlg.withdraw()
+            ConfidenceTuner(app, tmpl, float(conf_ent.get() if 'conf_ent' in locals() else action.get("condition_confidence", 0.8)), cb, lambda: dlg.deiconify())
+            
+        ctk.CTkButton(row, text="🖼 Pick", width=50, command=on_pick, fg_color=T["raised"]).pack(side="left", padx=4)
+        ctk.CTkButton(row, text="✂ Snip", width=50, command=on_snip, fg_color=T["raised"]).pack(side="left")
+        ctk.CTkButton(row, text="🎛 Tune", width=50, command=on_tune, fg_color=T["accent"], text_color=T["text"]).pack(side="left", padx=4)
+        
+        _lbl("Fixed Iteration Count (if Condition is 'none')")
+        count_ent = ctk.CTkEntry(count_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        count_ent.pack(fill="x")
+        count_ent.insert(0, str(action.get("count", 1)))
+        fields["count"] = count_ent
+        
+        def _update_cond_ui(*args):
+            if cond_type.get() == "none":
+                cond_frame.pack_forget()
+                count_frame.pack(fill="x")
+            else:
+                count_frame.pack_forget()
+                cond_frame.pack(fill="x")
+        cond_type.trace_add("write", _update_cond_ui)
+        _update_cond_ui()
+        
+    elif atype == "hotkey":
                 upd["keys"] = [k.strip() for k in fields["keys"].get().split(",")]
             else:
                 val = fields["_generic"].get().strip()
