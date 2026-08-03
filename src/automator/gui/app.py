@@ -911,7 +911,6 @@ class AutomatorGUI(ctk.CTk):
             self.wf_log_box.delete("0.0", "end")
         _btn(c_hdr, "Clear", clear_wf_log, width=60, height=24, fg_color="transparent", border_width=1, border_color=T["border"], text_color=T["dim"]).pack(side="right")
         
-        from ..utils.logger import LogHandler
         import logging
         handler = LogHandler(self.wf_log_box)
         logging.getLogger().addHandler(handler)
