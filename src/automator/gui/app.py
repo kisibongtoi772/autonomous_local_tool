@@ -468,6 +468,13 @@ class AutomatorGUI(ctk.CTk):
              border_width=1, border_color=T["border"],
              text_color=T["accent"],
              hover_color=T["hover"]
+             ).pack(pady=(2, 2), fill="x")
+
+        _btn(sel, "📦 Export Project", self._export_project, width=166,
+             fg_color="transparent",
+             border_width=1, border_color=T["border"],
+             text_color=T["accent"],
+             hover_color=T["hover"]
              ).pack(pady=(2, 6), fill="x")
 
         wf_mgmt_row = ctk.CTkFrame(sel, fg_color="transparent")
@@ -2029,6 +2036,72 @@ class AutomatorGUI(ctk.CTk):
         _btn(dlg, "Replace All", on_replace, primary=True).pack(pady=24)
 
 
+
+
+    def _export_project(self):
+        from tkinter import filedialog
+        import zipfile
+        
+        current_file = self.file_var.get()
+        if not current_file:
+            self.show_toast("❌ No workflow selected", T["err"])
+            return
+            
+        suggested_name = current_file.replace('.json', '_export.zip')
+        
+        save_path = filedialog.asksaveasfilename(
+            title="Export Project to ZIP",
+            initialfile=suggested_name,
+            defaultextension=".zip",
+            filetypes=[("ZIP Archive", "*.zip")]
+        )
+        if not save_path: return
+        
+        required_templates = set()
+        required_workflows = set([current_file])
+        
+        def scan_file(filename):
+            p = os.path.join(WORKSPACE_DIR, filename)
+            if not os.path.exists(p): return
+            d = load_json(p, {})
+            
+            def scan_actions(actions):
+                for a in actions:
+                    t = a.get("template") or a.get("template_image")
+                    if t: required_templates.add(t)
+                    
+                    wf = a.get("workflow_file")
+                    if wf and wf not in required_workflows:
+                        required_workflows.add(wf)
+                        scan_file(wf)
+                        
+                    if "actions" in a: scan_actions(a["actions"])
+                    if "then_actions" in a: scan_actions(a["then_actions"])
+                    if "else_actions" in a: scan_actions(a["else_actions"])
+            
+            scan_actions(d.get("actions", []))
+            
+        # 1. Resolve all dependencies recursively
+        scan_file(current_file)
+        
+        # 2. Pack to ZIP
+        try:
+            with zipfile.ZipFile(save_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for wf in required_workflows:
+                    wf_path = os.path.join(WORKSPACE_DIR, wf)
+                    if os.path.exists(wf_path):
+                        zipf.write(wf_path, arcname=wf)
+                
+                for t in required_templates:
+                    t_path = os.path.join(TEMPLATES_DIR, t)
+                    if os.path.exists(t_path):
+                        zipf.write(t_path, arcname=f"templates/{t}")
+                        
+            self.show_toast(f"📦 Exported {len(required_workflows)} workflows & {len(required_templates)} assets!", T["ok"])
+            logger.info(f"Project exported successfully to {save_path}")
+        except Exception as e:
+            logger.error(f"Export failed: {e}")
+            self.show_toast("❌ Export failed!", T["err"])
 
     def _open_variables_vault(self):
         dlg = ctk.CTkToplevel(self)
