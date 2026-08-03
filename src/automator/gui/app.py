@@ -483,7 +483,7 @@ class AutomatorGUI(ctk.CTk):
     # ── Sidebar ───────────────────────────────────────────────────────────────
 
     def _build_sidebar(self):
-        sb = ctk.CTkFrame(self, width=190, fg_color=T["surface"], corner_radius=0)
+        self._sidebar = sb = ctk.CTkFrame(self, width=190, fg_color=T["surface"], corner_radius=0)
         sb.grid(row=0, column=0, sticky="nsew")
         sb.grid_propagate(False)
 
@@ -900,6 +900,8 @@ class AutomatorGUI(ctk.CTk):
         _btn(tb, "Bulk Edit",  self._toggle_bulk_mode, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Export Group",  self._export_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Flowchart",  self._generate_flowchart, False).pack(side="left", padx=(8, 0), pady=8)
+        self._zen_btn = _btn(tb, "Zen Mode", self._toggle_zen_mode, False)
+        self._zen_btn.pack(side="right", padx=(0, 8), pady=8)
         _btn(tb, "Docs",  self._generate_markdown_docs, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Import",  self._import_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
@@ -2172,6 +2174,22 @@ class AutomatorGUI(ctk.CTk):
             self.show_toast("Đã copy Markdown!", T["ok"])
             
         _btn(dlg, "Copy to Clipboard", _copy, height=36).pack(pady=(0, 16), padx=16, fill="x")
+
+
+    def _toggle_zen_mode(self):
+        self._zen_mode = not getattr(self, "_zen_mode", False)
+        if self._zen_mode:
+            self._sidebar.grid_forget()
+            if hasattr(self, '_breadcrumb_container') and self._breadcrumb_container.winfo_exists():
+                self._breadcrumb_container.grid_forget()
+            if hasattr(self, '_zen_btn') and self._zen_btn.winfo_exists():
+                self._zen_btn.configure(text="Exit Zen", fg_color=T["accent"], text_color="#FFFFFF")
+        else:
+            self._sidebar.grid(row=0, column=0, sticky="nsew")
+            if hasattr(self, '_breadcrumb_container') and self._breadcrumb_container.winfo_exists():
+                self._breadcrumb_container.grid(row=1, column=0, sticky="ew", padx=24, pady=(0, 8))
+            if hasattr(self, '_zen_btn') and self._zen_btn.winfo_exists():
+                self._zen_btn.configure(text="Zen Mode", fg_color="transparent", text_color=T["text"])
 
     def _generate_flowchart(self):
         import webbrowser
