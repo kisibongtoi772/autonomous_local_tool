@@ -1498,7 +1498,9 @@ class AutomatorGUI(ctk.CTk):
             if atype == "group":
                 menu.add_command(label="💥  Ungroup", command=lambda: self._ungroup_action(i))
             menu.add_command(label="➕  Insert Below", command=lambda: self._open_add_dialog(insert_idx=i + 1))
+            menu.add_command(label="🧩  Insert Snippet Below", command=lambda: self._insert_snippet(i + 1))
             menu.add_separator()
+            menu.add_command(label="💾  Save as Snippet", command=lambda: self._save_as_snippet([i]))
             menu.add_command(label="⏺  Record & Insert Below", command=lambda: self.start_recording(insert_idx=i + 1))
             
             # Show menu at mouse position, or at button position if triggered by button
@@ -3293,6 +3295,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         _btn(self._bulk_toolbar, "Toggle 🟢", self._bulk_toggle).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "✂️ Extract", self._bulk_extract).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "📦 Group", self._bulk_group).pack(side="right", padx=6, pady=6)
+        _btn(self._bulk_toolbar, "💾 Save Snippet", self._bulk_save_snippet).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "📋 Copy", self._bulk_copy).pack(side="right", padx=6, pady=6)
         _btn(self._bulk_toolbar, "⧉ Duplicate", self._bulk_duplicate).pack(side="right", padx=6, pady=6)
 
@@ -3412,6 +3415,87 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         
         if hasattr(self, "_floating_status") and self._floating_status.winfo_exists():
             self._floating_status.update_status(f"Copied {len(self._action_clipboard)} action(s)")
+
+
+    # --- SNIPPETS LOGIC ---
+    def _bulk_save_snippet(self):
+        if not self._selected_indices: return
+        self._save_as_snippet(sorted(list(self._selected_indices)))
+        self._toggle_bulk_mode()
+
+    def _save_as_snippet(self, indices):
+        import json
+        actions = self.data.get("actions", [])
+        snippet_actions = [copy.deepcopy(actions[i]) for i in indices if i < len(actions)]
+        if not snippet_actions: return
+        
+        dlg = ctk.CTkInputDialog(text="Enter a name for this Snippet:", title="Save Snippet")
+        name = dlg.get_input()
+        if not name: return
+        
+        name = "".join(c if c.isalnum() else "_" for c in name).strip("_").lower()
+        if not name: name = "snippet"
+        
+        snip_dir = os.path.join(WORKSPACE_DIR, "snippets")
+        os.makedirs(snip_dir, exist_ok=True)
+        
+        path = os.path.join(snip_dir, f"{name}.json")
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(snippet_actions, f, indent=4, ensure_ascii=False)
+            self.show_toast(f"💾 Snippet saved: {name}", T["ok"])
+        except Exception as e:
+            logger.error(f"Error saving snippet: {e}")
+            self.show_toast("❌ Error saving snippet", T["err"])
+
+    def _insert_snippet(self, insert_idx: int):
+        import json
+        snip_dir = os.path.join(WORKSPACE_DIR, "snippets")
+        if not os.path.exists(snip_dir):
+            self.show_toast("❌ No snippets found.", T["err"])
+            return
+            
+        snippets = [f for f in os.listdir(snip_dir) if f.endswith(".json")]
+        if not snippets:
+            self.show_toast("❌ No snippets found.", T["err"])
+            return
+            
+        dlg = ctk.CTkToplevel(self)
+        dlg.title("Insert Snippet")
+        dlg.geometry("300x150")
+        dlg.attributes("-topmost", True)
+        
+        _label(dlg, "Select Snippet:", size=12, colour=T["text"]).pack(pady=(15, 5))
+        
+        sel_var = ctk.StringVar(value=snippets[0])
+        ctk.CTkOptionMenu(
+            dlg, variable=sel_var, values=snippets,
+            fg_color=T["raised"], button_color=T["border"]
+        ).pack(pady=5, padx=20, fill="x")
+        
+        def on_confirm():
+            snip_name = sel_var.get()
+            path = os.path.join(snip_dir, snip_name)
+            try:
+                with open(path, "r", encoding="utf-8") as f:
+                    snippet_actions = json.load(f)
+                
+                self._undo_stack.append(copy.deepcopy(self.data.get("actions", [])))
+                self._redo_stack.clear()
+                
+                for i, action in enumerate(snippet_actions):
+                    self.data["actions"].insert(insert_idx + i, action)
+                    
+                self._save_file()
+                self._refresh_workflow()
+                self.show_toast(f"🧩 Inserted snippet: {snip_name}", T["ok"])
+            except Exception as e:
+                logger.error(f"Error loading snippet: {e}")
+                self.show_toast("❌ Error loading snippet", T["err"])
+            finally:
+                dlg.destroy()
+                
+        ctk.CTkButton(dlg, text="Insert", command=on_confirm, fg_color=T["accent"]).pack(pady=15)
 
     def _bulk_delete(self):
         if not self._selected_indices: return
