@@ -903,6 +903,7 @@ class AutomatorGUI(ctk.CTk):
         self._zen_btn = _btn(tb, "Zen Mode", self._toggle_zen_mode, False)
         self._zen_btn.pack(side="right", padx=(0, 8), pady=8)
         _btn(tb, "Docs",  self._generate_markdown_docs, False).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "Breakpoints", self._open_breakpoints_manager, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Import",  self._import_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Gallery",    self._open_template_gallery_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Clear All",  self._clear_workflow,   False, danger=True).pack(side="left", padx=(8, 0), pady=8)
@@ -5189,6 +5190,88 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
             img_lbl.pack(padx=20, pady=10)
         except Exception as e:
             _label(dlg, f"Error loading image: {e}", colour=T["err"]).pack(pady=30)
+
+
+    def _open_breakpoints_manager(self):
+        dlg = self._dialog("Breakpoint Manager", "600x500")
+        
+        _label(dlg, "Active Breakpoints in Workspace", size=14, weight="bold").pack(pady=(16, 8))
+        
+        scroll = ctk.CTkScrollableFrame(dlg, fg_color="transparent")
+        scroll.pack(fill="both", expand=True, padx=16, pady=8)
+        
+        bp_list = []
+        
+        # Scan all workflows
+        workflows = glob.glob(os.path.join(WORKSPACE_DIR, "*.json"))
+        for wf in workflows:
+            wf_name = os.path.basename(wf)
+            if wf_name in ["run_history.json", "run_variables.json"]:
+                continue
+            
+            try:
+                with open(wf, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                
+                actions = data.get("actions", [])
+                for i, action in enumerate(actions):
+                    if action.get("breakpoint", False):
+                        bp_list.append({
+                            "file": wf,
+                            "filename": wf_name,
+                            "idx": i,
+                            "type": action.get("type", "unknown")
+                        })
+            except Exception:
+                pass
+                
+        if not bp_list:
+            _label(scroll, "No breakpoints active in this project. 🎉", colour=T["dim"]).pack(pady=40)
+            return
+            
+        def _clear_all_breakpoints():
+            import json
+            for wf in glob.glob(os.path.join(WORKSPACE_DIR, "*.json")):
+                if os.path.basename(wf) in ["run_history.json", "run_variables.json"]:
+                    continue
+                try:
+                    with open(wf, "r", encoding="utf-8") as f:
+                        data = json.load(f)
+                    changed = False
+                    for action in data.get("actions", []):
+                        if action.get("breakpoint", False):
+                            action["breakpoint"] = False
+                            changed = True
+                    if changed:
+                        with open(wf, "w", encoding="utf-8") as f:
+                            json.dump(data, f, indent=4)
+                except Exception:
+                    pass
+            self.show_toast("Cleared all breakpoints in workspace", T["ok"])
+            if self.file_var.get():
+                # Refresh current view
+                path = os.path.join(WORKSPACE_DIR, self.file_var.get())
+                self.data = load_json(path, {"actions": []})
+                self._refresh_workflow()
+            dlg.destroy()
+            
+        _btn(dlg, "Clear All Breakpoints", _clear_all_breakpoints, danger=True).pack(pady=(0, 16))
+        
+        for bp in bp_list:
+            row = ctk.CTkFrame(scroll, fg_color=T["raised"], corner_radius=6)
+            row.pack(fill="x", pady=2, ipady=4, ipadx=8)
+            
+            _label(row, f"{bp['filename']}", size=11, weight="bold", colour=T["accent"]).pack(side="left", padx=(0, 8))
+            _label(row, f"Step {bp['idx']+1}: {bp['type']}", size=11).pack(side="left")
+            
+            def jump(filename=bp['filename'], idx=bp['idx']):
+                self._on_file_select(filename)
+                if self._active_nav != "workflow":
+                    self._nav_to("workflow")
+                self._current_highlight_idx = idx
+                dlg.destroy()
+                
+            _btn(row, "Jump To", jump, width=60, height=24, fg_color="transparent", border_width=1, border_color=T["border"]).pack(side="right")
 
     def _open_template_gallery_dialog(self):
         dlg = self._dialog("Template Gallery", "560x420")
