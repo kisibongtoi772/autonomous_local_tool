@@ -1456,6 +1456,24 @@ class AutomatorGUI(ctk.CTk):
                 badge_f.grid(row=0, column=4, padx=8, pady=4)
                 _label(badge_f, f"⏱ {dur:.2f}s", size=10, colour=dur_color, weight="bold").pack(side="right")
         
+
+        # --- SMART WORKFLOW LINTER (Pre-Flight Check) ---
+        lint_err = None
+        if atype in ("click", "wait_for_template", "if_template"):
+            tpl = action.get("template") or action.get("template_image")
+            if tpl and not os.path.exists(os.path.join(TEMPLATES_DIR, tpl)):
+                lint_err = f"[Missing Image: {tpl}]"
+        elif atype == "run_workflow":
+            wf_file = action.get("workflow_file")
+            if wf_file and not os.path.exists(os.path.join(WORKSPACE_DIR, wf_file)):
+                lint_err = f"[Missing Workflow: {wf_file}]"
+                
+        if lint_err:
+            row.configure(border_width=1, border_color=T["err"])
+            err_f = ctk.CTkFrame(row, fg_color="transparent")
+            err_f.grid(row=0, column=3, padx=8, pady=4, sticky="e")
+            _label(err_f, lint_err, size=11, colour=T["err"], weight="bold").pack(side="right")
+
         # Controls — plain text buttons only
         ctrl = ctk.CTkFrame(row, fg_color="transparent")
         ctrl.grid(row=0, column=5, padx=8, pady=4)
