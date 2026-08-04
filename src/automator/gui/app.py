@@ -827,6 +827,14 @@ class AutomatorGUI(ctk.CTk):
         )
         self.play_btn.pack(side="left", padx=(0, 8))
         
+        self.diagnose_btn = ctk.CTkButton(
+            btn_row, text="🩺 Diagnose", height=36, width=100,
+            fg_color="#059669", hover_color="#047857",
+            text_color="white", font=ctk.CTkFont(*FONT_BOLD),
+            corner_radius=6, command=self._open_diagnostics
+        )
+        self.diagnose_btn.pack(side="left", padx=(0, 8))
+        
         self.resume_btn = ctk.CTkButton(
             btn_row, text="▶ Resume", height=36, width=110,
             fg_color=T["warn"], hover_color="#C06000",
@@ -5115,6 +5123,24 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
             self._on_file_select(filename)
             
         self._file_switcher = FileSwitcher(self, files, current, on_select)
+
+    def _open_diagnostics(self):
+        from ..core.config import WORKSPACE_DIR
+        wf_path = os.path.join(WORKSPACE_DIR, self.file_var.get())
+        if not os.path.exists(wf_path):
+            self.show_toast("Vui lòng lưu kịch bản trước khi chẩn đoán", T["err"])
+            return
+            
+        from ..core.config import load_json
+        data = load_json(wf_path, {})
+        actions = data.get("actions", [])
+        
+        if not actions:
+            self.show_toast("Kịch bản rỗng", T["warn"])
+            return
+            
+        from .diagnostics_modal import DiagnosticsModal
+        DiagnosticsModal(self, actions)
 
     def _on_done(self, success: bool, error: str = None, snapshot: str = None, profiler_data: list = None):
         self.after(0, getattr(self, "_cleanup_debugger", lambda: None))
