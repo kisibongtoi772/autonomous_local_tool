@@ -36,6 +36,9 @@ class VariableManager:
         except Exception as e:
             logger.error(f"Failed to save variables: {e}")
 
+    def get_all(self):
+        return self.variables
+
     def set(self, key: str, value: str):
         self.variables[key] = value
         self.save()

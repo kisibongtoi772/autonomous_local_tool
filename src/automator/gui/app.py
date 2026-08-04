@@ -4659,7 +4659,27 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
                         row = ctk.CTkFrame(vars_container, fg_color=bg_color, corner_radius=6)
                         row.pack(fill="x", pady=4)
                         
-                        ctk.CTkLabel(row, text=k, font=ctk.CTkFont("SF Pro Text", 12, "bold"), text_color=T["accent"]).pack(anchor="w", padx=10, pady=(10, 0))
+                        header_frame = ctk.CTkFrame(row, fg_color="transparent")
+                        header_frame.pack(fill="x", padx=10, pady=(10, 0))
+                        
+                        ctk.CTkLabel(header_frame, text=k, font=ctk.CTkFont("SF Pro Text", 12, "bold"), text_color=T["accent"]).pack(side="left")
+                        
+                        def make_edit_command(key=k, current_val=str(v)):
+                            def edit_var():
+                                dialog = ctk.CTkInputDialog(text=f"Sửa giá trị cho biến '{key}':", title="Chỉnh Sửa Biến Trực Tiếp")
+                                # Try to center dialog? CTkInputDialog handles its own centering mostly
+                                val = dialog.get_input()
+                                if val is not None:
+                                    self._player.var_manager.set(key, val)
+                            return edit_var
+                            
+                        edit_btn = ctk.CTkButton(
+                            header_frame, text="✏ Edit", width=50, height=20,
+                            font=ctk.CTkFont("SF Pro Text", 10),
+                            fg_color="#059669", hover_color="#047857", text_color="white",
+                            command=make_edit_command()
+                        )
+                        edit_btn.pack(side="right")
                         
                         val_str = str(v)
                         if len(val_str) > 100: val_str = val_str[:97] + "..."
