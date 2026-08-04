@@ -628,6 +628,7 @@ class AutomatorGUI(ctk.CTk):
             ("workflow",  "Workflow Editor"),
             ("scheduler", "Scheduler"),
             ("variables", "Variables"),
+            ("bookmarks", "🔖 Bookmarks"),
             ("history",   "Run History"),
         ]
         for key, label in nav_items:
@@ -671,6 +672,7 @@ class AutomatorGUI(ctk.CTk):
             ("workflow",  self._build_workflow),
             ("scheduler", self._build_scheduler),
             ("variables", self._build_variables),
+            ("bookmarks", self._build_bookmarks),
             ("history",   self._build_history),
         ]:
             f = ctk.CTkFrame(main, fg_color=T["bg"], corner_radius=0)
@@ -765,6 +767,7 @@ class AutomatorGUI(ctk.CTk):
             "variables": self._refresh_variables,
             "history":   self._refresh_history,
             "scheduler": self._refresh_scheduler,
+            "bookmarks": self._refresh_bookmarks,
         }
         if key in refresh:
             refresh[key]()
@@ -1527,6 +1530,23 @@ class AutomatorGUI(ctk.CTk):
                     fg_color="transparent", hover_color=T["hover"],
                     text_color=bp_color, font=ctk.CTkFont("SF Pro Text", 10),
                     corner_radius=4, border_width=0, command=toggle_bp
+                ).pack(side="left")
+                
+                is_bm = action.get("bookmark", False)
+                bm_color = "#FBBF24" if is_bm else "#4B5563"
+                bm_text = "🔖" if is_bm else "[ ]"
+                
+                def toggle_bm():
+                    def m(lst):
+                        if 0 <= i < len(lst):
+                            lst[i]["bookmark"] = not is_bm
+                    self._modify_workflow(m)
+                
+                ctk.CTkButton(
+                    idx_frame, text=bm_text, width=24, height=24,
+                    fg_color="transparent", hover_color=T["hover"],
+                    text_color=bm_color, font=ctk.CTkFont("SF Pro Text", 10),
+                    corner_radius=4, border_width=0, command=toggle_bm
                 ).pack(side="left")
             
             _label(idx_frame, str(i + 1), size=10, colour=T["dim"],
@@ -4290,6 +4310,72 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
 
     # ── PANEL: History ────────────────────────────────────────────────────────
 
+
+    # --- BOOKMARKS PANEL ---
+    def _build_bookmarks(self, parent: ctk.CTkFrame):
+        self._page_header(parent, "🔖 Action Bookmarks", 0)
+        
+        main_content = ctk.CTkFrame(parent, fg_color="transparent")
+        main_content.grid(row=1, column=0, sticky="nsew", padx=24, pady=20)
+        parent.grid_rowconfigure(1, weight=1)
+        parent.grid_columnconfigure(0, weight=1)
+        
+        self._bookmarks_list = ctk.CTkScrollableFrame(main_content, fg_color="transparent")
+        self._bookmarks_list.pack(fill="both", expand=True)
+        
+    def _refresh_bookmarks(self):
+        if not hasattr(self, '_bookmarks_list') or not self._bookmarks_list.winfo_exists():
+            return
+            
+        for w in self._bookmarks_list.winfo_children():
+            w.destroy()
+            
+        actions = []
+        try:
+            wf = self._read_workflow()
+            actions = wf.get("actions", [])
+        except Exception:
+            pass
+            
+        count = 0
+        for i, action in enumerate(actions):
+            if action.get("bookmark", False):
+                count += 1
+                row = ctk.CTkFrame(self._bookmarks_list, fg_color=T["surface"], corner_radius=6)
+                row.pack(fill="x", pady=4, ipady=4)
+                
+                atype = action.get("type", "unknown")
+                summary = self._action_summary(atype, action)
+                if len(summary) > 60:
+                    summary = summary[:57] + "..."
+                    
+                _label(row, f"Step {i+1}: ", size=12, colour=T["accent"], weight="bold").pack(side="left", padx=(10, 5))
+                _label(row, f"[{atype}] {summary}", size=12, colour=T["text"]).pack(side="left")
+                
+                def make_jump(idx=i):
+                    def jump():
+                        self._nav_to("workflow")
+                        total = max(1, len(actions))
+                        pct = max(0, idx - 2) / total
+                        if hasattr(self, "_wf_list") and self._wf_list.winfo_exists():
+                            self._wf_list._parent_canvas.yview_moveto(pct)
+                            # Highlight it
+                            if hasattr(self, "_action_rows") and 0 <= idx < len(self._action_rows):
+                                for r in self._action_rows:
+                                    r.configure(fg_color=T["surface"])
+                                self._action_rows[idx].configure(fg_color="#047857") # Highlight Green
+                    return jump
+                
+                ctk.CTkButton(
+                    row, text="Dịch chuyển 🚀", width=80, height=24,
+                    fg_color=T["accent"], hover_color=T["accent_d"],
+                    text_color=T["text"], font=ctk.CTkFont("SF Pro Text", 11, "bold"),
+                    command=make_jump()
+                ).pack(side="right", padx=10)
+                
+        if count == 0:
+            _label(self._bookmarks_list, "Chưa có hành động nào được đánh dấu (Bookmark).", size=13, colour=T["dim"]).pack(pady=40)
+            
     def _build_history(self, p: ctk.CTkFrame):
         p.grid_columnconfigure(0, weight=1)
         p.grid_rowconfigure(1, weight=1)

@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 class BaseAction(BaseModel):
     enabled: bool = Field(default=True, description="Whether this action should be executed")
     breakpoint: bool = Field(default=False, description="Pause execution before this action")
+    bookmark: bool = Field(default=False, description="Quick navigation bookmark marker")
     time_offset: float = Field(default=0.0, ge=0.0)
     # Reliability fields — optional on every action
     retry_count: int = Field(default=0, ge=0,
