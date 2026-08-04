@@ -236,3 +236,75 @@ class ScreenLocator(ctk.CTkToplevel):
     def _close(self):
         self.on_close()
         self.destroy()
+
+class RegionPicker(ctk.CTkToplevel):
+    """Translucent overlay to select a screen region. Returns (x, y, w, h)."""
+    def __init__(self, parent, on_complete):
+        super().__init__(parent)
+        self.on_complete = on_complete
+        self.title("Select Region")
+        
+        self.attributes('-fullscreen', True)
+        self.attributes('-topmost', True)
+        self.overrideredirect(True)
+        self.configure(cursor="cross")
+        
+        try:
+            self.attributes('-alpha', 0.3)
+            self.config(bg="black")
+            canvas_bg = "black"
+        except Exception:
+            self.attributes("-alpha", 0.3)
+            canvas_bg = "black"
+            
+        self.canvas = tk.Canvas(self, bg=canvas_bg, highlightthickness=0, cursor="cross")
+        self.canvas.pack(fill="both", expand=True)
+        
+        self.start_x = None
+        self.start_y = None
+        self.rect = None
+        
+        # Instruction text
+        self.canvas.create_text(
+            self.winfo_screenwidth()//2, 50,
+            text="Click and drag to select region. Press ESC to cancel.",
+            fill="white", font=("Arial", 24, "bold")
+        )
+        
+        self.canvas.bind("<ButtonPress-1>", self.on_press)
+        self.canvas.bind("<B1-Motion>", self.on_drag)
+        self.canvas.bind("<ButtonRelease-1>", self.on_release)
+        self.bind("<Escape>", lambda e: self.cancel())
+        
+    def on_press(self, event):
+        self.start_x = event.x
+        self.start_y = event.y
+        if self.rect:
+            self.canvas.delete(self.rect)
+        self.rect = self.canvas.create_rectangle(
+            self.start_x, self.start_y, self.start_x, self.start_y,
+            outline="#10B981", width=3, fill="#047857", stipple="gray25"
+        )
+        
+    def on_drag(self, event):
+        if self.rect:
+            self.canvas.coords(self.rect, self.start_x, self.start_y, event.x, event.y)
+            
+    def on_release(self, event):
+        if self.start_x is None: return
+        x1, y1 = min(self.start_x, event.x), min(self.start_y, event.y)
+        x2, y2 = max(self.start_x, event.x), max(self.start_y, event.y)
+        
+        w = x2 - x1
+        h = y2 - y1
+        
+        self.destroy()
+        if w > 10 and h > 10:
+            self.on_complete([x1, y1, w, h])
+        else:
+            self.on_complete(None)
+            
+    def cancel(self):
+        self.destroy()
+        self.on_complete(None)
+

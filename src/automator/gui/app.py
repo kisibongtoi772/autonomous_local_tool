@@ -1771,6 +1771,20 @@ class AutomatorGUI(ctk.CTk):
                 _ctrl_btn(ctrl, "Img", lambda t=tmpl_file: self._show_template_preview_dialog(t)).pack(side="left", padx=1)
                 _ctrl_btn(ctrl, "Find", lambda a=action: self._test_template_match(a)).pack(side="left", padx=1)
             
+            def do_region():
+                from .pickers import RegionPicker
+                def on_done(region_tuple):
+                    self.deiconify()
+                    if region_tuple:
+                        def modify(lst):
+                            lst[i]["search_region"] = region_tuple
+                        self._modify_workflow(modify)
+                self.withdraw()
+                self.after(200, lambda: RegionPicker(self, on_done))
+                
+            has_reg = action.get("search_region")
+            _ctrl_btn(ctrl, "Region" if not has_reg else "[Region]", do_region, text_color=T["ok"] if has_reg else T["dim"]).pack(side="left", padx=1)
+            
             _ctrl_btn(ctrl, "Retake", lambda t=tmpl_file: self._quick_recapture(t), text_color=T["err"] if is_missing else T["accent"]).pack(side="left", padx=1)
             
         if atype in ("click", "assert_color", "if_color") and "x" in action and "y" in action:

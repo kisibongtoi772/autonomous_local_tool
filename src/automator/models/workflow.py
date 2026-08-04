@@ -27,6 +27,7 @@ class ClickAction(BaseAction):
     y: int
     template_image: Optional[str] = None
     confidence: float = Field(default=0.8, ge=0.1, le=1.0)
+    search_region: Optional[list] = None
     offset_x: int = 0
     offset_y: int = 0
     move_duration: float = Field(default=0.0, ge=0.0, description="Seconds to smoothly move mouse before clicking")
@@ -78,6 +79,7 @@ class AssertTemplateAction(BaseAction):
     type: Literal["assert_template"]
     template: str
     confidence: float = Field(default=0.8, ge=0.1, le=1.0)
+    search_region: Optional[list] = None
 
 
 class ClipboardAction(BaseAction):
@@ -92,6 +94,7 @@ class IfTemplateAction(BaseAction):
     type: Literal["if_template"]
     template: str
     confidence: float = Field(default=0.8, ge=0.1, le=1.0)
+    search_region: Optional[list] = None
     then_actions: List['ActionType'] = Field(default_factory=list)
     else_actions: List['ActionType'] = Field(default_factory=list)
 
@@ -102,6 +105,8 @@ class WaitForTemplateAction(BaseAction):
     template: str
     timeout: float = Field(default=10.0, gt=0.0,
         description="Max seconds to wait before raising an error")
+    confidence: float = Field(default=0.8, ge=0.1, le=1.0)
+    search_region: Optional[list] = None
     interval: float = Field(default=0.5, gt=0.0,
         description="Polling interval in seconds")
     confidence: float = Field(default=0.8, ge=0.1, le=1.0)
