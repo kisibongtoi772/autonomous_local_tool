@@ -1032,6 +1032,7 @@ class AutomatorGUI(ctk.CTk):
                 
         _btn(tb, "Console ⌨️", toggle_console, False).pack(side="left", padx=(8, 0), pady=8)
         
+        _btn(tb, "Trinh Sát 🔍", self._open_live_inspector, False).pack(side="right", padx=(0, 8), pady=8)
         _btn(tb, "Find/Replace 🔍", self._open_find_replace, False).pack(side="right", padx=(0, 8), pady=8)
         _btn(tb, "Outline 📑", self._toggle_outline, False).pack(side="right", padx=(0, 8), pady=8)
         _btn(tb, "Gallery 🖼", self._open_template_gallery, False).pack(side="right", padx=(0, 8), pady=8)
@@ -5388,8 +5389,16 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         cmds.append(("Tool", "Template Gallery", self._open_template_gallery_dialog))
         cmds.append(("Tool", "Zen Mode Toggle", self._toggle_zen_mode))
         cmds.append(("Tool", "Generate Flowchart", self._generate_flowchart))
+        cmds.append(("Tool", "Live Inspector (HUD)", self._open_live_inspector))
         
         SpotlightPalette(self, cmds)
+
+    def _open_live_inspector(self):
+        from automator.gui.live_inspector import LiveInspector
+        if hasattr(self, "_live_inspector") and self._live_inspector.winfo_exists():
+            self._live_inspector.lift()
+        else:
+            self._live_inspector = LiveInspector(self)
 
     def _open_file_switcher(self, event=None):
         if hasattr(self, "_file_switcher") and self._file_switcher.winfo_exists():
