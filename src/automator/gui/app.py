@@ -270,8 +270,8 @@ class AutomatorGUI(ctk.CTk):
         # Mac / Win standard shortcuts
         self.bind("<Command-z>", self._safe_undo)
         self.bind("<Control-z>", self._safe_undo)
-        self.bind("<Command-p>", self._open_file_switcher)
-        self.bind("<Control-p>", self._open_file_switcher)
+        self.bind("<Command-p>", self._open_spotlight)
+        self.bind("<Control-p>", self._open_spotlight)
         self.bind("<Control-Tab>", self._cycle_tabs)
         
         self.bind("<Command-Shift-Z>", self._safe_redo)
@@ -5362,6 +5362,34 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
             next_idx = 0
         self._on_file_select(self._open_tabs[next_idx])
         return "break"
+
+    def _open_spotlight(self, event=None):
+        if self._is_typing(): return
+        
+        from automator.gui.spotlight import SpotlightPalette
+        cmds = []
+        
+        # Files
+        for wf in get_workflow_files():
+            cmds.append(("File", f"Open Workflow: {wf}", lambda w=wf: self._set_file(w)))
+            
+        # Actions
+        for atype, label in ACTION_LABELS.items():
+            cmds.append(("Add Action", f"Add: {label}", lambda t=atype: self._add_action_direct(t)))
+            
+        # Tools
+        cmds.append(("Tool", "Run Current Workflow", self._play_current))
+        cmds.append(("Tool", "Stop Playback", self._stop_playback))
+        cmds.append(("Tool", "Export to Python", self._export_to_python))
+        cmds.append(("Tool", "Global Search", self._open_global_search))
+        cmds.append(("Tool", "Variables Vault", self._open_variables_vault))
+        cmds.append(("Tool", "Restore Backup", self._open_backups_dialog))
+        cmds.append(("Tool", "Breakpoints Manager", self._open_breakpoints_manager))
+        cmds.append(("Tool", "Template Gallery", self._open_template_gallery_dialog))
+        cmds.append(("Tool", "Zen Mode Toggle", self._toggle_zen_mode))
+        cmds.append(("Tool", "Generate Flowchart", self._generate_flowchart))
+        
+        SpotlightPalette(self, cmds)
 
     def _open_file_switcher(self, event=None):
         if hasattr(self, "_file_switcher") and self._file_switcher.winfo_exists():
