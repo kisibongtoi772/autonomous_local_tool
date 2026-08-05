@@ -1008,6 +1008,7 @@ class AutomatorGUI(ctk.CTk):
         
         _btn(tb, "Bulk Edit",  self._toggle_bulk_mode, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Export Group",  self._export_workflow, False).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "🐍 To Python",  self._export_to_python, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Flowchart",  self._generate_flowchart, False).pack(side="left", padx=(8, 0), pady=8)
         self._zen_btn = _btn(tb, "Zen Mode", self._toggle_zen_mode, False)
         self._zen_btn.pack(side="right", padx=(0, 8), pady=8)
@@ -2615,6 +2616,45 @@ class AutomatorGUI(ctk.CTk):
                 _label(row, "(Latest)", size=11, colour=T["ok"]).pack(side="left", padx=4)
                 
             _btn(row, "⏪ Restore", lambda vp=v["path"]: _do_rollback(vp), width=60, fg_color=T["raised"], text_color=T["text"]).pack(side="right", padx=12)
+
+    def _export_to_python(self):
+        if not self._workflow_data or not self._workflow_data.get("actions"):
+            if hasattr(self, "_show_toast"):
+                self._show_toast("⚠️ Kịch bản trống, không có gì để xuất!")
+            return
+            
+        import tkinter.filedialog as tkfd
+        from automator.core.exporter import export_workflow_to_python
+        import os
+        
+        default_name = self._workflow_data.get("name", "script") + ".py"
+        target_path = tkfd.asksaveasfilename(
+            title="Export to Python",
+            initialfile=default_name.replace(" ", "_").lower(),
+            defaultextension=".py",
+            filetypes=[("Python Script", "*.py"), ("All Files", "*.*")]
+        )
+        
+        if not target_path:
+            return
+            
+        try:
+            export_workflow_to_python(self._workflow_data, target_path, TEMPLATES_DIR)
+            if hasattr(self, "_show_toast"):
+                self._show_toast("✅ Xuất code Python thành công!")
+                
+            # Offer to open the folder
+            folder = os.path.dirname(target_path)
+            if os.name == 'posix':
+                os.system(f'open "{folder}"')
+            elif os.name == 'nt':
+                os.startfile(folder)
+                
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to export: {e}")
+            import tkinter.messagebox as tkmb
+            tkmb.showerror("Export Failed", str(e))
 
     def _generate_flowchart(self):
         import webbrowser
