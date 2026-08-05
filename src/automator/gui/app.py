@@ -1047,7 +1047,10 @@ class AutomatorGUI(ctk.CTk):
             text_color=T["text"], font=ctk.CTkFont(*FONT_BODY),
             corner_radius=6
         )
-        search_entry.pack(side="right", padx=8, pady=8)
+        search_entry.pack(side="right", padx=(0, 8), pady=8)
+        
+        self._replace_btn = _btn(tb, "Thay Thế", self._open_replace_dialog, False)
+        self._replace_btn.pack(side="right", padx=(0, 4), pady=8)
 
         # Sticky Breadcrumb Container
         self._breadcrumb_container = ctk.CTkFrame(p, fg_color="transparent")
@@ -2121,6 +2124,57 @@ class AutomatorGUI(ctk.CTk):
             logger.error(f"Export failed: {e}")
             import tkinter.messagebox as tkmb
             tkmb.showerror("Export Failed", str(e))
+
+    def _open_replace_dialog(self):
+        query = self._wf_search_var.get().strip()
+        if not query:
+            if hasattr(self, "_show_toast"):
+                self._show_toast("⚠️ Nhập từ khóa vào ô Filter trước!")
+            return
+            
+        dlg = self._dialog("Find & Replace", "350x220")
+        
+        import customtkinter as ctk
+        
+        lbl = ctk.CTkLabel(dlg, text=f"Replace '{query}' with:", font=ctk.CTkFont("SF Pro Text", 12))
+        lbl.pack(pady=(20, 10))
+        
+        rep_var = ctk.StringVar()
+        entry = ctk.CTkEntry(dlg, textvariable=rep_var, width=250, height=32)
+        entry.pack(pady=10)
+        entry.focus()
+        
+        def on_replace():
+            new_text = rep_var.get()
+            count = 0
+            
+            def m(lst):
+                nonlocal count
+                import re
+                for action in lst:
+                    for k, v in action.items():
+                        if isinstance(v, str) and k not in ("type", "id"):
+                            # Replace ignoring case
+                            pattern = re.compile(re.escape(query), re.IGNORECASE)
+                            new_v = pattern.sub(new_text, v)
+                            if new_v != v:
+                                action[k] = new_v
+                                count += 1
+            
+            self._modify_workflow(m)
+            self._refresh_workflow()
+            dlg.destroy()
+            if hasattr(self, "_show_toast"):
+                self._show_toast(f"✅ Đã thay đổi {count} mục!")
+                
+        btn_frame = ctk.CTkFrame(dlg, fg_color="transparent")
+        btn_frame.pack(pady=20)
+        
+        btn_ok = ctk.CTkButton(btn_frame, text="Replace All", fg_color="#059669", hover_color="#047857", width=120, command=on_replace)
+        btn_ok.pack(side="left", padx=10)
+        
+        btn_cancel = ctk.CTkButton(btn_frame, text="Cancel", fg_color="transparent", border_width=1, width=80, text_color="#9CA3AF", command=dlg.destroy)
+        btn_cancel.pack(side="left", padx=10)
 
     def _import_workflow(self):
         import tkinter.filedialog as tkfd
