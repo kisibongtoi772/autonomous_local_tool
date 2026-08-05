@@ -1025,7 +1025,7 @@ class AutomatorGUI(ctk.CTk):
             self._console_visible = not self._console_visible
             if self._console_visible:
                 self._wf_list.grid(pady=(0, 0))
-                self._console_frame.grid(row=5, column=0, sticky="nsew", padx=24, pady=(12, 24))
+                self._console_frame.grid(row=6, column=0, sticky="nsew", padx=24, pady=(12, 24))
             else:
                 self._console_frame.grid_forget()
                 self._wf_list.grid(pady=(0, 24))
@@ -1087,9 +1087,47 @@ class AutomatorGUI(ctk.CTk):
         # Minimap (Live Tracker)
         import tkinter as tk
         self._minimap = tk.Canvas(p, width=12, bg="#1E1E1E", highlightthickness=0)
-        self._minimap.grid(row=4, column=1, sticky="ns", padx=(0, 24), pady=(0, 24))
+        self._minimap.grid(row=4, column=1, sticky="ns", padx=(0, 24), pady=(0, 8))
         self._wf_list.grid_columnconfigure(2, weight=1)
         p.grid_rowconfigure(4, weight=3)
+        
+        # --- Sticky Quick Add Bar ---
+        self._sticky_qa_bar = ctk.CTkFrame(p, fg_color=T["surface"], corner_radius=6)
+        self._sticky_qa_bar.grid(row=5, column=0, columnspan=2, sticky="ew", padx=24, pady=(0, 16))
+        
+        _label(self._sticky_qa_bar, "Quick Add:", size=11, colour=T["dim"]).pack(side="left", padx=(12, 8), pady=8)
+        
+        def instant_qa(atype, extra=None):
+            def mut(lst):
+                new_act = {"type": atype}
+                if extra: new_act.update(extra)
+                elif atype == "sleep": new_act["duration"] = 1.0
+                elif atype == "click": new_act["x"] = 0; new_act["y"] = 0; new_act["clicks"] = 1
+                elif atype == "type": new_act["key"] = ""
+                elif atype == "assert_template": new_act["template"] = ""
+                
+                idx = getattr(self, "_active_row_idx", None)
+                if idx is not None and 0 <= idx < len(lst):
+                    lst.insert(idx + 1, new_act)
+                    self._active_row_idx = idx + 1
+                else:
+                    lst.append(new_act)
+                    self._active_row_idx = len(lst) - 1
+            self._modify_workflow(mut)
+            self._refresh_workflow()
+            self._set_active_row(self._active_row_idx, self._action_rows[self._active_row_idx])
+            
+        _btn(self._sticky_qa_bar, "⏳ Sleep", lambda: instant_qa("sleep"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
+        _btn(self._sticky_qa_bar, "👆 Click", lambda: instant_qa("click"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
+        _btn(self._sticky_qa_bar, "⌨️ Type", lambda: instant_qa("type"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
+        _btn(self._sticky_qa_bar, "🖼 Image", lambda: instant_qa("assert_template"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
+        
+        def qa_more():
+            idx = getattr(self, "_active_row_idx", None)
+            self._open_add_dialog(insert_idx=(idx + 1) if idx is not None else None, default_type="sleep")
+        _btn(self._sticky_qa_bar, "More...", qa_more, fg_color="transparent", text_color=T["accent"]).pack(side="left", padx=8)
+        
+        p.grid_rowconfigure(5, weight=0)
         
         # --- Interactive Minimap Logic ---
         self._minimap_viewport_id = None
@@ -1273,51 +1311,7 @@ class AutomatorGUI(ctk.CTk):
                 text_color=T["text"], font=ctk.CTkFont("SF Pro Text", 12, "bold"),
                 command=lambda: self._execute_move(len(actions))
             ).pack(pady=4)
-        elif not self._bulk_mode and not query:
-            qa_row = ctk.CTkFrame(self._wf_list, fg_color="transparent")
-            qa_row.pack(fill="x", pady=(12, 4), padx=8)
-            
-            _label(qa_row, "Quick Add:", size=11, colour=T["dim"]).pack(side="left", padx=(0, 8))
-            
-            def instant_qa(atype, extra=None):
-                def mut(lst):
-                    new_act = {"type": atype}
-                    if extra:
-                        new_act.update(extra)
-                    elif atype == "sleep": new_act["duration"] = 1.0
-                    elif atype == "click": new_act["x"] = 0; new_act["y"] = 0; new_act["clicks"] = 1
-                    elif atype == "type": new_act["key"] = ""
-                    elif atype == "assert_template": new_act["template"] = ""
-                    lst.append(new_act)
-                self._modify_workflow(mut)
-                self.after(100, lambda: self._wf_list._parent_canvas.yview_moveto(1.0))
-                
-            if actions:
-                last_type = actions[-1].get("type")
-                suggestion = None
-                if last_type == "app_focus":
-                    suggestion = ("sleep", {"duration": 1.0}, "✨ Sleep 1s")
-                elif last_type in ("wait_for_template", "assert_template"):
-                    suggestion = ("click", {"x": 0, "y": 0, "clicks": 1}, "✨ Click Image")
-                elif last_type == "click":
-                    suggestion = ("sleep", {"duration": 0.5}, "✨ Sleep 0.5s")
-                elif last_type == "type":
-                    suggestion = ("hotkey", {"key": "enter"}, "✨ Press Enter")
-                elif last_type == "hotkey":
-                    suggestion = ("sleep", {"duration": 0.5}, "✨ Sleep 0.5s")
-                
-                if suggestion:
-                    stype, sextra, slabel = suggestion
-                    _btn(qa_row, slabel, lambda t=stype, e=sextra: instant_qa(t, e), fg_color="transparent", border_width=1, border_color="#FFD700", text_color="#FFD700").pack(side="left", padx=(2, 6))
-                
-            _btn(qa_row, "⏳ Sleep", lambda: instant_qa("sleep"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
-            _btn(qa_row, "👆 Click", lambda: instant_qa("click"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
-            _btn(qa_row, "⌨️ Type", lambda: instant_qa("type"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
-            _btn(qa_row, "🖼 Image", lambda: instant_qa("assert_template"), fg_color=T["raised"], text_color=T["text"]).pack(side="left", padx=2)
-            
-            def qa_more():
-                self._open_add_dialog(insert_idx=len(actions), default_type="sleep")
-            _btn(qa_row, "More...", qa_more, fg_color="transparent", text_color=T["accent"]).pack(side="left", padx=8)
+
 
     def _enter_move_mode(self, source_idx: int):
         self._move_source_idx = source_idx
