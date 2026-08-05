@@ -14,6 +14,7 @@ class BaseAction(BaseModel):
         description="Seconds to wait between retries")
     color_tag: Optional[str] = Field(default=None, description="Visual badge color for UI")
     label: Optional[str] = Field(default=None, description="Custom name for this action")
+    repeat: int = Field(default=1, ge=1, description="Number of times to repeat this action inline")
 
 
 class CommentAction(BaseAction):

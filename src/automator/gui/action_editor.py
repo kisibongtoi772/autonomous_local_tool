@@ -295,6 +295,17 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         conf_ent.pack(fill="x")
         conf_ent.insert(0, str(action.get("confidence", 0.8)))
         fields["confidence"] = conf_ent
+
+    adv_row2 = ctk.CTkFrame(form, fg_color="transparent")
+    adv_row2.pack(fill="x", pady=(8, 0))
+    
+    rep_frame = ctk.CTkFrame(adv_row2, fg_color="transparent")
+    rep_frame.pack(side="left", fill="x", expand=True, padx=(0, 4))
+    _label(rep_frame, "Inline Repeat", size=10, colour=T["dim"]).pack(anchor="w", pady=(4, 2))
+    rep_ent = ctk.CTkEntry(rep_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+    rep_ent.pack(fill="x")
+    rep_ent.insert(0, str(action.get("repeat", 1)))
+    fields["repeat"] = rep_ent
     
     # --- Submit Logic ---
     def on_submit():
@@ -302,6 +313,8 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         try:
             upd["retry_count"] = int(rc_ent.get())
             upd["retry_delay"] = float(rd_ent.get())
+            if "repeat" in fields:
+                upd["repeat"] = int(rep_ent.get())
             
             if "confidence" in fields:
                 upd["confidence"] = float(fields["confidence"].get())

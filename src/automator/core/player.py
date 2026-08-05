@@ -181,47 +181,52 @@ class Player:
             if not getattr(action, "enabled", True):
                 continue
 
-            if self.progress_callback is not None:
+            repeat_count = getattr(action, "repeat", 1)
+            for _r in range(max(1, repeat_count)):
+                if self._stop_requested:
+                    return
+
+                if self.progress_callback is not None:
+                    try:
+                        import inspect
+                        sig = inspect.signature(self.progress_callback)
+                        if len(sig.parameters) >= 4:
+                            self.progress_callback(idx_1_based, total_steps, action.model_dump(), self._depth)
+                        else:
+                            self.progress_callback(idx_1_based, total_steps, action.model_dump())
+                    except Exception:
+                        pass
+    
+                # ── Step-by-step confirmation ────────────────────────────────────
+                if self.step_callback is not None:
+                    raw = action.model_dump()
+                    decision = self.step_callback(raw)
+                    if decision == "stop":
+                        self._stop_requested = True
+                        logger.info("Step-by-step: user stopped playback.")
+                        return
+                    if decision == "skip":
+                        logger.info(f"Step-by-step: skipped {action.type}")
+                        break
+    
+                # ── Time offset (scaled by speed) ────────────────────────────────
+                scaled_offset = action.time_offset / self.speed
+                if scaled_offset > 0:
+                    if not self._chunked_sleep(scaled_offset):
+                        return
+    
+                # ── Execute with optional retry & Profile ────────────────────────
+                start_t = time.time()
                 try:
-                    import inspect
-                    sig = inspect.signature(self.progress_callback)
-                    if len(sig.parameters) >= 4:
-                        self.progress_callback(idx_1_based, total_steps, action.model_dump(), self._depth)
-                    else:
-                        self.progress_callback(idx_1_based, total_steps, action.model_dump())
-                except Exception:
-                    pass
-
-            # ── Step-by-step confirmation ────────────────────────────────────
-            if self.step_callback is not None:
-                raw = action.model_dump()
-                decision = self.step_callback(raw)
-                if decision == "stop":
-                    self._stop_requested = True
-                    logger.info("Step-by-step: user stopped playback.")
-                    return
-                if decision == "skip":
-                    logger.info(f"Step-by-step: skipped {action.type}")
-                    continue
-
-            # ── Time offset (scaled by speed) ────────────────────────────────
-            scaled_offset = action.time_offset / self.speed
-            if scaled_offset > 0:
-                if not self._chunked_sleep(scaled_offset):
-                    return
-
-            # ── Execute with optional retry & Profile ────────────────────────
-            start_t = time.time()
-            try:
-                self._execute_with_retry(action)
-            finally:
-                dur = time.time() - start_t
-                self.profiler_data.append({
-                    "step": idx_1_based,
-                    "type": action.type,
-                    "label": getattr(action, "label", None),
-                    "duration": round(dur, 3)
-                })
+                    self._execute_with_retry(action)
+                finally:
+                    dur = time.time() - start_t
+                    self.profiler_data.append({
+                        "step": idx_1_based,
+                        "type": action.type,
+                        "label": getattr(action, "label", None),
+                        "duration": round(dur, 3)
+                    })
 
     def _execute_with_retry(self, action: ActionType):
         max_attempts = 1 + max(0, action.retry_count)
