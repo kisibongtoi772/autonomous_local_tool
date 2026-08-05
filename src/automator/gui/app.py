@@ -1009,6 +1009,7 @@ class AutomatorGUI(ctk.CTk):
         _btn(tb, "Bulk Edit",  self._toggle_bulk_mode, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Export Group",  self._export_workflow, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "🐍 To Python",  self._export_to_python, False).pack(side="left", padx=(8, 0), pady=8)
+        _btn(tb, "🕒 Lịch sử File",  self._open_backups_dialog, False).pack(side="left", padx=(8, 0), pady=8)
         _btn(tb, "Flowchart",  self._generate_flowchart, False).pack(side="left", padx=(8, 0), pady=8)
         self._zen_btn = _btn(tb, "Zen Mode", self._toggle_zen_mode, False)
         self._zen_btn.pack(side="right", padx=(0, 8), pady=8)
@@ -2616,6 +2617,45 @@ class AutomatorGUI(ctk.CTk):
                 _label(row, "(Latest)", size=11, colour=T["ok"]).pack(side="left", padx=4)
                 
             _btn(row, "⏪ Restore", lambda vp=v["path"]: _do_rollback(vp), width=60, fg_color=T["raised"], text_color=T["text"]).pack(side="right", padx=12)
+
+    def _open_backups_dialog(self):
+        import customtkinter as ctk
+        from automator.core.backup import get_backups, restore_backup
+        
+        path = os.path.join(WORKSPACE_DIR, self.file_var.get())
+        backups = get_backups(path)
+        
+        dlg = self._dialog("Lịch sử Phiên bản Kịch bản", "450x400")
+        
+        _label(dlg, f"File: {self.file_var.get()}", size=12, weight="bold").pack(pady=(15, 5))
+        _label(dlg, "Các bản lưu gần nhất (Tối đa 10):", size=10, colour=T["dim"]).pack(pady=(0, 10))
+        
+        sf = ctk.CTkScrollableFrame(dlg, fg_color="transparent")
+        sf.pack(fill="both", expand=True, padx=20, pady=10)
+        
+        if not backups:
+            _label(sf, "Chưa có bản sao lưu nào.", colour=T["dim"]).pack(pady=20)
+            
+        def on_restore(b_path):
+            if restore_backup(path, b_path):
+                self._undo_stack.clear()
+                self._redo_stack.clear()
+                self._refresh_workflow()
+                dlg.destroy()
+                if hasattr(self, "_show_toast"):
+                    self._show_toast("✅ Khôi phục thành công!")
+            else:
+                if hasattr(self, "_show_toast"):
+                    self._show_toast("⚠️ Lỗi khôi phục!", T["err"])
+                    
+        for b in backups:
+            row = ctk.CTkFrame(sf, fg_color=T["raised"], corner_radius=6)
+            row.pack(fill="x", pady=4)
+            _label(row, b["display_time"], size=12).pack(side="left", padx=10, pady=8)
+            ctk.CTkButton(row, text="Restore", width=80, fg_color=T["accent"], 
+                          command=lambda bp=b["path"]: on_restore(bp)).pack(side="right", padx=10, pady=8)
+                          
+        ctk.CTkButton(dlg, text="Close", fg_color="transparent", border_width=1, width=100, command=dlg.destroy).pack(pady=15)
 
     def _export_to_python(self):
         if not self._workflow_data or not self._workflow_data.get("actions"):
