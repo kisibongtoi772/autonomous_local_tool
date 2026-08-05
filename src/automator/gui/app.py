@@ -1770,6 +1770,26 @@ class AutomatorGUI(ctk.CTk):
                 text_color=text_color, font=ctk.CTkFont("SF Pro Text", 11),
                 corner_radius=4, border_width=0, command=cmd
             )
+            
+        # --- Quick Controls Panel ---
+        qc_frame = ctk.CTkFrame(ctrl, fg_color="transparent")
+        qc_frame.pack(side="left", padx=(0, 4))
+        
+        _ctrl_btn(qc_frame, "▶", lambda idx=i: self._test_action(idx), text_color=T["ok"]).pack(side="left", padx=1)
+        
+        if i > 0:
+            _ctrl_btn(qc_frame, "▲", lambda idx=i: self._move_action_up(idx), text_color=T["accent"]).pack(side="left", padx=1)
+        else:
+            _ctrl_btn(qc_frame, "▲", lambda: None, text_color="#333333").pack(side="left", padx=1)
+            
+        if i < total - 1:
+            _ctrl_btn(qc_frame, "▼", lambda idx=i: self._move_action_down(idx), text_color=T["accent"]).pack(side="left", padx=1)
+        else:
+            _ctrl_btn(qc_frame, "▼", lambda: None, text_color="#333333").pack(side="left", padx=1)
+            
+        _sep = ctk.CTkFrame(ctrl, width=1, height=16, fg_color=T["border"])
+        _sep.pack(side="left", padx=(2, 6), pady=4)
+        # ---------------------------
 
         if atype == "loop":
             _ctrl_btn(ctrl, "Mở", lambda idx=i: [self._nav_stack.append((idx, "actions", f"Loop {idx+1}")), self._refresh_workflow()], text_color=T["ok"]).pack(side="left", padx=2)
