@@ -1652,6 +1652,11 @@ class AutomatorGUI(ctk.CTk):
             if retry > 0:
                 _label(top_line, f"[{retry}x]", size=11, colour=T["warn"]).pack(side="left", padx=(8, 0))
                 
+            offset = action.get("time_offset", 0)
+            if offset > 0:
+                _label(top_line, f"⏱ +{offset:.1f}s", size=10, colour=T["accent"]).pack(side="left", padx=(8, 0))
+
+                
             # Render Rich Note (DocString)
             if note:
                 if self._xray_mode_var.get():
@@ -1768,6 +1773,17 @@ class AutomatorGUI(ctk.CTk):
         # --- Quick Controls Panel ---
         qc_frame = ctk.CTkFrame(ctrl, fg_color="transparent")
         qc_frame.pack(side="left", padx=(0, 4))
+        
+        def toggle_enable(idx=i):
+            def m(lst):
+                if 0 <= idx < len(lst):
+                    lst[idx]["enabled"] = not lst[idx].get("enabled", True)
+            self._modify_workflow(m)
+            
+        is_enabled = action.get("enabled", True)
+        btn_text = "✓" if is_enabled else "✕"
+        btn_color = T["ok"] if is_enabled else T["dim"]
+        _ctrl_btn(qc_frame, btn_text, toggle_enable, text_color=btn_color).pack(side="left", padx=1)
         
         _ctrl_btn(qc_frame, "▶", lambda idx=i: self._test_action(idx), text_color=T["ok"]).pack(side="left", padx=1)
         
