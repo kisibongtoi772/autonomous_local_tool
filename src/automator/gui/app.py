@@ -1136,10 +1136,26 @@ class AutomatorGUI(ctk.CTk):
             if not self.winfo_exists() or not self._minimap.winfo_exists(): return
             try:
                 if self._minimap.winfo_ismapped():
+                    h = self._minimap.winfo_height()
+                    if h != getattr(self, "_last_minimap_h", 0) or getattr(self, "_minimap_dirty", False):
+                        self._minimap.delete("action_mark")
+                        visible_acts = getattr(self, "_visible_actions_for_minimap", [])
+                        total = len(visible_acts)
+                        if total > 0:
+                            CAT_COLORS = {
+                                "logic": "#8B5CF6", "interaction": "#3B82F6", "system": "#F59E0B",
+                                "assert": "#10B981", "wait": "#6B7280", "breakpoint": "#FF3B30"
+                            }
+                            for idx, act_cat in enumerate(visible_acts):
+                                y = (idx / total) * h + (h / total) / 2
+                                color = CAT_COLORS.get(act_cat, "#6B7280")
+                                self._minimap.create_line(0, y, 12, y, fill=color, tags="action_mark")
+                        self._last_minimap_h = h
+                        self._minimap_dirty = False
+
                     yv = self._wf_list._parent_canvas.yview()
                     if len(yv) == 2:
                         top, bottom = yv
-                        h = self._minimap.winfo_height()
                         if self._minimap_viewport_id:
                             self._minimap.delete(self._minimap_viewport_id)
                         # Draw translucent viewport indicator
@@ -1303,6 +1319,7 @@ class AutomatorGUI(ctk.CTk):
             
         is_hidden = False
         rendered_count = 0
+        visible_cats = []
         for i, action in enumerate(actions):
             atype = action.get("type", "").lower()
             
@@ -1328,6 +1345,20 @@ class AutomatorGUI(ctk.CTk):
                     
             self._render_action_row(i, action, len(actions))
             rendered_count += 1
+            
+            # Gather minimap data
+            cat = "wait"
+            if atype in ("loop", "group", "if_template", "if_color"): cat = "logic"
+            elif atype in ("click", "type_text", "hotkey", "open_url"): cat = "interaction"
+            elif atype in ("run_command", "run_script", "run_workflow"): cat = "system"
+            elif atype in ("assert_color", "assert_template"): cat = "assert"
+            
+            if action.get("breakpoint"):
+                cat = "breakpoint"
+            visible_cats.append(cat)
+
+        self._visible_actions_for_minimap = visible_cats
+        self._minimap_dirty = True
 
         if query and rendered_count == 0:
             _label(self._wf_list, f"No actions match '{query}'", colour=T["dim"]).pack(pady=30)
