@@ -329,6 +329,17 @@ class AutomatorGUI(ctk.CTk):
         if row_frame.winfo_exists():
             row_frame.configure(fg_color="#262A33", border_width=1, border_color=T["accent"])
             
+            # Intelligent Auto-Scroll to keep active row in view
+            if hasattr(self, "_wf_list") and self._wf_list.winfo_exists():
+                try:
+                    total_items = len(self._action_rows)
+                    if total_items > 5:
+                        target_idx = max(0, idx - 2)
+                        pct = target_idx / total_items
+                        self._wf_list._parent_canvas.yview_moveto(pct)
+                except Exception:
+                    pass
+            
     def _safe_hotkey_copy(self, event):
         if self._is_typing(): return
         if getattr(self, "_active_row_idx", None) is not None:
@@ -1710,6 +1721,15 @@ class AutomatorGUI(ctk.CTk):
                             
                         peek_lbl.bind("<Enter>", on_enter_wf)
                         peek_lbl.bind("<Leave>", self._hide_wf_peek)
+                        
+                        def _open_sub_wf(e=None, f=wf_file):
+                            from .file_switcher import get_workflow_files
+                            if f not in get_workflow_files(): return
+                            self._on_file_select(f)
+                            
+                        open_lbl = ctk.CTkLabel(top_line, text="↪ Open", corner_radius=4, fg_color=T["raised"], text_color=T["ok"], font=ctk.CTkFont("SF Pro Text", 10), cursor="hand2")
+                        open_lbl.pack(side="left", padx=(4, 0))
+                        open_lbl.bind("<Button-1>", _open_sub_wf)
             
             import re
             parts = re.split(r'(\{\{[a-zA-Z0-9_]+\}\})', summary)
@@ -1725,7 +1745,15 @@ class AutomatorGUI(ctk.CTk):
                 warning_frame.pack(anchor="w", fill="x", pady=(2, 0))
                 for w_msg in lint_warnings:
                     lbl_color = T["err"] if "tồn tại" in w_msg and "mẫu" in w_msg else T["warn"]
-                    _label(warning_frame, w_msg, size=11, colour=lbl_color, weight="bold").pack(anchor="w", pady=1)
+                    row_w = ctk.CTkFrame(warning_frame, fg_color="transparent")
+                    row_w.pack(fill="x")
+                    _label(row_w, w_msg, size=11, colour=lbl_color, weight="bold").pack(side="left", pady=1)
+                    if "Workflow" in w_msg and "not found" in w_msg:
+                        wf_match = w_msg.split("'")[1] if "'" in w_msg else None
+                        if wf_match:
+                            def _create_wf(wf=wf_match):
+                                self._quick_create_sub_workflow(wf)
+                            ctk.CTkButton(row_w, text="+ Create", width=40, height=18, fg_color=T["ok"], font=ctk.CTkFont("SF Pro Text", 10), command=_create_wf).pack(side="left", padx=6)
                 
             retry = action.get("retry_count", 0)
             if retry > 0:
