@@ -1697,6 +1697,20 @@ class AutomatorGUI(ctk.CTk):
                             thumb_label.bind("<Enter>", on_enter_thumb)
                             thumb_label.bind("<Leave>", on_leave_thumb)
             
+            elif atype == "run_workflow":
+                wf_file = action.get("workflow_file") or action.get("workflow_name")
+                if wf_file:
+                    wf_path = os.path.join(WORKSPACE_DIR, wf_file)
+                    if os.path.exists(wf_path):
+                        peek_lbl = ctk.CTkLabel(top_line, text="👁 Peek", corner_radius=4, fg_color=T["raised"], text_color=T["accent"], font=ctk.CTkFont("SF Pro Text", 10), cursor="hand2")
+                        peek_lbl.pack(side="left", padx=(8, 0))
+                        
+                        def on_enter_wf(e, path=wf_path):
+                            self._show_wf_peek(e, path)
+                            
+                        peek_lbl.bind("<Enter>", on_enter_wf)
+                        peek_lbl.bind("<Leave>", self._hide_wf_peek)
+            
             import re
             parts = re.split(r'(\{\{[a-zA-Z0-9_]+\}\})', summary)
             for p in parts:
@@ -6280,3 +6294,44 @@ def run_gui():
                     self._minimap.create_rectangle(2, y + 1, 10, y + block_h - 1, fill=color, outline="")
         except Exception:
             pass
+
+    def _show_wf_peek(self, event, path: str):
+        if hasattr(self, "_peek_win") and self._peek_win:
+            self._peek_win.destroy()
+            
+        try:
+            import json, os, tkinter as tk
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            
+            acts = data.get("actions", [])
+            lines = [f"Sub-workflow: {os.path.basename(path)}", f"Total: {len(acts)} actions", "-" * 30]
+            for i, a in enumerate(acts[:7]):
+                atype = a.get('type', '')
+                lines.append(f"{i+1}. {atype}")
+            if len(acts) > 7:
+                lines.append("... (more)")
+                
+            txt = "\n".join(lines)
+            
+            self._peek_win = tk.Toplevel(self)
+            self._peek_win.overrideredirect(True)
+            self._peek_win.attributes("-topmost", True)
+            
+            x = self.winfo_pointerx() + 15
+            y = self.winfo_pointery() + 15
+            self._peek_win.geometry(f"+{x}+{y}")
+            
+            lbl = tk.Label(
+                self._peek_win, text=txt, justify="left",
+                bg="#1F2937", fg="#10B981", font=("Courier", 11),
+                padx=8, pady=8, relief="solid", bd=1
+            )
+            lbl.pack()
+        except Exception:
+            pass
+            
+    def _hide_wf_peek(self, event=None):
+        if hasattr(self, "_peek_win") and self._peek_win:
+            self._peek_win.destroy()
+            self._peek_win = None
