@@ -49,13 +49,13 @@ def _bind_var_injector(widget, app):
 
 def _SmartEntry(app, *args, **kwargs):
     import customtkinter as ctk
-    w = _SmartEntry(app, *args, **kwargs)
+    w = ctk.CTkEntry(*args, **kwargs)
     _bind_var_injector(w, app)
     return w
 
 def _SmartTextbox(app, *args, **kwargs):
     import customtkinter as ctk
-    w = _SmartTextbox(app, *args, **kwargs)
+    w = ctk.CTkTextbox(*args, **kwargs)
     _bind_var_injector(w, app)
     return w
 
@@ -68,18 +68,45 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
     form = ctk.CTkScrollableFrame(dlg, fg_color="transparent")
     form.pack(fill="both", expand=True, padx=20, pady=(16, 2))
     
+
     # Helper to add a label
-    def _lbl(text):
+    def _lbl(parent, text):
         from .components import _label
-        lbl = _label(form, text, size=10, colour=T["dim"])
+        lbl = _label(parent, text, size=10, colour=T["dim"])
         lbl.pack(anchor="w", pady=(8, 2))
+        
+    # --- SMART CONTEXTUAL HELP ---
+    help_texts = {
+        "click": "Mô phỏng click chuột tại tọa độ X, Y. Nếu có chọn Image, sẽ tự động click vào giữa ảnh.",
+        "type": "Gõ văn bản. Chuột phải để chèn Biến. Dùng dấu ngoặc vuông cho phím đặc biệt (VD: [enter]).",
+        "sleep": "Tạm dừng kịch bản trong khoảng thời gian (giây).",
+        "wait_for_template": "Quét màn hình tìm ảnh. Báo lỗi nếu quá thời gian Timeout mà chưa thấy.",
+        "if_template": "Rẽ nhánh: Nếu tìm thấy ảnh trên màn hình thì chạy nhánh Then, ngược lại chạy Else.",
+        "if_color": "Rẽ nhánh: Nếu màu tại X,Y khớp với mã HEX (trong khoảng sai số Tolerance).",
+        "assert_color": "Kiểm tra màu sắc tại X,Y. Nếu sai màu kịch bản sẽ báo lỗi.",
+        "run_command": "Thực thi lệnh ẩn (Terminal). Dùng để gọi script Python hoặc mở app.",
+        "clipboard": "Đọc hoặc Ghi dữ liệu vào Clipboard hệ điều hành.",
+        "prompt_user": "Hiện hộp thoại yêu cầu người dùng nhập thông tin. Có thể lưu kết quả vào Biến.",
+        "loop": "Lặp lại một khối lệnh n lần, hoặc lặp tới khi tìm thấy ảnh/chữ.",
+        "group": "Gom nhóm các lệnh lại cho gọn gàng."
+    }
+    if atype in help_texts:
+        help_f = ctk.CTkFrame(form, fg_color=T["bg"], corner_radius=6, border_width=1, border_color="#059669")
+        help_f.pack(fill="x", pady=(0, 16), ipady=4)
+        lbl = ctk.CTkLabel(
+            help_f, text=f"💡 Hướng dẫn: {help_texts[atype]}",
+            text_color="#10B981", font=ctk.CTkFont("SF Pro Text", 11, "italic"),
+            justify="left", wraplength=380
+        )
+        lbl.pack(fill="x", padx=10, pady=8)
+
         return lbl
         
     fields = {}
     
     # --- Contextual UI ---
     if atype == "sleep":
-        _lbl("Duration (seconds)")
+        _lbl(form, "Duration (seconds)")
         dur = _SmartEntry(app, form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         dur.pack(fill="x")
         dur.insert(0, str(action.get("duration", 1.0)))
@@ -169,7 +196,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         fields["tolerance"] = tol_ent
 
     elif atype in ("wait_for_template", "assert_template", "if_template"):
-        _lbl("Template Image")
+        _lbl(form, "Template Image")
         row = ctk.CTkFrame(form, fg_color="transparent")
         row.pack(fill="x")
         
@@ -221,21 +248,21 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
 
         
         if atype == "wait_for_template":
-            _lbl("Timeout (seconds)")
+            _lbl(form, "Timeout (seconds)")
             timeout_ent = _SmartEntry(app, form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
             timeout_ent.pack(fill="x")
             timeout_ent.insert(0, str(action.get("timeout", 10.0)))
             fields["timeout"] = timeout_ent
             
     elif atype == "group":
-        _lbl("Group Name")
+        _lbl(form, "Group Name")
         grp_ent = _SmartEntry(app, form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         grp_ent.pack(fill="x")
         grp_ent.insert(0, action.get("name", "Group"))
         fields["name"] = grp_ent
         
     elif atype == "loop":
-        _lbl("Condition Type")
+        _lbl(form, "Condition Type")
         cond_type = ctk.StringVar(value=action.get("condition_type", "none"))
         ctk.CTkSegmentedButton(
             form, variable=cond_type,
@@ -251,7 +278,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         count_frame.pack(fill="x")
         
         # Template
-        _lbl("Condition Template (if while/until found)")
+        _lbl(form, "Condition Template (if while/until found)")
         row = ctk.CTkFrame(cond_frame, fg_color="transparent")
         row.pack(fill="x")
         
@@ -300,7 +327,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         ctk.CTkButton(row, text="🎯", width=30, command=on_locate, fg_color="#EF4444", hover_color="#B91C1C", text_color="white").pack(side="left")
         ctk.CTkButton(row, text="🎛 Tune", width=50, command=on_tune, fg_color=T["accent"], text_color=T["text"]).pack(side="left", padx=4)
         
-        _lbl("Fixed Iteration Count (if Condition is 'none')")
+        _lbl(form, "Fixed Iteration Count (if Condition is 'none')")
         count_ent = _SmartEntry(app, count_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         count_ent.pack(fill="x")
         count_ent.insert(0, str(action.get("count", 1)))
@@ -317,7 +344,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         _update_cond_ui()
         
     elif atype == "hotkey":
-        _lbl("Keys (comma separated, e.g. ctrl, c)")
+        _lbl(form, "Keys (comma separated, e.g. ctrl, c)")
         row = ctk.CTkFrame(form, fg_color="transparent")
         row.pack(fill="x")
         key_ent = _SmartEntry(app, row, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
@@ -337,7 +364,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         
     else:
         # Fallback for others
-        _lbl(f"Value for {atype}")
+        _lbl(form, f"Value for {atype}")
         fallback_ent = _SmartEntry(app, form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         fallback_ent.pack(fill="x")
         
@@ -491,14 +518,14 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
                 if atype == "wait_for_template":
                     upd["timeout"] = float(fields["timeout"].get())
             elif atype == "group":
-        _lbl("Group Name")
+        _lbl(form, "Group Name")
         grp_ent = _SmartEntry(app, form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         grp_ent.pack(fill="x")
         grp_ent.insert(0, action.get("name", "Group"))
         fields["name"] = grp_ent
         
     elif atype == "loop":
-        _lbl("Condition Type")
+        _lbl(form, "Condition Type")
         cond_type = ctk.StringVar(value=action.get("condition_type", "none"))
         ctk.CTkSegmentedButton(
             form, variable=cond_type,
@@ -514,7 +541,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         count_frame.pack(fill="x")
         
         # Template
-        _lbl("Condition Template (if while/until found)")
+        _lbl(form, "Condition Template (if while/until found)")
         row = ctk.CTkFrame(cond_frame, fg_color="transparent")
         row.pack(fill="x")
         
@@ -563,7 +590,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         ctk.CTkButton(row, text="🎯", width=30, command=on_locate, fg_color="#EF4444", hover_color="#B91C1C", text_color="white").pack(side="left")
         ctk.CTkButton(row, text="🎛 Tune", width=50, command=on_tune, fg_color=T["accent"], text_color=T["text"]).pack(side="left", padx=4)
         
-        _lbl("Fixed Iteration Count (if Condition is 'none')")
+        _lbl(form, "Fixed Iteration Count (if Condition is 'none')")
         count_ent = _SmartEntry(app, count_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         count_ent.pack(fill="x")
         count_ent.insert(0, str(action.get("count", 1)))
