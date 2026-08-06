@@ -4,6 +4,61 @@ import copy
 from typing import Callable
 from ..utils.config import T, FONT_BODY
 
+def _bind_var_injector(widget, app):
+    import tkinter as tk
+    def show_menu(event):
+        menu = tk.Menu(widget, tearoff=0)
+        var_menu = tk.Menu(menu, tearoff=0)
+        
+        def insert_var(v):
+            text = f"{{{{{v}}}}}"
+            try:
+                import customtkinter as ctk
+                if isinstance(widget, ctk.CTkTextbox):
+                    widget.insert(tk.INSERT, text)
+                else:
+                    try:
+                        idx = widget.index(tk.INSERT)
+                        widget.insert(idx, text)
+                    except:
+                        widget.insert("end", text)
+            except Exception as e:
+                print("Inject error:", e)
+                
+        var_menu.add_command(label="📋 CLIPBOARD", command=lambda: insert_var("CLIPBOARD"))
+        var_menu.add_command(label="🕒 TIME", command=lambda: insert_var("TIME"))
+        var_menu.add_command(label="📅 DATE", command=lambda: insert_var("DATE"))
+        var_menu.add_command(label="🕰 DATETIME", command=lambda: insert_var("DATETIME"))
+        
+        vars_dict = getattr(app, "var_manager", None)
+        if vars_dict:
+            custom = vars_dict.get_all()
+            if custom:
+                var_menu.add_separator()
+                for k in custom.keys():
+                    var_menu.add_command(label=f"@{k}", command=lambda v=k: insert_var(v))
+                    
+        menu.add_cascade(label="✨ Insert Variable...", menu=var_menu)
+        menu.add_separator()
+        menu.add_command(label="Copy", command=lambda: widget.event_generate("<<Copy>>"))
+        menu.add_command(label="Paste", command=lambda: widget.event_generate("<<Paste>>"))
+        menu.tk_popup(event.x_root, event.y_root)
+        
+    widget.bind("<Button-3>", show_menu)
+    widget.bind("<Button-2>", show_menu)
+
+def _SmartEntry(app, *args, **kwargs):
+    import customtkinter as ctk
+    w = _SmartEntry(app, *args, **kwargs)
+    _bind_var_injector(w, app)
+    return w
+
+def _SmartTextbox(app, *args, **kwargs):
+    import customtkinter as ctk
+    w = _SmartTextbox(app, *args, **kwargs)
+    _bind_var_injector(w, app)
+    return w
+
 def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], None]):
     """Smart Form Builder for editing actions with type-specific UI."""
     atype = action.get("type", "unknown")
@@ -25,7 +80,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
     # --- Contextual UI ---
     if atype == "sleep":
         _lbl("Duration (seconds)")
-        dur = ctk.CTkEntry(form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        dur = _SmartEntry(app, form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         dur.pack(fill="x")
         dur.insert(0, str(action.get("duration", 1.0)))
         fields["duration"] = dur
@@ -38,7 +93,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         x_frame.pack(side="left", fill="x", expand=True, padx=(0, 4))
         from .components import _label
         _label(x_frame, "X Coordinate", size=10, colour=T["dim"]).pack(anchor="w", pady=(8, 2))
-        x_ent = ctk.CTkEntry(x_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        x_ent = _SmartEntry(app, x_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         x_ent.pack(fill="x")
         x_ent.insert(0, str(action.get("x", 0)))
         fields["x"] = x_ent
@@ -46,7 +101,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         y_frame = ctk.CTkFrame(row, fg_color="transparent")
         y_frame.pack(side="left", fill="x", expand=True, padx=(4, 0))
         _label(y_frame, "Y Coordinate", size=10, colour=T["dim"]).pack(anchor="w", pady=(8, 2))
-        y_ent = ctk.CTkEntry(y_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        y_ent = _SmartEntry(app, y_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         y_ent.pack(fill="x")
         y_ent.insert(0, str(action.get("y", 0)))
         fields["y"] = y_ent
@@ -68,7 +123,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         row = ctk.CTkFrame(form, fg_color="transparent")
         row.pack(fill="x")
         
-        tpl_ent = ctk.CTkEntry(row, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        tpl_ent = _SmartEntry(app, row, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         tpl_ent.pack(side="left", fill="x", expand=True)
         tpl_ent.insert(0, action.get("template", ""))
         fields["template"] = tpl_ent
@@ -117,14 +172,14 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         
         if atype == "wait_for_template":
             _lbl("Timeout (seconds)")
-            timeout_ent = ctk.CTkEntry(form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+            timeout_ent = _SmartEntry(app, form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
             timeout_ent.pack(fill="x")
             timeout_ent.insert(0, str(action.get("timeout", 10.0)))
             fields["timeout"] = timeout_ent
             
     elif atype == "group":
         _lbl("Group Name")
-        grp_ent = ctk.CTkEntry(form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        grp_ent = _SmartEntry(app, form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         grp_ent.pack(fill="x")
         grp_ent.insert(0, action.get("name", "Group"))
         fields["name"] = grp_ent
@@ -150,7 +205,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         row = ctk.CTkFrame(cond_frame, fg_color="transparent")
         row.pack(fill="x")
         
-        tpl_ent = ctk.CTkEntry(row, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        tpl_ent = _SmartEntry(app, row, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         tpl_ent.pack(side="left", fill="x", expand=True)
         tpl_ent.insert(0, action.get("condition_template", ""))
         fields["condition_template"] = tpl_ent
@@ -196,7 +251,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         ctk.CTkButton(row, text="🎛 Tune", width=50, command=on_tune, fg_color=T["accent"], text_color=T["text"]).pack(side="left", padx=4)
         
         _lbl("Fixed Iteration Count (if Condition is 'none')")
-        count_ent = ctk.CTkEntry(count_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        count_ent = _SmartEntry(app, count_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         count_ent.pack(fill="x")
         count_ent.insert(0, str(action.get("count", 1)))
         fields["count"] = count_ent
@@ -215,7 +270,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         _lbl("Keys (comma separated, e.g. ctrl, c)")
         row = ctk.CTkFrame(form, fg_color="transparent")
         row.pack(fill="x")
-        key_ent = ctk.CTkEntry(row, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        key_ent = _SmartEntry(app, row, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         key_ent.pack(side="left", fill="x", expand=True)
         key_ent.insert(0, ",".join(action.get("keys", [])))
         fields["keys"] = key_ent
@@ -233,7 +288,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
     else:
         # Fallback for others
         _lbl(f"Value for {atype}")
-        fallback_ent = ctk.CTkEntry(form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        fallback_ent = _SmartEntry(app, form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         fallback_ent.pack(fill="x")
         
         # Determine current generic string value
@@ -274,7 +329,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
     rc_frame = ctk.CTkFrame(adv_row, fg_color="transparent")
     rc_frame.pack(side="left", fill="x", expand=True, padx=(0, 4))
     _label(rc_frame, "Retry Count", size=10, colour=T["dim"]).pack(anchor="w", pady=(4, 2))
-    rc_ent = ctk.CTkEntry(rc_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+    rc_ent = _SmartEntry(app, rc_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
     rc_ent.pack(fill="x")
     rc_ent.insert(0, str(action.get("retry_count", 0)))
     fields["retry_count"] = rc_ent
@@ -282,7 +337,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
     rd_frame = ctk.CTkFrame(adv_row, fg_color="transparent")
     rd_frame.pack(side="left", fill="x", expand=True, padx=(4, 0))
     _label(rd_frame, "Retry Delay (s)", size=10, colour=T["dim"]).pack(anchor="w", pady=(4, 2))
-    rd_ent = ctk.CTkEntry(rd_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+    rd_ent = _SmartEntry(app, rd_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
     rd_ent.pack(fill="x")
     rd_ent.insert(0, str(action.get("retry_delay", 0.5)))
     fields["retry_delay"] = rd_ent
@@ -291,7 +346,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         conf_frame = ctk.CTkFrame(adv_row, fg_color="transparent")
         conf_frame.pack(side="left", fill="x", expand=True, padx=(4, 0))
         _label(conf_frame, "Confidence", size=10, colour=T["dim"]).pack(anchor="w", pady=(4, 2))
-        conf_ent = ctk.CTkEntry(conf_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        conf_ent = _SmartEntry(app, conf_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         conf_ent.pack(fill="x")
         conf_ent.insert(0, str(action.get("confidence", 0.8)))
         fields["confidence"] = conf_ent
@@ -302,7 +357,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
     rep_frame = ctk.CTkFrame(adv_row2, fg_color="transparent")
     rep_frame.pack(side="left", fill="x", expand=True, padx=(0, 4))
     _label(rep_frame, "Inline Repeat", size=10, colour=T["dim"]).pack(anchor="w", pady=(4, 2))
-    rep_ent = ctk.CTkEntry(rep_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+    rep_ent = _SmartEntry(app, rep_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
     rep_ent.pack(fill="x")
     rep_ent.insert(0, str(action.get("repeat", 1)))
     fields["repeat"] = rep_ent
@@ -337,7 +392,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
                     upd["timeout"] = float(fields["timeout"].get())
             elif atype == "group":
         _lbl("Group Name")
-        grp_ent = ctk.CTkEntry(form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        grp_ent = _SmartEntry(app, form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         grp_ent.pack(fill="x")
         grp_ent.insert(0, action.get("name", "Group"))
         fields["name"] = grp_ent
@@ -363,7 +418,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         row = ctk.CTkFrame(cond_frame, fg_color="transparent")
         row.pack(fill="x")
         
-        tpl_ent = ctk.CTkEntry(row, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        tpl_ent = _SmartEntry(app, row, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         tpl_ent.pack(side="left", fill="x", expand=True)
         tpl_ent.insert(0, action.get("condition_template", ""))
         fields["condition_template"] = tpl_ent
@@ -409,7 +464,7 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         ctk.CTkButton(row, text="🎛 Tune", width=50, command=on_tune, fg_color=T["accent"], text_color=T["text"]).pack(side="left", padx=4)
         
         _lbl("Fixed Iteration Count (if Condition is 'none')")
-        count_ent = ctk.CTkEntry(count_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        count_ent = _SmartEntry(app, count_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
         count_ent.pack(fill="x")
         count_ent.insert(0, str(action.get("count", 1)))
         fields["count"] = count_ent
