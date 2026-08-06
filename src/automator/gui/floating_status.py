@@ -84,16 +84,56 @@ class FloatingStatus(ctk.CTkToplevel):
             )
             self.vars_btn.pack(side="right", padx=(0, 2))
         
+        self._is_expanded = False
+        
+        # Expand Logs Button
+        self.expand_btn = ctk.CTkButton(
+            self.main_frame, text="▼", width=28, height=28,
+            fg_color="transparent", hover_color="#374151",
+            text_color="#9CA3AF", font=ctk.CTkFont("SF Pro Text", 12),
+            corner_radius=14, command=self._toggle_expand
+        )
+        self.expand_btn.pack(side="right", padx=(0, 2))
+        
+        # Log Box Frame (Hidden initially)
+        self.log_frame = ctk.CTkFrame(self, fg_color="#111827", corner_radius=12, border_width=1, border_color="#374151")
+        
+        self.log_box = ctk.CTkTextbox(
+            self.log_frame, fg_color="transparent", text_color="#10B981", 
+            font=ctk.CTkFont("SF Pro Text", 11), wrap="word", state="disabled"
+        )
+        self.log_box.pack(fill="both", expand=True, padx=8, pady=8)
+        
         self._is_blinking = True
         self._blink_id = None
         
         self._blink_dot()
         
+    def _toggle_expand(self):
+        self._is_expanded = not self._is_expanded
+        if self._is_expanded:
+            self.geometry("380x200")
+            self.expand_btn.configure(text="▲", fg_color="#374151")
+            self.log_frame.pack(fill="both", expand=True, pady=(4, 0))
+        else:
+            self.geometry("380x48")
+            self.expand_btn.configure(text="▼", fg_color="transparent")
+            self.log_frame.pack_forget()
+
     def update_status(self, text: str):
         if not self.winfo_exists():
             return
         if self._is_paused:
             text = f"[PAUSED] {text}"
+            
+        # Append to log box
+        import datetime
+        ts = datetime.datetime.now().strftime("%H:%M:%S")
+        self.log_box.configure(state="normal")
+        self.log_box.insert("end", f"[{ts}] {text}\n")
+        self.log_box.see("end")
+        self.log_box.configure(state="disabled")
+        
         if len(text) > 35:
             text = text[:32] + "..."
         self.status_label.configure(text=text)
