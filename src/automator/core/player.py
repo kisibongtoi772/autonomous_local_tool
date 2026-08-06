@@ -94,6 +94,10 @@ class Player:
         self._paused = True
         logger.info("Player: Playback paused.")
 
+    def step(self):
+        self.step_once = True
+        self.resume()
+
     def resume(self):
         self._paused = False
         logger.info("Player: Playback resumed.")
@@ -169,8 +173,14 @@ class Player:
             action = actions[i]
             idx_1_based = i + 1
 
-            if getattr(action, "breakpoint", False):
-                logger.info(f"⏸ Breakpoint hit at action {idx_1_based}")
+            is_breakpoint = getattr(action, "breakpoint", False)
+            if is_breakpoint or getattr(self, "step_once", False):
+                self.step_once = False
+                if is_breakpoint:
+                    logger.info(f"⏸ Breakpoint hit at action {idx_1_based}")
+                else:
+                    logger.info(f"👉 Stepped into action {idx_1_based}")
+                    
                 if self.breakpoint_callback:
                     self.breakpoint_callback(idx_1_based)
                 self.pause()

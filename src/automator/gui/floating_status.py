@@ -10,6 +10,7 @@ class FloatingStatus(ctk.CTkToplevel):
         self.on_stop = on_stop
         self.on_pause = on_pause
         self.on_resume = on_resume
+        self.on_step = on_step
         self.on_view_vars = on_view_vars
         self._is_paused = False
         
@@ -167,6 +168,10 @@ class FloatingStatus(ctk.CTkToplevel):
         if self.on_stop:
             self.on_stop()
             
+    def _handle_step(self):
+        if self.on_step:
+            self.on_step()
+
     def force_pause(self):
         if not self._is_paused:
             self._handle_pause_resume()

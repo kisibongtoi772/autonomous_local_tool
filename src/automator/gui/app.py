@@ -4956,6 +4956,10 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
         def _on_resume():
             if hasattr(self, "_player") and self._player:
                 self._player.resume()
+                
+        def _on_step():
+            if hasattr(self, "_player") and self._player:
+                self._player.step()
         def _on_view_vars():
             if not hasattr(self, "_player") or not self._player: return
             
@@ -5037,7 +5041,7 @@ python3 -c "from src.automator.core.player import Player; Player('{os.path.join(
             ctk.CTkButton(dlg, text="Close", command=dlg.destroy, width=100).pack(pady=10)
 
         self._floating_status = FloatingStatus(
-            self, on_stop=self._stop_playback, on_pause=_on_pause, on_resume=_on_resume, on_view_vars=_on_view_vars
+            self, on_stop=self._stop_playback, on_pause=_on_pause, on_resume=_on_resume, on_view_vars=_on_view_vars, on_step=_on_step
         )
 
         def run():
