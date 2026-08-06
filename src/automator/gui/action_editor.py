@@ -118,6 +118,56 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
         btn = ctk.CTkButton(form, text="🎯 Locate on Screen", command=on_locate, fg_color=T["raised"], hover_color=T["hover"], text_color=T["text"])
         btn.pack(fill="x", pady=12)
         
+    elif atype in ("assert_color", "if_color"):
+        row = ctk.CTkFrame(form, fg_color="transparent")
+        row.pack(fill="x")
+        
+        x_frame = ctk.CTkFrame(row, fg_color="transparent")
+        x_frame.pack(side="left", fill="x", expand=True, padx=(0, 4))
+        _lbl(x_frame, "X:")
+        x_ent = _SmartEntry(app, x_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        x_ent.pack(fill="x")
+        x_ent.insert(0, str(action.get("x", 0)))
+        fields["x"] = x_ent
+        
+        y_frame = ctk.CTkFrame(row, fg_color="transparent")
+        y_frame.pack(side="left", fill="x", expand=True, padx=(4, 0))
+        _lbl(y_frame, "Y:")
+        y_ent = _SmartEntry(app, y_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        y_ent.pack(fill="x")
+        y_ent.insert(0, str(action.get("y", 0)))
+        fields["y"] = y_ent
+        
+        c_frame = ctk.CTkFrame(form, fg_color="transparent")
+        c_frame.pack(fill="x", pady=(12, 0))
+        _lbl(c_frame, "Color (HEX):")
+        
+        c_row = ctk.CTkFrame(c_frame, fg_color="transparent")
+        c_row.pack(fill="x")
+        
+        col_ent = _SmartEntry(app, c_row, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        col_ent.pack(side="left", fill="x", expand=True)
+        col_ent.insert(0, action.get("color", "#FFFFFF"))
+        fields["color"] = col_ent
+        
+        def on_pick_color():
+            from .pickers import ColorPicker
+            dlg.withdraw()
+            def cb(x, y, hex_col):
+                x_ent.delete(0, "end"); x_ent.insert(0, str(x))
+                y_ent.delete(0, "end"); y_ent.insert(0, str(y))
+                col_ent.delete(0, "end"); col_ent.insert(0, hex_col)
+                dlg.deiconify()
+            ColorPicker(app, cb, lambda: dlg.deiconify())
+            
+        ctk.CTkButton(c_row, text="🎨 Pick", width=60, command=on_pick_color, fg_color=T["raised"]).pack(side="left", padx=(4, 0))
+        
+        _lbl(form, "Tolerance (0-255):")
+        tol_ent = _SmartEntry(app, form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        tol_ent.pack(fill="x")
+        tol_ent.insert(0, str(action.get("tolerance", 10)))
+        fields["tolerance"] = tol_ent
+
     elif atype in ("wait_for_template", "assert_template", "if_template"):
         _lbl("Template Image")
         row = ctk.CTkFrame(form, fg_color="transparent")
@@ -386,7 +436,57 @@ def open_action_editor(app, idx: int, action: dict, on_save: Callable[[dict], No
             elif atype == "click":
                 upd["x"] = int(fields["x"].get())
                 upd["y"] = int(fields["y"].get())
-            elif atype in ("wait_for_template", "assert_template", "if_template"):
+            elif atype in ("assert_color", "if_color"):
+        row = ctk.CTkFrame(form, fg_color="transparent")
+        row.pack(fill="x")
+        
+        x_frame = ctk.CTkFrame(row, fg_color="transparent")
+        x_frame.pack(side="left", fill="x", expand=True, padx=(0, 4))
+        _lbl(x_frame, "X:")
+        x_ent = _SmartEntry(app, x_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        x_ent.pack(fill="x")
+        x_ent.insert(0, str(action.get("x", 0)))
+        fields["x"] = x_ent
+        
+        y_frame = ctk.CTkFrame(row, fg_color="transparent")
+        y_frame.pack(side="left", fill="x", expand=True, padx=(4, 0))
+        _lbl(y_frame, "Y:")
+        y_ent = _SmartEntry(app, y_frame, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        y_ent.pack(fill="x")
+        y_ent.insert(0, str(action.get("y", 0)))
+        fields["y"] = y_ent
+        
+        c_frame = ctk.CTkFrame(form, fg_color="transparent")
+        c_frame.pack(fill="x", pady=(12, 0))
+        _lbl(c_frame, "Color (HEX):")
+        
+        c_row = ctk.CTkFrame(c_frame, fg_color="transparent")
+        c_row.pack(fill="x")
+        
+        col_ent = _SmartEntry(app, c_row, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        col_ent.pack(side="left", fill="x", expand=True)
+        col_ent.insert(0, action.get("color", "#FFFFFF"))
+        fields["color"] = col_ent
+        
+        def on_pick_color():
+            from .pickers import ColorPicker
+            dlg.withdraw()
+            def cb(x, y, hex_col):
+                x_ent.delete(0, "end"); x_ent.insert(0, str(x))
+                y_ent.delete(0, "end"); y_ent.insert(0, str(y))
+                col_ent.delete(0, "end"); col_ent.insert(0, hex_col)
+                dlg.deiconify()
+            ColorPicker(app, cb, lambda: dlg.deiconify())
+            
+        ctk.CTkButton(c_row, text="🎨 Pick", width=60, command=on_pick_color, fg_color=T["raised"]).pack(side="left", padx=(4, 0))
+        
+        _lbl(form, "Tolerance (0-255):")
+        tol_ent = _SmartEntry(app, form, fg_color=T["raised"], text_color=T["text"], border_color=T["border"])
+        tol_ent.pack(fill="x")
+        tol_ent.insert(0, str(action.get("tolerance", 10)))
+        fields["tolerance"] = tol_ent
+
+    elif atype in ("wait_for_template", "assert_template", "if_template"):
                 upd["template"] = fields["template"].get()
                 if atype == "wait_for_template":
                     upd["timeout"] = float(fields["timeout"].get())

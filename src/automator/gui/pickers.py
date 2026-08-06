@@ -308,3 +308,51 @@ class RegionPicker(ctk.CTkToplevel):
         self.destroy()
         self.on_complete(None)
 
+
+
+class ColorPicker(ctk.CTkToplevel):
+    def __init__(self, parent, on_complete, on_cancel):
+        super().__init__(parent)
+        self.on_complete = on_complete
+        self.on_cancel = on_cancel
+        self.title("Pick Color")
+        
+        self.attributes('-fullscreen', True)
+        self.attributes('-topmost', True)
+        self.overrideredirect(True)
+        self.configure(cursor="cross")
+        
+        try:
+            self.attributes('-alpha', 0.3)
+            self.config(bg="black")
+            canvas_bg = "black"
+        except Exception:
+            self.attributes("-alpha", 0.3)
+            canvas_bg = "black"
+            
+        self.canvas = tk.Canvas(self, bg=canvas_bg, highlightthickness=0, cursor="cross")
+        self.canvas.pack(fill="both", expand=True)
+        
+        self.canvas.create_text(
+            self.winfo_screenwidth()//2, 50,
+            text="Click anywhere to pick a color. Press ESC to cancel.",
+            fill="white", font=("Arial", 24, "bold")
+        )
+        
+        self.bind("<ButtonRelease-1>", self.on_click)
+        self.bind("<Escape>", lambda e: self.cancel())
+        
+    def on_click(self, event):
+        x, y = event.x_root, event.y_root
+        import pyautogui
+        try:
+            r, g, b = pyautogui.pixel(x, y)
+            hex_color = f"#{r:02x}{g:02x}{b:02x}".upper()
+        except Exception:
+            hex_color = "#000000"
+        self.destroy()
+        self.on_complete(x, y, hex_color)
+        
+    def cancel(self):
+        self.destroy()
+        self.on_cancel()
