@@ -1264,6 +1264,25 @@ class AutomatorGUI(ctk.CTk):
             command=self._refresh_workflow, width=80, height=20, switch_width=32, switch_height=16,
             progress_color=T["accent"], font=ctk.CTkFont(*FONT_SM)
         ).pack(side="right", padx=16)
+        
+        # --- SMART CATEGORY FILTER ---
+        self._category_filter = getattr(self, "_category_filter", "all")
+        filter_frame = ctk.CTkFrame(self._breadcrumb_bar, fg_color="transparent")
+        filter_frame.pack(side="right", padx=(0, 24))
+        
+        cats = [("All", "all"), ("Mouse/Key", "interaction"), ("Logic", "logic"), ("System", "system")]
+        for label, val in cats:
+            is_active = (self._category_filter == val)
+            color = T["surface"] if is_active else "transparent"
+            tcolor = T["text"] if is_active else T["dim"]
+            btn = ctk.CTkButton(
+                filter_frame, text=label, width=40, height=24,
+                fg_color=color, hover_color=T["hover"],
+                text_color=tcolor, font=ctk.CTkFont("SF Pro Text", 11, "bold" if is_active else "normal"),
+                corner_radius=12,
+                command=lambda v=val: self._set_category_filter(v)
+            )
+            btn.pack(side="left", padx=2)
                  
         _label(self._breadcrumb_bar, f"  ({len(actions)} actions)", size=11, colour=T["dim"], slant="italic").pack(side="left", padx=(8, 0))
                  
@@ -1296,6 +1315,17 @@ class AutomatorGUI(ctk.CTk):
             summary = self._action_summary(action.get("type", ""), action).lower()
             if query and query not in atype and query not in summary and query not in str(action).lower():
                 continue
+                
+            if getattr(self, "_category_filter", "all") != "all":
+                cat = "wait"
+                if atype in ("loop", "group", "if_template", "if_color"): cat = "logic"
+                elif atype in ("click", "type_text", "hotkey", "open_url"): cat = "interaction"
+                elif atype in ("run_command", "run_script", "run_workflow"): cat = "system"
+                elif atype in ("assert_color", "assert_template"): cat = "assert"
+                
+                if cat != self._category_filter:
+                    continue
+                    
             self._render_action_row(i, action, len(actions))
             rendered_count += 1
 
@@ -1374,6 +1404,10 @@ class AutomatorGUI(ctk.CTk):
             if 0 <= idx < len(lst) - 1:
                 lst[idx], lst[idx+1] = lst[idx+1], lst[idx]
         self._modify_workflow(m)
+        self._refresh_workflow()
+
+    def _set_category_filter(self, val):
+        self._category_filter = val
         self._refresh_workflow()
 
     def _render_action_row(self, i: int, action: dict, total: int):
